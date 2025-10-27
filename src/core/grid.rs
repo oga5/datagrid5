@@ -23,6 +23,14 @@ pub struct Grid {
     pub row_header_width: f32,
     pub col_header_height: f32,
     pub show_headers: bool,
+
+    // Sort state
+    pub sort_column: Option<usize>,
+    pub sort_ascending: bool,
+
+    // Freeze state
+    pub frozen_rows: usize,
+    pub frozen_cols: usize,
 }
 
 impl Grid {
@@ -42,6 +50,10 @@ impl Grid {
             row_header_width: 60.0,
             col_header_height: 30.0,
             show_headers: true,
+            sort_column: None,
+            sort_ascending: true,
+            frozen_rows: 0,
+            frozen_cols: 0,
         }
     }
 
@@ -306,6 +318,74 @@ impl Grid {
             self.col_widths.remove(index);
         }
         self.cols -= 1;
+    }
+
+    /// Sort grid by column
+    pub fn sort_by_column(&mut self, col: usize, ascending: bool) {
+        if col >= self.cols {
+            return;
+        }
+
+        // Store sort state
+        self.sort_column = Some(col);
+        self.sort_ascending = ascending;
+
+        // Collect all row indices and their values in the sort column
+        let mut row_values: Vec<(usize, CellValue)> = Vec::new();
+
+        for row in 0..self.rows {
+            let value = self.get_value(row, col).clone();
+            row_values.push((row, value));
+        }
+
+        // Sort rows based on column values
+        row_values.sort_by(|(_, a), (_, b)| {
+            let cmp = match (a, b) {
+                (CellValue::Number(na), CellValue::Number(nb)) => {
+                    na.partial_cmp(nb).unwrap_or(std::cmp::Ordering::Equal)
+                }
+                (CellValue::Boolean(ba), CellValue::Boolean(bb)) => ba.cmp(bb),
+                (CellValue::Text(ta), CellValue::Text(tb)) => ta.cmp(tb),
+                (CellValue::Empty, CellValue::Empty) => std::cmp::Ordering::Equal,
+                (CellValue::Empty, _) => std::cmp::Ordering::Greater, // Empty values go to the end
+                (_, CellValue::Empty) => std::cmp::Ordering::Less,
+                // Mixed types: Number < Boolean < Text
+                (CellValue::Number(_), _) => std::cmp::Ordering::Less,
+                (_, CellValue::Number(_)) => std::cmp::Ordering::Greater,
+                (CellValue::Boolean(_), CellValue::Text(_)) => std::cmp::Ordering::Less,
+                (CellValue::Text(_), CellValue::Boolean(_)) => std::cmp::Ordering::Greater,
+            };
+
+            if ascending {
+                cmp
+            } else {
+                cmp.reverse()
+            }
+        });
+
+        // Create mapping from old row to new row
+        let mut row_mapping: HashMap<usize, usize> = HashMap::new();
+        for (new_row, (old_row, _)) in row_values.iter().enumerate() {
+            row_mapping.insert(*old_row, new_row);
+        }
+
+        // Remap all cells to new row positions
+        let mut new_cells = HashMap::new();
+        for ((old_row, col_idx), cell) in self.cells.drain() {
+            if let Some(&new_row) = row_mapping.get(&old_row) {
+                new_cells.insert((new_row, col_idx), cell);
+            }
+        }
+        self.cells = new_cells;
+
+        // Remap row heights
+        let mut new_row_heights = vec![self.default_row_height; self.rows];
+        for (old_row, new_row) in row_mapping {
+            if old_row < self.row_heights.len() && new_row < new_row_heights.len() {
+                new_row_heights[new_row] = self.row_heights[old_row];
+            }
+        }
+        self.row_heights = new_row_heights;
     }
 }
 

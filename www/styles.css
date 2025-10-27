@@ -116,10 +116,16 @@ button:active {
 
 .search-panel {
     display: flex;
+    flex-direction: column;
     gap: 10px;
     padding: 15px 30px;
     background: #f0f4ff;
     border-bottom: 1px solid #e0e0e0;
+}
+
+.search-row {
+    display: flex;
+    gap: 10px;
     align-items: center;
 }
 

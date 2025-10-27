@@ -90,6 +90,16 @@ impl TextRenderer {
 
     /// Render all visible text in the grid
     pub fn render(&self, grid: &Grid, viewport: &Viewport) {
+        self.render_with_search(grid, viewport, &[], None);
+    }
+
+    pub fn render_with_search(
+        &self,
+        grid: &Grid,
+        viewport: &Viewport,
+        search_results: &[(usize, usize)],
+        current_search_index: Option<usize>
+    ) {
         // Clear canvas first
         self.clear(viewport.canvas_width, viewport.canvas_height);
 
@@ -106,13 +116,26 @@ impl TextRenderer {
         // Render visible cells
         for row in first_row..=last_row {
             for col in first_col..=last_col {
-                self.render_cell(grid, viewport, row, col);
+                self.render_cell_with_search(grid, viewport, row, col, search_results, current_search_index);
             }
         }
     }
 
     /// Render a single cell's text
     fn render_cell(&self, grid: &Grid, viewport: &Viewport, row: usize, col: usize) {
+        self.render_cell_with_search(grid, viewport, row, col, &[], None);
+    }
+
+    /// Render a single cell's text with search highlighting
+    fn render_cell_with_search(
+        &self,
+        grid: &Grid,
+        viewport: &Viewport,
+        row: usize,
+        col: usize,
+        search_results: &[(usize, usize)],
+        current_search_index: Option<usize>
+    ) {
         let text = grid.get_value_string(row, col);
         if text.is_empty() {
             return;
@@ -143,12 +166,38 @@ impl TextRenderer {
         let cell = grid.get_cell(row, col);
         let is_selected = cell.map(|c| c.selected).unwrap_or(false);
 
-        // Draw cell background (custom color or selection)
+        // Check if this cell is a search result
+        let is_search_match = search_results.contains(&(row, col));
+        let is_current_match = if let Some(idx) = current_search_index {
+            idx < search_results.len() && search_results[idx] == (row, col)
+        } else {
+            false
+        };
+
+        // Draw cell background (priority: custom color > current search > search match > selection > default)
         if let Some(cell) = cell {
             if let Some(bg_color) = cell.bg_color {
-                // Use custom background color
+                // Use custom background color (highest priority)
                 let bg_str = u32_to_rgba_string(bg_color);
                 self.context.set_fill_style(&bg_str.into());
+                self.context.fill_rect(
+                    canvas_x as f64,
+                    canvas_y as f64,
+                    width as f64,
+                    height as f64,
+                );
+            } else if is_current_match {
+                // Current (active) search result - bright orange
+                self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+                self.context.fill_rect(
+                    canvas_x as f64,
+                    canvas_y as f64,
+                    width as f64,
+                    height as f64,
+                );
+            } else if is_search_match {
+                // Other search results - light yellow
+                self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
                 self.context.fill_rect(
                     canvas_x as f64,
                     canvas_y as f64,
@@ -165,6 +214,24 @@ impl TextRenderer {
                     height as f64,
                 );
             }
+        } else if is_current_match {
+            // Current search result
+            self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+            self.context.fill_rect(
+                canvas_x as f64,
+                canvas_y as f64,
+                width as f64,
+                height as f64,
+            );
+        } else if is_search_match {
+            // Other search results
+            self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
+            self.context.fill_rect(
+                canvas_x as f64,
+                canvas_y as f64,
+                width as f64,
+                height as f64,
+            );
         } else if is_selected {
             self.context.set_fill_style(&self.selected_bg_color.clone().into());
             self.context.fill_rect(
@@ -359,13 +426,25 @@ impl TextRenderer {
 
             // Draw column name (A, B, C, ...)
             let col_name = Grid::get_col_name(col);
+
+            // Add sort indicator if this column is sorted
+            let display_text = if grid.sort_column == Some(col) {
+                if grid.sort_ascending {
+                    format!("{} ▲", col_name)
+                } else {
+                    format!("{} ▼", col_name)
+                }
+            } else {
+                col_name
+            };
+
             self.context.set_fill_style(&self.header_text_color.clone().into());
             self.context.set_text_align("center");
 
             let text_x = canvas_x + width / 2.0;
             let text_y = col_header_height / 2.0;
 
-            let _ = self.context.fill_text(&col_name, text_x as f64, text_y as f64);
+            let _ = self.context.fill_text(&display_text, text_x as f64, text_y as f64);
 
             // Reset text align
             self.context.set_text_align("left");

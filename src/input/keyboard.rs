@@ -42,13 +42,18 @@ impl KeyboardHandler {
     }
 
     /// Handle keyboard event with modifier keys
-    pub fn handle_key_with_modifiers(&self, key: &str, ctrl: bool) -> Option<NavigationCommand> {
+    pub fn handle_key_with_modifiers(&self, key: &str, ctrl: bool, shift: bool) -> Option<NavigationCommand> {
         if ctrl {
             match key {
                 "Home" => Some(NavigationCommand::DocumentStart),
                 "End" => Some(NavigationCommand::DocumentEnd),
+                "z" | "Z" => Some(NavigationCommand::Undo),
+                "y" | "Y" => Some(NavigationCommand::Redo),
                 _ => self.handle_key(key),
             }
+        } else if shift {
+            // Shift-only modifiers (none currently)
+            self.handle_key(key)
         } else {
             self.handle_key(key)
         }
@@ -78,4 +83,6 @@ pub enum NavigationCommand {
     Delete,
     DocumentStart,
     DocumentEnd,
+    Undo,
+    Redo,
 }

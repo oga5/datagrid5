@@ -44,12 +44,27 @@
         </div>
 
         <div class="search-panel">
-            <input type="text" id="search-input" placeholder="Search in grid..." />
-            <button id="search-btn">Search</button>
-            <button id="search-prev-btn">◀ Prev</button>
-            <button id="search-next-btn">Next ▶</button>
-            <button id="search-clear-btn">Clear</button>
-            <span id="search-results">-</span>
+            <div class="search-row">
+                <input type="text" id="search-input" placeholder="Search in grid..." />
+                <button id="search-btn">Search</button>
+                <button id="search-prev-btn">◀ Prev</button>
+                <button id="search-next-btn">Next ▶</button>
+                <button id="search-clear-btn">Clear</button>
+                <span id="search-results">-</span>
+            </div>
+            <div class="search-row">
+                <input type="text" id="replace-input" placeholder="Replace with..." />
+                <button id="replace-btn">Replace</button>
+                <button id="replace-all-btn">Replace All</button>
+                <label>
+                    <input type="checkbox" id="case-sensitive" />
+                    Case sensitive
+                </label>
+                <label>
+                    <input type="checkbox" id="whole-word" />
+                    Whole word
+                </label>
+            </div>
         </div>
 
         <div class="canvas-container" id="canvas-container">
@@ -533,7 +548,9 @@
                 if (!grid) return;
                 const query = document.getElementById('search-input').value;
                 if (query) {
-                    const count = grid.search_text(query);
+                    const caseSensitive = document.getElementById('case-sensitive').checked;
+                    const wholeWord = document.getElementById('whole-word').checked;
+                    const count = grid.search_text_with_options(query, caseSensitive, wholeWord);
                     updateSearchResults(count);
                     renderLoop();
                 }
@@ -561,6 +578,27 @@
                 grid.clear_search();
                 document.getElementById('search-input').value = '';
                 document.getElementById('search-results').textContent = '-';
+                renderLoop();
+            });
+
+            // Replace current match
+            document.getElementById('replace-btn').addEventListener('click', () => {
+                if (!grid) return;
+                const replacement = document.getElementById('replace-input').value;
+                const success = grid.replace_current(replacement);
+                if (success) {
+                    updateSearchResults();
+                    renderLoop();
+                }
+            });
+
+            // Replace all matches
+            document.getElementById('replace-all-btn').addEventListener('click', () => {
+                if (!grid) return;
+                const replacement = document.getElementById('replace-input').value;
+                const count = grid.replace_all(replacement);
+                console.log(`Replaced ${count} occurrences`);
+                document.getElementById('search-results').textContent = `Replaced ${count} occurrences`;
                 renderLoop();
             });
 

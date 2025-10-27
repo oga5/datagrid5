@@ -18,9 +18,9 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 - **Real-time Resize**: Live feedback vs preview rectangle
 - **Smart Type Detection**: Auto-detect Number/Boolean/Text on paste
 
-### 📊 Feature Coverage: 71% (82/116 features from original)
+### 📊 Feature Coverage: 89% (103/116 features from original)
 - ✅ Phase 1-4: Core, Rendering, Text, Interaction - **100% Complete**
-- ✅ Phase 5: Advanced Features - **50% Complete** (10/20 feature groups)
+- ✅ Phase 5: Advanced Features - **70% Complete** (14/20 feature groups)
   - ✅ Column resizing
   - ✅ Row resizing
   - ✅ Multi-cell selection
@@ -28,10 +28,17 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - ✅ Row/Column headers
   - ✅ Advanced selection (SelectAll/Row/Col)
   - ✅ Cell styling API
-  - ✅ Row/Column operations (insert/delete) ← **New!**
-  - ✅ Keyboard enhancements (Delete key, Ctrl+Home/End) ← **New!**
-  - ✅ Text search with navigation ← **New!**
-- ⏳ Phase 6-9: Search, Undo/Redo, Optimization, Testing - **15% Complete**
+  - ✅ Row/Column operations (insert/delete)
+  - ✅ Keyboard enhancements (Delete key, Ctrl+Home/End)
+  - ✅ Text search with navigation
+  - ✅ Search highlighting ← **New!**
+  - ✅ Advanced search (case-sensitive, whole word, replace) ← **New!**
+  - ✅ Column sorting (ascending/descending) ← **New!**
+  - ✅ Freeze rows/columns API ← **New!**
+- ✅ Phase 6-7: Search & Undo/Redo - **60% Complete**
+  - ✅ Text search with highlighting
+  - ✅ Replace functionality (current/all/selection)
+  - ✅ Undo/Redo system (Ctrl+Z/Ctrl+Y) ← **New!**
 
 ### 🎯 Next Priorities
 1. ~~Row/Column headers~~ ✅ **Complete!**
@@ -39,8 +46,12 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 3. ~~Cell styling API~~ ✅ **Complete!**
 4. ~~Row/Column operations (挿入・削除)~~ ✅ **Complete!**
 5. ~~Search functionality (テキスト検索)~~ ✅ **Complete!**
-6. Fixed headers/columns (freeze rows/columns)
-7. Advanced clipboard (Cut, SQL format export)
+6. ~~Search highlighting~~ ✅ **Complete!**
+7. ~~Advanced search & replace~~ ✅ **Complete!**
+8. ~~Column sorting~~ ✅ **Complete!**
+9. ~~Undo/Redo system~~ ✅ **Complete!**
+10. Performance optimization
+11. Unit testing
 
 ## Architecture
 
@@ -190,48 +201,56 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [ ] SQL INSERT format export
   - [ ] SQL WHERE clause format
   - [ ] SQL IN clause format
-- [ ] Sorting
-  - [ ] Sort by column (ascending/descending)
+- [x] Sorting
+  - [x] Sort by column (ascending/descending)
+  - [x] Column header click to sort
+  - [x] Sort indicator (▲/▼)
   - [ ] Multi-column sort
   - [ ] Custom sort comparators
 - [ ] Filtering
   - [ ] Column filters
   - [ ] Filter UI
   - [ ] Custom filter predicates
+- [x] Freeze rows/columns
+  - [x] Freeze first N rows API
+  - [x] Freeze first N columns API
+  - [ ] Freeze rendering implementation
+  - [ ] Freeze UI controls
 
 ### Phase 6: Search & Find 🔍
 - [x] Text search
   - [x] Find text in cells
   - [x] Find next/previous
-  - [ ] Case-sensitive option
-  - [ ] Whole word matching
+  - [x] Case-sensitive option
+  - [x] Whole word matching
 - [ ] Regular expression search
   - [ ] Regex pattern support
   - [ ] Regex validation
-- [ ] Search highlighting
-  - [ ] Highlight matching cells
-  - [ ] Distinct background color for matches
-  - [ ] Navigate through matches
-- [ ] Replace functionality
-  - [ ] Replace single occurrence
-  - [ ] Replace all
-  - [ ] Replace in selection
+- [x] Search highlighting
+  - [x] Highlight matching cells
+  - [x] Distinct background color for matches (yellow)
+  - [x] Current match highlighting (orange)
+  - [x] Navigate through matches
+- [x] Replace functionality
+  - [x] Replace single occurrence
+  - [x] Replace all
+  - [x] Replace in selection
 - [ ] Find modified cells
   - [ ] Search for edited cells
   - [ ] Navigate through changes
 
 ### Phase 7: Undo/Redo System 🔄
-- [ ] Edit history tracking
-  - [ ] Track cell value changes
+- [x] Edit history tracking
+  - [x] Track cell value changes
   - [ ] Track row/column operations
   - [ ] Track styling changes
-- [ ] Undo implementation
-  - [ ] Undo last edit (Ctrl+Z)
-  - [ ] Undo stack management
-  - [ ] Maximum history size
-- [ ] Redo implementation
-  - [ ] Redo last undo (Ctrl+Y / Ctrl+Shift+Z)
-  - [ ] Redo stack management
+- [x] Undo implementation
+  - [x] Undo last edit (Ctrl+Z)
+  - [x] Undo stack management
+  - [x] Maximum history size (100 actions)
+- [x] Redo implementation
+  - [x] Redo last undo (Ctrl+Y)
+  - [x] Redo stack management
 - [ ] History navigation
   - [ ] View edit history
   - [ ] Jump to specific state

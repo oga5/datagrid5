@@ -177,6 +177,54 @@ impl Viewport {
             && col >= self.first_visible_col
             && col <= self.last_visible_col
     }
+
+    /// Check if click is on column header and return column index
+    pub fn canvas_to_column_header(&self, canvas_x: f32, canvas_y: f32, grid: &Grid) -> Option<usize> {
+        if !grid.show_headers {
+            return None;
+        }
+
+        // Check if click is in column header area
+        if canvas_y < grid.col_header_height {
+            // Find which column was clicked
+            let grid_x = canvas_x - grid.row_header_width + self.scroll_x;
+
+            let mut x = 0.0;
+            for c in 0..grid.col_count() {
+                let width = grid.col_width(c);
+                if grid_x >= x && grid_x < x + width {
+                    return Some(c);
+                }
+                x += width;
+            }
+        }
+
+        None
+    }
+
+    /// Check if click is on row header and return row index
+    pub fn canvas_to_row_header(&self, canvas_x: f32, canvas_y: f32, grid: &Grid) -> Option<usize> {
+        if !grid.show_headers {
+            return None;
+        }
+
+        // Check if click is in row header area
+        if canvas_x < grid.row_header_width {
+            // Find which row was clicked
+            let grid_y = canvas_y - grid.col_header_height + self.scroll_y;
+
+            let mut y = 0.0;
+            for r in 0..grid.row_count() {
+                let height = grid.row_height(r);
+                if grid_y >= y && grid_y < y + height {
+                    return Some(r);
+                }
+                y += height;
+            }
+        }
+
+        None
+    }
 }
 
 #[cfg(test)]

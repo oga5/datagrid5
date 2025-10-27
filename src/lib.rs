@@ -11,6 +11,17 @@ use core::{Cell, CellValue, Grid, Viewport};
 use input::{KeyboardHandler, MouseHandler, NavigationCommand};
 use renderer::{TextRenderer, WebGLRenderer};
 
+/// Action that can be undone/redone
+#[derive(Clone)]
+enum EditAction {
+    SetValue {
+        row: usize,
+        col: usize,
+        old_value: CellValue,
+        new_value: CellValue,
+    },
+}
+
 // Use wee_alloc as the global allocator for smaller WASM size
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -41,6 +52,12 @@ pub struct DataGrid {
     search_query: String,
     search_results: Vec<(usize, usize)>,
     current_search_index: Option<usize>,
+    search_case_sensitive: bool,
+    search_whole_word: bool,
+    // Undo/Redo state
+    undo_stack: Vec<EditAction>,
+    redo_stack: Vec<EditAction>,
+    max_undo_size: usize,
 }
 
 #[wasm_bindgen]
@@ -110,6 +127,11 @@ impl DataGrid {
             search_query: String::new(),
             search_results: Vec::new(),
             current_search_index: None,
+            search_case_sensitive: false,
+            search_whole_word: false,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            max_undo_size: 100,
         })
     }
 
@@ -118,8 +140,13 @@ impl DataGrid {
         // Render WebGL layer (grid lines and backgrounds)
         self.webgl_renderer.render(&self.grid, &self.viewport);
 
-        // Render text layer on top
-        self.text_renderer.render(&self.grid, &self.viewport);
+        // Render text layer on top with search highlight info
+        self.text_renderer.render_with_search(
+            &self.grid,
+            &self.viewport,
+            &self.search_results,
+            self.current_search_index
+        );
     }
 
     /// Resize the grid
@@ -149,6 +176,20 @@ impl DataGrid {
         let y = event.offset_y() as f32;
 
         self.mouse_handler.mouse_down(x, y);
+
+        // Check if clicked on column header (for sorting)
+        if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
+            web_sys::console::log_1(&format!("Clicked column header: {}", col).into());
+            self.toggle_column_sort(col);
+            return;
+        }
+
+        // Check if clicked on row header (already handled for row selection)
+        if let Some(row) = self.viewport.canvas_to_row_header(x, y, &self.grid) {
+            // Row header click - select entire row
+            self.select_row(row);
+            return;
+        }
 
         // Check if clicked on a cell
         if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
@@ -198,11 +239,37 @@ impl DataGrid {
 
     /// Set cell value
     pub fn set_cell_value(&mut self, row: usize, col: usize, value: &str) {
+        // Record old value for undo
+        let old_value = self.grid.get_value(row, col).clone();
+
         // Try to parse as number
-        if let Ok(num) = value.parse::<f64>() {
-            self.grid.set_value(row, col, CellValue::Number(num));
+        let new_value = if let Ok(num) = value.parse::<f64>() {
+            CellValue::Number(num)
         } else {
-            self.grid.set_value(row, col, CellValue::Text(value.to_string()));
+            CellValue::Text(value.to_string())
+        };
+
+        // Only record if value actually changed
+        if old_value != new_value {
+            self.grid.set_value(row, col, new_value.clone());
+
+            // Record action for undo
+            let action = EditAction::SetValue {
+                row,
+                col,
+                old_value,
+                new_value,
+            };
+
+            self.undo_stack.push(action);
+
+            // Limit undo stack size
+            if self.undo_stack.len() > self.max_undo_size {
+                self.undo_stack.remove(0);
+            }
+
+            // Clear redo stack on new edit
+            self.redo_stack.clear();
         }
     }
 
@@ -307,6 +374,18 @@ impl DataGrid {
                     }
                     None
                 }
+                NavigationCommand::Undo => {
+                    if self.undo() {
+                        web_sys::console::log_1(&"Undo action".into());
+                    }
+                    None
+                }
+                NavigationCommand::Redo => {
+                    if self.redo() {
+                        web_sys::console::log_1(&"Redo action".into());
+                    }
+                    None
+                }
                 NavigationCommand::Enter | NavigationCommand::Escape | NavigationCommand::Tab => {
                     // Future: handle edit mode, etc.
                     None
@@ -347,9 +426,10 @@ impl DataGrid {
     /// Handle keyboard event with modifier keys
     pub fn handle_keyboard_with_modifiers(&mut self, event: KeyboardEvent, ctrl: bool) -> bool {
         let key = event.key();
+        let shift = event.shift_key();
 
         // Get navigation command with modifiers
-        if let Some(command) = self.keyboard_handler.handle_key_with_modifiers(&key, ctrl) {
+        if let Some(command) = self.keyboard_handler.handle_key_with_modifiers(&key, ctrl, shift) {
             let current = self.mouse_handler.selected_cell;
 
             let new_selection = match command {
@@ -419,6 +499,18 @@ impl DataGrid {
                     if let Some((row, col)) = current {
                         self.grid.set_value(row, col, CellValue::Empty);
                         web_sys::console::log_1(&format!("Cleared cell: ({}, {})", row, col).into());
+                    }
+                    None
+                }
+                NavigationCommand::Undo => {
+                    if self.undo() {
+                        web_sys::console::log_1(&"Undo action".into());
+                    }
+                    None
+                }
+                NavigationCommand::Redo => {
+                    if self.redo() {
+                        web_sys::console::log_1(&"Redo action".into());
                     }
                     None
                 }
@@ -1025,21 +1117,38 @@ impl DataGrid {
         self.viewport.update_visible_range(&self.grid);
     }
 
-    /// Search for text in grid cells (case-insensitive)
+    /// Search for text in grid cells (case-insensitive by default)
     pub fn search_text(&mut self, query: String) -> usize {
-        self.search_query = query.to_lowercase();
+        self.search_text_with_options(query, false, false)
+    }
+
+    /// Search for text with options
+    pub fn search_text_with_options(&mut self, query: String, case_sensitive: bool, whole_word: bool) -> usize {
+        self.search_case_sensitive = case_sensitive;
+        self.search_whole_word = whole_word;
+        self.search_query = if case_sensitive { query.clone() } else { query.to_lowercase() };
         self.search_results.clear();
         self.current_search_index = None;
 
-        if self.search_query.is_empty() {
+        if query.is_empty() {
             return 0;
         }
 
         // Search through all cells
         for row in 0..self.grid.row_count() {
             for col in 0..self.grid.col_count() {
-                let cell_text = self.grid.get_value_string(row, col).to_lowercase();
-                if cell_text.contains(&self.search_query) {
+                let cell_text = self.grid.get_value_string(row, col);
+                let search_text = if case_sensitive { cell_text.clone() } else { cell_text.to_lowercase() };
+
+                let is_match = if whole_word {
+                    // Whole word matching: split by whitespace and check for exact match
+                    search_text.split_whitespace().any(|word| word == self.search_query)
+                } else {
+                    // Substring matching
+                    search_text.contains(&self.search_query)
+                };
+
+                if is_match {
                     self.search_results.push((row, col));
                 }
             }
@@ -1116,6 +1225,196 @@ impl DataGrid {
         } else {
             -1
         }
+    }
+
+    /// Check if a cell is a search result
+    pub fn is_search_result(&self, row: usize, col: usize) -> bool {
+        self.search_results.contains(&(row, col))
+    }
+
+    /// Check if a cell is the current (active) search result
+    pub fn is_current_search_result(&self, row: usize, col: usize) -> bool {
+        if let Some(idx) = self.current_search_index {
+            if idx < self.search_results.len() {
+                self.search_results[idx] == (row, col)
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Replace current search result with new text
+    pub fn replace_current(&mut self, replacement: String) -> bool {
+        if let Some(idx) = self.current_search_index {
+            if idx < self.search_results.len() {
+                let (row, col) = self.search_results[idx];
+
+                // Parse replacement as number if possible
+                if let Ok(num) = replacement.parse::<f64>() {
+                    self.grid.set_value(row, col, CellValue::Number(num));
+                } else {
+                    self.grid.set_value(row, col, CellValue::Text(replacement));
+                }
+
+                // Move to next search result (or wrap around)
+                self.search_next();
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Replace all search results with new text
+    pub fn replace_all(&mut self, replacement: String) -> usize {
+        let count = self.search_results.len();
+
+        // Replace all matching cells
+        for (row, col) in &self.search_results {
+            // Parse replacement as number if possible
+            if let Ok(num) = replacement.parse::<f64>() {
+                self.grid.set_value(*row, *col, CellValue::Number(num));
+            } else {
+                self.grid.set_value(*row, *col, CellValue::Text(replacement.clone()));
+            }
+        }
+
+        // Clear search results after replacing all
+        self.clear_search();
+        count
+    }
+
+    /// Replace in selection only
+    pub fn replace_in_selection(&mut self, search: String, replacement: String, case_sensitive: bool) -> usize {
+        let mut count = 0;
+        let search_str = if case_sensitive { search.clone() } else { search.to_lowercase() };
+
+        // Get list of selected cells
+        let selected: Vec<(usize, usize)> = self.selected_cells.iter().cloned().collect();
+
+        for (row, col) in selected {
+            let cell_text = self.grid.get_value_string(row, col);
+            let search_text = if case_sensitive { cell_text.clone() } else { cell_text.to_lowercase() };
+
+            if search_text.contains(&search_str) {
+                // Parse replacement as number if possible
+                if let Ok(num) = replacement.parse::<f64>() {
+                    self.grid.set_value(row, col, CellValue::Number(num));
+                } else {
+                    self.grid.set_value(row, col, CellValue::Text(replacement.clone()));
+                }
+                count += 1;
+            }
+        }
+
+        count
+    }
+
+    /// Sort by column
+    pub fn sort_by_column(&mut self, col: usize, ascending: bool) {
+        self.grid.sort_by_column(col, ascending);
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Toggle sort on column (click column header)
+    pub fn toggle_column_sort(&mut self, col: usize) {
+        // If already sorting by this column, toggle direction
+        if self.grid.sort_column == Some(col) {
+            self.sort_by_column(col, !self.grid.sort_ascending);
+        } else {
+            // Otherwise, sort ascending
+            self.sort_by_column(col, true);
+        }
+    }
+
+    /// Get sort state for a column (returns: (is_sorted, is_ascending))
+    pub fn get_column_sort_state(&self, col: usize) -> (bool, bool) {
+        if self.grid.sort_column == Some(col) {
+            (true, self.grid.sort_ascending)
+        } else {
+            (false, true)
+        }
+    }
+
+    /// Freeze first N rows
+    pub fn freeze_rows(&mut self, count: usize) {
+        self.grid.frozen_rows = count.min(self.grid.row_count());
+    }
+
+    /// Freeze first N columns
+    pub fn freeze_cols(&mut self, count: usize) {
+        self.grid.frozen_cols = count.min(self.grid.col_count());
+    }
+
+    /// Get frozen row count
+    pub fn get_frozen_rows(&self) -> usize {
+        self.grid.frozen_rows
+    }
+
+    /// Get frozen column count
+    pub fn get_frozen_cols(&self) -> usize {
+        self.grid.frozen_cols
+    }
+
+    /// Undo last edit action
+    pub fn undo(&mut self) -> bool {
+        if let Some(action) = self.undo_stack.pop() {
+            match &action {
+                EditAction::SetValue { row, col, old_value, new_value: _ } => {
+                    // Restore old value without recording undo
+                    self.grid.set_value(*row, *col, old_value.clone());
+                }
+            }
+
+            // Move action to redo stack
+            self.redo_stack.push(action);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Redo last undone action
+    pub fn redo(&mut self) -> bool {
+        if let Some(action) = self.redo_stack.pop() {
+            match &action {
+                EditAction::SetValue { row, col, old_value: _, new_value } => {
+                    // Re-apply new value without recording undo
+                    self.grid.set_value(*row, *col, new_value.clone());
+                }
+            }
+
+            // Move action back to undo stack
+            self.undo_stack.push(action);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if undo is available
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    /// Check if redo is available
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    /// Get undo stack size
+    pub fn get_undo_count(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    /// Get redo stack size
+    pub fn get_redo_count(&self) -> usize {
+        self.redo_stack.len()
     }
 }
 
