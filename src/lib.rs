@@ -2,6 +2,7 @@ mod core;
 mod input;
 mod renderer;
 
+use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
@@ -33,6 +34,9 @@ pub struct DataGrid {
     resizing_row: Option<usize>,
     resize_start_pos: f32,
     resize_start_size: f32,
+    // Multi-selection state
+    selected_cells: HashSet<(usize, usize)>,
+    selection_anchor: Option<(usize, usize)>,
 }
 
 #[wasm_bindgen]
@@ -97,6 +101,8 @@ impl DataGrid {
             resizing_row: None,
             resize_start_pos: 0.0,
             resize_start_size: 0.0,
+            selected_cells: HashSet::new(),
+            selection_anchor: None,
         })
     }
 
@@ -130,39 +136,40 @@ impl DataGrid {
         self.viewport.update_visible_range(&self.grid);
     }
 
-    /// Handle mouse down event
-    pub fn handle_mouse_down(&mut self, event: MouseEvent) {
+    /// Handle mouse down event with modifier keys
+    pub fn handle_mouse_down_with_modifiers(&mut self, event: MouseEvent, shift: bool, ctrl: bool) {
         let x = event.offset_x() as f32;
         let y = event.offset_y() as f32;
 
         self.mouse_handler.mouse_down(x, y);
 
-        // Clear previous selection
-        if let Some((prev_row, prev_col)) = self.mouse_handler.selected_cell {
-            if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
-                cell.selected = false;
-            }
-        }
-
         // Check if clicked on a cell
         if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
-            self.mouse_handler.select_cell(row, col);
-
-            // Set new selection
-            if let Some(cell) = self.grid.get_cell_mut(row, col) {
-                cell.selected = true;
+            if shift {
+                // Shift+Click: Range selection
+                self.select_range(row, col);
+            } else if ctrl {
+                // Ctrl+Click: Toggle selection
+                self.toggle_cell_selection(row, col);
             } else {
-                // Create cell if it doesn't exist
-                let mut cell = Cell::default();
-                cell.selected = true;
-                self.grid.set_cell(row, col, cell);
+                // Normal click: Single selection
+                self.select_single_cell(row, col);
             }
 
-            web_sys::console::log_1(&format!("Selected cell: ({}, {})", row, col).into());
+            self.mouse_handler.select_cell(row, col);
+            web_sys::console::log_1(&format!("Selected {} cells", self.selected_cells.len()).into());
         } else {
             // Clicked outside grid, clear selection
+            if !ctrl {
+                self.clear_selection();
+            }
             self.mouse_handler.selected_cell = None;
         }
+    }
+
+    /// Handle mouse down event (legacy, for backward compatibility)
+    pub fn handle_mouse_down(&mut self, event: MouseEvent) {
+        self.handle_mouse_down_with_modifiers(event, false, false);
     }
 
     /// Handle mouse up event
@@ -524,6 +531,108 @@ impl DataGrid {
     /// Check if currently resizing
     pub fn is_resizing(&self) -> bool {
         self.is_resizing
+    }
+
+    /// Select a single cell (clears previous selection)
+    fn select_single_cell(&mut self, row: usize, col: usize) {
+        // Clear all previous selections
+        self.clear_selection();
+
+        // Add new selection
+        self.selected_cells.insert((row, col));
+        self.selection_anchor = Some((row, col));
+
+        // Update cell state
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.selected = true;
+        } else {
+            let mut cell = Cell::default();
+            cell.selected = true;
+            self.grid.set_cell(row, col, cell);
+        }
+    }
+
+    /// Toggle cell selection (add/remove from selection)
+    fn toggle_cell_selection(&mut self, row: usize, col: usize) {
+        if self.selected_cells.contains(&(row, col)) {
+            // Remove from selection
+            self.selected_cells.remove(&(row, col));
+            if let Some(cell) = self.grid.get_cell_mut(row, col) {
+                cell.selected = false;
+            }
+        } else {
+            // Add to selection
+            self.selected_cells.insert((row, col));
+            if let Some(cell) = self.grid.get_cell_mut(row, col) {
+                cell.selected = true;
+            } else {
+                let mut cell = Cell::default();
+                cell.selected = true;
+                self.grid.set_cell(row, col, cell);
+            }
+        }
+
+        // Update anchor
+        if !self.selected_cells.is_empty() {
+            self.selection_anchor = Some((row, col));
+        }
+    }
+
+    /// Select range from anchor to target cell
+    fn select_range(&mut self, target_row: usize, target_col: usize) {
+        if let Some((anchor_row, anchor_col)) = self.selection_anchor {
+            // Clear previous selection
+            self.clear_selection();
+
+            // Calculate range
+            let min_row = anchor_row.min(target_row);
+            let max_row = anchor_row.max(target_row);
+            let min_col = anchor_col.min(target_col);
+            let max_col = anchor_col.max(target_col);
+
+            // Select all cells in range
+            for r in min_row..=max_row {
+                for c in min_col..=max_col {
+                    if r < self.grid.row_count() && c < self.grid.col_count() {
+                        self.selected_cells.insert((r, c));
+
+                        if let Some(cell) = self.grid.get_cell_mut(r, c) {
+                            cell.selected = true;
+                        } else {
+                            let mut cell = Cell::default();
+                            cell.selected = true;
+                            self.grid.set_cell(r, c, cell);
+                        }
+                    }
+                }
+            }
+        } else {
+            // No anchor, just select single cell
+            self.select_single_cell(target_row, target_col);
+        }
+    }
+
+    /// Clear all selections
+    fn clear_selection(&mut self) {
+        for (row, col) in &self.selected_cells {
+            if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
+                cell.selected = false;
+            }
+        }
+        self.selected_cells.clear();
+    }
+
+    /// Get selected cells as a list of [row, col] pairs
+    pub fn get_selected_cells(&self) -> Vec<Vec<usize>> {
+        self.selected_cells
+            .iter()
+            .map(|(row, col)| vec![*row, *col])
+            .collect()
+    }
+
+    /// Get selection count
+    pub fn get_selection_count(&self) -> usize {
+        self.selected_cells.len()
     }
 }
 

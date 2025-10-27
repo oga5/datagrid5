@@ -94,11 +94,17 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] Minimum width/height enforcement
 - [x] Row resizing
   - [x] Same features as column resizing
+- [x] Multi-cell selection
+  - [x] Shift+Click for range selection
+  - [x] Ctrl/Cmd+Click for toggle selection
+  - [x] HashSet-based selection tracking
+  - [x] Visual feedback for all selected cells
+  - [x] Selection count display
+  - [x] get_selected_cells() API
 - [ ] Cell styling (colors, borders)
 - [ ] Sorting
 - [ ] Filtering
 - [ ] Copy/Paste support
-- [ ] Multi-cell selection
 - [ ] Fixed headers/columns
 
 ### Phase 6: Performance Optimization ⚡

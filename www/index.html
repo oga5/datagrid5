@@ -60,6 +60,8 @@
                 <li><strong>Enter:</strong> 編集を確定 / Confirm edit</li>
                 <li><strong>Escape:</strong> 編集をキャンセル / Cancel edit</li>
                 <li><strong>列/行の境界をドラッグ / Drag Column/Row Border:</strong> サイズ変更 / Resize</li>
+                <li><strong>Shift+クリック / Shift+Click:</strong> 範囲選択 / Range selection</li>
+                <li><strong>Ctrl/Cmd+クリック / Ctrl/Cmd+Click:</strong> 複数選択 / Multi selection</li>
             </ul>
         </div>
 
@@ -136,11 +138,15 @@
             if (!grid) return;
 
             const dimensions = grid.get_dimensions();
+            const selectionCount = grid.get_selection_count();
+
             document.getElementById('grid-size').textContent =
                 `${dimensions[0]} rows × ${dimensions[1]} cols`;
 
+            const viewportText = grid.get_viewport_info();
+            const selectionText = selectionCount > 0 ? ` | Selected: ${selectionCount} cells` : '';
             document.getElementById('viewport-info').textContent =
-                grid.get_viewport_info();
+                viewportText + selectionText;
         }
 
         // Cell editing functions
@@ -255,7 +261,10 @@
                     grid.start_resize(x, y, resizeType);
                     e.preventDefault();
                 } else {
-                    grid.handle_mouse_down(e);
+                    // Check modifier keys for multi-selection
+                    const shift = e.shiftKey;
+                    const ctrl = e.ctrlKey || e.metaKey; // metaKey for Mac Cmd
+                    grid.handle_mouse_down_with_modifiers(e, shift, ctrl);
                 }
                 renderLoop();
             });
