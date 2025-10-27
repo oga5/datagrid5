@@ -59,6 +59,7 @@
                 <li><strong>ダブルクリック / Double Click:</strong> セルを編集 / Edit cell</li>
                 <li><strong>Enter:</strong> 編集を確定 / Confirm edit</li>
                 <li><strong>Escape:</strong> 編集をキャンセル / Cancel edit</li>
+                <li><strong>列/行の境界をドラッグ / Drag Column/Row Border:</strong> サイズ変更 / Resize</li>
             </ul>
         </div>
 
@@ -239,29 +240,71 @@
             const canvas = document.getElementById('text-canvas');
 
             // Mouse events
+            let isResizingLocal = false;
+
             canvas.addEventListener('mousedown', (e) => {
-                if (grid) {
+                if (!grid) return;
+
+                const x = e.offsetX;
+                const y = e.offsetY;
+
+                // Check if clicking on resize handle
+                const resizeType = grid.check_resize_handle(x, y);
+                if (resizeType !== 'none') {
+                    isResizingLocal = true;
+                    grid.start_resize(x, y, resizeType);
+                    e.preventDefault();
+                } else {
                     grid.handle_mouse_down(e);
-                    renderLoop(); // Trigger immediate render
                 }
+                renderLoop();
             });
 
             canvas.addEventListener('mouseup', (e) => {
-                if (grid) {
+                if (!grid) return;
+
+                if (isResizingLocal) {
+                    grid.end_resize();
+                    isResizingLocal = false;
+                } else {
                     grid.handle_mouse_up(e);
                 }
             });
 
             canvas.addEventListener('mousemove', (e) => {
-                if (grid) {
+                if (!grid) return;
+
+                const x = e.offsetX;
+                const y = e.offsetY;
+
+                if (isResizingLocal) {
+                    // Update resize
+                    grid.update_resize(x, y);
+                } else {
+                    // Check for resize handle to change cursor
+                    const resizeType = grid.check_resize_handle(x, y);
+                    if (resizeType === 'col') {
+                        canvas.style.cursor = 'col-resize';
+                    } else if (resizeType === 'row') {
+                        canvas.style.cursor = 'row-resize';
+                    } else {
+                        canvas.style.cursor = 'grab';
+                    }
+
+                    // Normal mouse move
                     grid.handle_mouse_move(e);
                 }
             });
 
             canvas.addEventListener('mouseleave', (e) => {
-                if (grid) {
-                    grid.handle_mouse_up(e);
+                if (!grid) return;
+
+                if (isResizingLocal) {
+                    grid.end_resize();
+                    isResizingLocal = false;
                 }
+                grid.handle_mouse_up(e);
+                canvas.style.cursor = 'grab';
             });
 
             // Wheel event for scrolling

@@ -27,6 +27,12 @@ pub struct DataGrid {
     text_canvas: HtmlCanvasElement,
     is_editing: bool,
     editing_cell: Option<(usize, usize)>,
+    // Resize state
+    is_resizing: bool,
+    resizing_column: Option<usize>,
+    resizing_row: Option<usize>,
+    resize_start_pos: f32,
+    resize_start_size: f32,
 }
 
 #[wasm_bindgen]
@@ -86,6 +92,11 @@ impl DataGrid {
             text_canvas,
             is_editing: false,
             editing_cell: None,
+            is_resizing: false,
+            resizing_column: None,
+            resizing_row: None,
+            resize_start_pos: 0.0,
+            resize_start_size: 0.0,
         })
     }
 
@@ -400,6 +411,119 @@ impl DataGrid {
         }
 
         None
+    }
+
+    /// Check if mouse is over a resize handle
+    /// Returns: "col" for column resize, "row" for row resize, "none" otherwise
+    pub fn check_resize_handle(&self, x: f32, y: f32) -> String {
+        const RESIZE_HANDLE_WIDTH: f32 = 5.0;
+
+        let grid_x = x + self.viewport.scroll_x;
+        let grid_y = y + self.viewport.scroll_y;
+
+        // Check column resize handles
+        let mut col_x = 0.0;
+        for col in 0..self.grid.col_count() {
+            let width = self.grid.col_width(col);
+            col_x += width;
+
+            // Check if near right edge of column
+            if (grid_x - col_x).abs() < RESIZE_HANDLE_WIDTH {
+                return "col".to_string();
+            }
+        }
+
+        // Check row resize handles
+        let mut row_y = 0.0;
+        for row in 0..self.grid.row_count() {
+            let height = self.grid.row_height(row);
+            row_y += height;
+
+            // Check if near bottom edge of row
+            if (grid_y - row_y).abs() < RESIZE_HANDLE_WIDTH {
+                return "row".to_string();
+            }
+        }
+
+        "none".to_string()
+    }
+
+    /// Start column or row resize
+    pub fn start_resize(&mut self, x: f32, y: f32, resize_type: &str) -> bool {
+        const RESIZE_HANDLE_WIDTH: f32 = 5.0;
+
+        let grid_x = x + self.viewport.scroll_x;
+        let grid_y = y + self.viewport.scroll_y;
+
+        if resize_type == "col" {
+            // Find which column to resize
+            let mut col_x = 0.0;
+            for col in 0..self.grid.col_count() {
+                let width = self.grid.col_width(col);
+                col_x += width;
+
+                if (grid_x - col_x).abs() < RESIZE_HANDLE_WIDTH {
+                    self.is_resizing = true;
+                    self.resizing_column = Some(col);
+                    self.resize_start_pos = x;
+                    self.resize_start_size = width;
+                    web_sys::console::log_1(&format!("Started resizing column {}", col).into());
+                    return true;
+                }
+            }
+        } else if resize_type == "row" {
+            // Find which row to resize
+            let mut row_y = 0.0;
+            for row in 0..self.grid.row_count() {
+                let height = self.grid.row_height(row);
+                row_y += height;
+
+                if (grid_y - row_y).abs() < RESIZE_HANDLE_WIDTH {
+                    self.is_resizing = true;
+                    self.resizing_row = Some(row);
+                    self.resize_start_pos = y;
+                    self.resize_start_size = height;
+                    web_sys::console::log_1(&format!("Started resizing row {}", row).into());
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Update resize during drag
+    pub fn update_resize(&mut self, x: f32, y: f32) {
+        if !self.is_resizing {
+            return;
+        }
+
+        if let Some(col) = self.resizing_column {
+            let delta = x - self.resize_start_pos;
+            let new_width = (self.resize_start_size + delta).max(30.0); // Minimum 30px
+            self.grid.set_col_width(col, new_width);
+        } else if let Some(row) = self.resizing_row {
+            let delta = y - self.resize_start_pos;
+            let new_height = (self.resize_start_size + delta).max(20.0); // Minimum 20px
+            self.grid.set_row_height(row, new_height);
+        }
+    }
+
+    /// End resize
+    pub fn end_resize(&mut self) {
+        if self.is_resizing {
+            web_sys::console::log_1(&"Ended resizing".into());
+        }
+        self.is_resizing = false;
+        self.resizing_column = None;
+        self.resizing_row = None;
+        self.resize_start_pos = 0.0;
+        self.resize_start_size = 0.0;
+    }
+
+    /// Check if currently resizing
+    pub fn is_resizing(&self) -> bool {
+        self.is_resizing
     }
 }
 

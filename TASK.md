@@ -87,8 +87,13 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] Value update and validation
 
 ### Phase 5: Advanced Features 🚀
-- [ ] Column resizing
-- [ ] Row resizing
+- [x] Column resizing
+  - [x] Resize handle detection (5px hot zone)
+  - [x] Cursor change (col-resize/row-resize)
+  - [x] Drag to resize
+  - [x] Minimum width/height enforcement
+- [x] Row resizing
+  - [x] Same features as column resizing
 - [ ] Cell styling (colors, borders)
 - [ ] Sorting
 - [ ] Filtering
