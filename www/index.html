@@ -42,7 +42,8 @@
         </div>
 
         <div class="canvas-container">
-            <canvas id="grid-canvas" width="1200" height="600"></canvas>
+            <canvas id="webgl-canvas" width="1200" height="600"></canvas>
+            <canvas id="text-canvas" width="1200" height="600"></canvas>
         </div>
 
         <div class="instructions">
@@ -85,8 +86,8 @@
                     cancelAnimationFrame(animationFrameId);
                 }
 
-                // Create new grid
-                grid = new DataGrid('grid-canvas', rows, cols);
+                // Create new grid with two canvas layers
+                grid = new DataGrid('webgl-canvas', 'text-canvas', rows, cols);
 
                 // Update info
                 updateInfo();
@@ -136,7 +137,8 @@
 
         // Event handlers
         function setupEventHandlers() {
-            const canvas = document.getElementById('grid-canvas');
+            // Use text canvas for event handling (it's on top)
+            const canvas = document.getElementById('text-canvas');
 
             // Mouse events
             canvas.addEventListener('mousedown', (e) => {
@@ -176,12 +178,15 @@
             // Window resize
             window.addEventListener('resize', () => {
                 if (grid) {
-                    const canvas = document.getElementById('grid-canvas');
-                    const container = canvas.parentElement;
+                    const webglCanvas = document.getElementById('webgl-canvas');
+                    const textCanvas = document.getElementById('text-canvas');
+                    const container = webglCanvas.parentElement;
                     const width = container.clientWidth;
                     const height = 600;
-                    canvas.width = width;
-                    canvas.height = height;
+                    webglCanvas.width = width;
+                    webglCanvas.height = height;
+                    textCanvas.width = width;
+                    textCanvas.height = height;
                     grid.resize(width, height);
                     updateInfo();
                 }

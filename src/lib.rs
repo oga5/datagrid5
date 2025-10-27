@@ -8,7 +8,7 @@ use web_sys::{HtmlCanvasElement, MouseEvent, WheelEvent};
 
 use core::{Cell, CellValue, Grid, Viewport};
 use input::MouseHandler;
-use renderer::WebGLRenderer;
+use renderer::{TextRenderer, WebGLRenderer};
 
 // Use wee_alloc as the global allocator for smaller WASM size
 #[global_allocator]
@@ -19,16 +19,18 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub struct DataGrid {
     grid: Grid,
     viewport: Viewport,
-    renderer: WebGLRenderer,
+    webgl_renderer: WebGLRenderer,
+    text_renderer: TextRenderer,
     mouse_handler: MouseHandler,
-    canvas: HtmlCanvasElement,
+    webgl_canvas: HtmlCanvasElement,
+    text_canvas: HtmlCanvasElement,
 }
 
 #[wasm_bindgen]
 impl DataGrid {
-    /// Create a new DataGrid instance
+    /// Create a new DataGrid instance with two canvas IDs (WebGL and text overlay)
     #[wasm_bindgen(constructor)]
-    pub fn new(canvas_id: &str, rows: usize, cols: usize) -> Result<DataGrid, JsValue> {
+    pub fn new(webgl_canvas_id: &str, text_canvas_id: &str, rows: usize, cols: usize) -> Result<DataGrid, JsValue> {
         // Set panic hook for better error messages
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
@@ -38,14 +40,22 @@ impl DataGrid {
             .document()
             .ok_or("No document")?;
 
-        let canvas = document
-            .get_element_by_id(canvas_id)
-            .ok_or("Canvas not found")?
+        // Get WebGL canvas
+        let webgl_canvas = document
+            .get_element_by_id(webgl_canvas_id)
+            .ok_or("WebGL canvas not found")?
             .dyn_into::<HtmlCanvasElement>()
-            .map_err(|_| "Element is not a canvas")?;
+            .map_err(|_| "WebGL element is not a canvas")?;
 
-        let canvas_width = canvas.width() as f32;
-        let canvas_height = canvas.height() as f32;
+        // Get text overlay canvas
+        let text_canvas = document
+            .get_element_by_id(text_canvas_id)
+            .ok_or("Text canvas not found")?
+            .dyn_into::<HtmlCanvasElement>()
+            .map_err(|_| "Text element is not a canvas")?;
+
+        let canvas_width = webgl_canvas.width() as f32;
+        let canvas_height = webgl_canvas.height() as f32;
 
         let mut grid = Grid::new(rows, cols);
         grid.fill_sample_data();
@@ -53,7 +63,10 @@ impl DataGrid {
         let mut viewport = Viewport::new(canvas_width, canvas_height);
         viewport.update_visible_range(&grid);
 
-        let renderer = WebGLRenderer::new(&canvas)
+        let webgl_renderer = WebGLRenderer::new(&webgl_canvas)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        let text_renderer = TextRenderer::new(&text_canvas)
             .map_err(|e| JsValue::from_str(&e))?;
 
         let mouse_handler = MouseHandler::new();
@@ -61,22 +74,31 @@ impl DataGrid {
         Ok(DataGrid {
             grid,
             viewport,
-            renderer,
+            webgl_renderer,
+            text_renderer,
             mouse_handler,
-            canvas,
+            webgl_canvas,
+            text_canvas,
         })
     }
 
     /// Render the grid
     pub fn render(&self) {
-        self.renderer.render(&self.grid, &self.viewport);
+        // Render WebGL layer (grid lines and backgrounds)
+        self.webgl_renderer.render(&self.grid, &self.viewport);
+
+        // Render text layer on top
+        self.text_renderer.render(&self.grid, &self.viewport);
     }
 
     /// Resize the grid
     pub fn resize(&mut self, width: f32, height: f32) {
-        self.canvas.set_width(width as u32);
-        self.canvas.set_height(height as u32);
-        self.renderer.resize(width, height);
+        self.webgl_canvas.set_width(width as u32);
+        self.webgl_canvas.set_height(height as u32);
+        self.text_canvas.set_width(width as u32);
+        self.text_canvas.set_height(height as u32);
+
+        self.webgl_renderer.resize(width, height);
         self.viewport.resize(width, height);
         self.viewport.update_visible_range(&self.grid);
     }
@@ -97,10 +119,31 @@ impl DataGrid {
 
         self.mouse_handler.mouse_down(x, y);
 
+        // Clear previous selection
+        if let Some((prev_row, prev_col)) = self.mouse_handler.selected_cell {
+            if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
+                cell.selected = false;
+            }
+        }
+
         // Check if clicked on a cell
         if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
             self.mouse_handler.select_cell(row, col);
+
+            // Set new selection
+            if let Some(cell) = self.grid.get_cell_mut(row, col) {
+                cell.selected = true;
+            } else {
+                // Create cell if it doesn't exist
+                let mut cell = Cell::default();
+                cell.selected = true;
+                self.grid.set_cell(row, col, cell);
+            }
+
             web_sys::console::log_1(&format!("Selected cell: ({}, {})", row, col).into());
+        } else {
+            // Clicked outside grid, clear selection
+            self.mouse_handler.selected_cell = None;
         }
     }
 

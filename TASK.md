@@ -46,36 +46,34 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 ### Phase 1: Core Foundation ✓
 - [x] Project structure setup
 - [x] Cargo.toml configuration with WebAssembly support
-- [ ] Core grid data structure
-  - [ ] Cell data storage (efficient memory layout)
-  - [ ] Virtual scrolling viewport calculation
-  - [ ] Row/column indexing
+- [x] Core grid data structure
+  - [x] Cell data storage (efficient memory layout)
+  - [x] Virtual scrolling viewport calculation
+  - [x] Row/column indexing
 
-### Phase 2: WebGL Renderer 🚧
-- [ ] WebGL context initialization
-- [ ] Shader programs (vertex & fragment)
-  - [ ] Grid line shader
-  - [ ] Cell background shader
-  - [ ] Text rendering shader (using texture atlas)
-- [ ] Texture atlas for text/glyphs
-- [ ] Batched rendering system
-  - [ ] Minimize draw calls
-  - [ ] GPU buffer management
-- [ ] Viewport culling (render only visible cells)
+### Phase 2: WebGL Renderer ✓
+- [x] WebGL context initialization
+- [x] Shader programs (vertex & fragment)
+  - [x] Grid line shader
+  - [x] Cell background shader
+- [x] Batched rendering system
+  - [x] Minimize draw calls
+  - [x] GPU buffer management
+- [x] Viewport culling (render only visible cells)
 
-### Phase 3: Text Rendering 📝
-- [ ] Canvas-based text rasterization
-- [ ] Texture atlas generation
-- [ ] Glyph caching
-- [ ] Font metrics calculation
-- [ ] Text clipping within cells
+### Phase 3: Text Rendering ✓
+- [x] Canvas-based text rasterization (Canvas 2D overlay)
+- [x] Font metrics calculation
+- [x] Text clipping within cells
+- [x] Selection highlighting
+- [x] Dual-canvas architecture (WebGL + Canvas 2D)
 
-### Phase 4: Interaction 🖱️
-- [ ] Mouse event handling
-  - [ ] Cell selection
-  - [ ] Click detection
-  - [ ] Drag selection
-  - [ ] Scroll handling
+### Phase 4: Interaction ✓
+- [x] Mouse event handling
+  - [x] Cell selection
+  - [x] Click detection
+  - [x] Drag to pan
+  - [x] Scroll handling (mouse wheel)
 - [ ] Keyboard navigation
   - [ ] Arrow key navigation
   - [ ] Page Up/Down

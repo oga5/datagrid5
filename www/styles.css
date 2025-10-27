@@ -119,16 +119,29 @@ button:active {
     background: #fafafa;
     display: flex;
     justify-content: center;
+    position: relative;
 }
 
-#grid-canvas {
+/* Stack canvases on top of each other */
+#webgl-canvas,
+#text-canvas {
+    position: absolute;
     border: 2px solid #ddd;
     border-radius: 8px;
-    cursor: grab;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-#grid-canvas:active {
+#webgl-canvas {
+    z-index: 1;
+}
+
+#text-canvas {
+    z-index: 2;
+    cursor: grab;
+    pointer-events: all;
+}
+
+#text-canvas:active {
     cursor: grabbing;
 }
 
@@ -196,7 +209,8 @@ footer a:hover {
         padding: 15px;
     }
 
-    #grid-canvas {
+    #webgl-canvas,
+    #text-canvas {
         max-width: 100%;
         height: auto;
     }
