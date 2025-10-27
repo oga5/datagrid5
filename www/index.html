@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Ultra-Fast WebAssembly Grid Control</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>DataGrid5</h1>
+            <p class="subtitle">Ultra-Fast WebAssembly Grid Control</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Rows:</label>
+                <input type="number" id="rows" value="1000" min="1" max="100000">
+            </div>
+            <div class="control-group">
+                <label>Columns:</label>
+                <input type="number" id="cols" value="50" min="1" max="1000">
+            </div>
+            <button id="recreate-btn">Recreate Grid</button>
+            <button id="fill-data-btn">Fill Sample Data</button>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-item">
+                <span class="label">Grid Size:</span>
+                <span id="grid-size">-</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Viewport:</span>
+                <span id="viewport-info">-</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Performance:</span>
+                <span id="fps">60 FPS</span>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="grid-canvas" width="1200" height="600"></canvas>
+        </div>
+
+        <div class="instructions">
+            <h3>使い方 / Instructions</h3>
+            <ul>
+                <li><strong>マウスドラッグ / Mouse Drag:</strong> グリッドをパン / Pan the grid</li>
+                <li><strong>マウスホイール / Mouse Wheel:</strong> スクロール / Scroll</li>
+                <li><strong>セルクリック / Click Cell:</strong> セル選択（コンソールに表示） / Select cell (shown in console)</li>
+            </ul>
+        </div>
+
+        <footer>
+            <p>
+                <strong>技術スタック / Tech Stack:</strong>
+                Rust + WebAssembly + WebGL |
+                <a href="https://github.com/oga5/datagrid5" target="_blank">GitHub</a>
+            </p>
+            <p class="license">BSD 2-Clause License</p>
+        </footer>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+
+        let grid = null;
+        let animationFrameId = null;
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+        let fps = 60;
+
+        async function initGrid() {
+            await init();
+
+            const rows = parseInt(document.getElementById('rows').value);
+            const cols = parseInt(document.getElementById('cols').value);
+
+            try {
+                // Stop existing animation loop
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+
+                // Create new grid
+                grid = new DataGrid('grid-canvas', rows, cols);
+
+                // Update info
+                updateInfo();
+
+                // Start render loop
+                renderLoop();
+
+                console.log('DataGrid initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize DataGrid:', error);
+                alert('Failed to initialize DataGrid: ' + error);
+            }
+        }
+
+        function renderLoop() {
+            if (!grid) return;
+
+            // Render the grid
+            grid.render();
+
+            // Calculate FPS
+            frameCount++;
+            const currentTime = performance.now();
+            const elapsed = currentTime - lastFrameTime;
+
+            if (elapsed >= 1000) {
+                fps = Math.round((frameCount * 1000) / elapsed);
+                document.getElementById('fps').textContent = fps + ' FPS';
+                frameCount = 0;
+                lastFrameTime = currentTime;
+            }
+
+            // Continue loop
+            animationFrameId = requestAnimationFrame(renderLoop);
+        }
+
+        function updateInfo() {
+            if (!grid) return;
+
+            const dimensions = grid.get_dimensions();
+            document.getElementById('grid-size').textContent =
+                `${dimensions[0]} rows × ${dimensions[1]} cols`;
+
+            document.getElementById('viewport-info').textContent =
+                grid.get_viewport_info();
+        }
+
+        // Event handlers
+        function setupEventHandlers() {
+            const canvas = document.getElementById('grid-canvas');
+
+            // Mouse events
+            canvas.addEventListener('mousedown', (e) => {
+                if (grid) {
+                    grid.handle_mouse_down(e);
+                    renderLoop(); // Trigger immediate render
+                }
+            });
+
+            canvas.addEventListener('mouseup', (e) => {
+                if (grid) {
+                    grid.handle_mouse_up(e);
+                }
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (grid) {
+                    grid.handle_mouse_move(e);
+                }
+            });
+
+            canvas.addEventListener('mouseleave', (e) => {
+                if (grid) {
+                    grid.handle_mouse_up(e);
+                }
+            });
+
+            // Wheel event for scrolling
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (grid) {
+                    grid.handle_wheel(e);
+                    updateInfo();
+                }
+            });
+
+            // Window resize
+            window.addEventListener('resize', () => {
+                if (grid) {
+                    const canvas = document.getElementById('grid-canvas');
+                    const container = canvas.parentElement;
+                    const width = container.clientWidth;
+                    const height = 600;
+                    canvas.width = width;
+                    canvas.height = height;
+                    grid.resize(width, height);
+                    updateInfo();
+                }
+            });
+
+            // Recreate button
+            document.getElementById('recreate-btn').addEventListener('click', () => {
+                initGrid();
+            });
+
+            // Fill data button (placeholder for now)
+            document.getElementById('fill-data-btn').addEventListener('click', () => {
+                console.log('Fill data functionality coming soon');
+            });
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            setupEventHandlers();
+            initGrid();
+        });
+
+        // Update viewport info periodically
+        setInterval(() => {
+            updateInfo();
+        }, 500);
+    </script>
+</body>
+</html>
