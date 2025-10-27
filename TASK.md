@@ -101,10 +101,16 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] Visual feedback for all selected cells
   - [x] Selection count display
   - [x] get_selected_cells() API
+- [x] Copy/Paste support
+  - [x] Ctrl+C / Cmd+C to copy selected cells
+  - [x] Ctrl+V / Cmd+V to paste cells
+  - [x] TSV (Tab-Separated Values) format
+  - [x] Rectangular selection support
+  - [x] Automatic type detection on paste
+  - [x] Clipboard API integration
 - [ ] Cell styling (colors, borders)
 - [ ] Sorting
 - [ ] Filtering
-- [ ] Copy/Paste support
 - [ ] Fixed headers/columns
 
 ### Phase 6: Performance Optimization ⚡

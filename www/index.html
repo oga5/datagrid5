@@ -62,6 +62,8 @@
                 <li><strong>列/行の境界をドラッグ / Drag Column/Row Border:</strong> サイズ変更 / Resize</li>
                 <li><strong>Shift+クリック / Shift+Click:</strong> 範囲選択 / Range selection</li>
                 <li><strong>Ctrl/Cmd+クリック / Ctrl/Cmd+Click:</strong> 複数選択 / Multi selection</li>
+                <li><strong>Ctrl/Cmd+C:</strong> 選択したセルをコピー / Copy selected cells</li>
+                <li><strong>Ctrl/Cmd+V:</strong> セルに貼り付け / Paste to cells</li>
             </ul>
         </div>
 
@@ -326,13 +328,46 @@
             });
 
             // Keyboard events
-            window.addEventListener('keydown', (e) => {
-                if (grid) {
-                    const handled = grid.handle_keyboard(e);
-                    if (handled) {
-                        e.preventDefault();
-                        updateInfo();
+            window.addEventListener('keydown', async (e) => {
+                if (!grid) return;
+
+                // Handle copy (Ctrl+C or Cmd+C)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                    e.preventDefault();
+                    const tsvData = grid.copy_selected_cells();
+                    if (tsvData) {
+                        try {
+                            await navigator.clipboard.writeText(tsvData);
+                            console.log('Copied to clipboard:', tsvData);
+                        } catch (err) {
+                            console.error('Failed to copy to clipboard:', err);
+                        }
                     }
+                    return;
+                }
+
+                // Handle paste (Ctrl+V or Cmd+V)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                    e.preventDefault();
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                            grid.paste_cells(text);
+                            renderLoop(); // Force re-render after paste
+                            updateInfo();
+                            console.log('Pasted from clipboard');
+                        }
+                    } catch (err) {
+                        console.error('Failed to paste from clipboard:', err);
+                    }
+                    return;
+                }
+
+                // Handle normal keyboard navigation
+                const handled = grid.handle_keyboard(e);
+                if (handled) {
+                    e.preventDefault();
+                    updateInfo();
                 }
             });
 
