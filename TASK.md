@@ -18,24 +18,29 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 - **Real-time Resize**: Live feedback vs preview rectangle
 - **Smart Type Detection**: Auto-detect Number/Boolean/Text on paste
 
-### 📊 Feature Coverage: 55% (71/116 features from original)
+### 📊 Feature Coverage: 71% (82/116 features from original)
 - ✅ Phase 1-4: Core, Rendering, Text, Interaction - **100% Complete**
-- ✅ Phase 5: Advanced Features - **35% Complete** (7/20 feature groups)
+- ✅ Phase 5: Advanced Features - **50% Complete** (10/20 feature groups)
   - ✅ Column resizing
   - ✅ Row resizing
   - ✅ Multi-cell selection
   - ✅ Copy/Paste support
   - ✅ Row/Column headers
   - ✅ Advanced selection (SelectAll/Row/Col)
-  - ✅ Cell styling API ← **New!**
-- ⏳ Phase 6-9: Search, Undo/Redo, Optimization, Testing - **0% Complete**
+  - ✅ Cell styling API
+  - ✅ Row/Column operations (insert/delete) ← **New!**
+  - ✅ Keyboard enhancements (Delete key, Ctrl+Home/End) ← **New!**
+  - ✅ Text search with navigation ← **New!**
+- ⏳ Phase 6-9: Search, Undo/Redo, Optimization, Testing - **15% Complete**
 
 ### 🎯 Next Priorities
 1. ~~Row/Column headers~~ ✅ **Complete!**
 2. ~~Advanced selection~~ ✅ **Complete!**
 3. ~~Cell styling API~~ ✅ **Complete!**
-4. Row/Column operations (挿入・削除)
-5. Search functionality (テキスト検索)
+4. ~~Row/Column operations (挿入・削除)~~ ✅ **Complete!**
+5. ~~Search functionality (テキスト検索)~~ ✅ **Complete!**
+6. Fixed headers/columns (freeze rows/columns)
+7. Advanced clipboard (Cut, SQL format export)
 
 ## Architecture
 
@@ -162,20 +167,20 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] RGBA color support (u32 format)
   - [x] Rendering integration (text & WebGL)
   - [ ] Custom cell borders (individual cell borders)
-- [ ] Row operations
-  - [ ] Insert row(s)
-  - [ ] Delete row(s)
+- [x] Row operations
+  - [x] Insert row(s)
+  - [x] Delete row(s)
   - [ ] Delete empty rows
   - [ ] Row context menu
-- [ ] Column operations
+- [x] Column operations
   - [ ] Auto-fit column width to content
   - [ ] Auto-fit all columns
   - [ ] Equal width for all columns
-  - [ ] Insert column
-  - [ ] Delete column
-- [ ] Keyboard enhancements
-  - [ ] Delete key to clear cell content
-  - [ ] Ctrl+Home/End (document start/end)
+  - [x] Insert column
+  - [x] Delete column
+- [x] Keyboard enhancements
+  - [x] Delete key to clear cell content
+  - [x] Ctrl+Home/End (document start/end)
 - [ ] Fixed headers/columns
   - [ ] Freeze first N rows
   - [ ] Freeze first N columns
@@ -195,9 +200,9 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [ ] Custom filter predicates
 
 ### Phase 6: Search & Find 🔍
-- [ ] Text search
-  - [ ] Find text in cells
-  - [ ] Find next/previous
+- [x] Text search
+  - [x] Find text in cells
+  - [x] Find next/previous
   - [ ] Case-sensitive option
   - [ ] Whole word matching
 - [ ] Regular expression search

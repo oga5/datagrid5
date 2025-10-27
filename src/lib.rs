@@ -37,6 +37,10 @@ pub struct DataGrid {
     // Multi-selection state
     selected_cells: HashSet<(usize, usize)>,
     selection_anchor: Option<(usize, usize)>,
+    // Search state
+    search_query: String,
+    search_results: Vec<(usize, usize)>,
+    current_search_index: Option<usize>,
 }
 
 #[wasm_bindgen]
@@ -103,6 +107,9 @@ impl DataGrid {
             resize_start_size: 0.0,
             selected_cells: HashSet::new(),
             selection_anchor: None,
+            search_query: String::new(),
+            search_results: Vec::new(),
+            current_search_index: None,
         })
     }
 
@@ -286,6 +293,20 @@ impl DataGrid {
                 NavigationCommand::End => {
                     current.map(|(row, _)| (row, self.grid.col_count() - 1))
                 }
+                NavigationCommand::DocumentStart => {
+                    Some((0, 0))
+                }
+                NavigationCommand::DocumentEnd => {
+                    Some((self.grid.row_count() - 1, self.grid.col_count() - 1))
+                }
+                NavigationCommand::Delete => {
+                    // Clear cell content
+                    if let Some((row, col)) = current {
+                        self.grid.set_value(row, col, CellValue::Empty);
+                        web_sys::console::log_1(&format!("Cleared cell: ({}, {})", row, col).into());
+                    }
+                    None
+                }
                 NavigationCommand::Enter | NavigationCommand::Escape | NavigationCommand::Tab => {
                     // Future: handle edit mode, etc.
                     None
@@ -321,6 +342,115 @@ impl DataGrid {
         }
 
         false // Event not handled
+    }
+
+    /// Handle keyboard event with modifier keys
+    pub fn handle_keyboard_with_modifiers(&mut self, event: KeyboardEvent, ctrl: bool) -> bool {
+        let key = event.key();
+
+        // Get navigation command with modifiers
+        if let Some(command) = self.keyboard_handler.handle_key_with_modifiers(&key, ctrl) {
+            let current = self.mouse_handler.selected_cell;
+
+            let new_selection = match command {
+                NavigationCommand::MoveUp => {
+                    current.and_then(|(row, col)| {
+                        if row > 0 {
+                            Some((row - 1, col))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveDown => {
+                    current.and_then(|(row, col)| {
+                        if row < self.grid.row_count() - 1 {
+                            Some((row + 1, col))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveLeft => {
+                    current.and_then(|(row, col)| {
+                        if col > 0 {
+                            Some((row, col - 1))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveRight => {
+                    current.and_then(|(row, col)| {
+                        if col < self.grid.col_count() - 1 {
+                            Some((row, col + 1))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::PageUp => {
+                    current.map(|(row, col)| {
+                        let page_size = self.viewport.visible_row_count();
+                        let new_row = row.saturating_sub(page_size);
+                        (new_row, col)
+                    })
+                }
+                NavigationCommand::PageDown => {
+                    current.map(|(row, col)| {
+                        let page_size = self.viewport.visible_row_count();
+                        let new_row = (row + page_size).min(self.grid.row_count() - 1);
+                        (new_row, col)
+                    })
+                }
+                NavigationCommand::Home => {
+                    current.map(|(row, _)| (row, 0))
+                }
+                NavigationCommand::End => {
+                    current.map(|(row, _)| (row, self.grid.col_count() - 1))
+                }
+                NavigationCommand::DocumentStart => {
+                    Some((0, 0))
+                }
+                NavigationCommand::DocumentEnd => {
+                    Some((self.grid.row_count() - 1, self.grid.col_count() - 1))
+                }
+                NavigationCommand::Delete => {
+                    if let Some((row, col)) = current {
+                        self.grid.set_value(row, col, CellValue::Empty);
+                        web_sys::console::log_1(&format!("Cleared cell: ({}, {})", row, col).into());
+                    }
+                    None
+                }
+                NavigationCommand::Enter | NavigationCommand::Escape | NavigationCommand::Tab => {
+                    None
+                }
+            };
+
+            if let Some((new_row, new_col)) = new_selection {
+                if let Some((prev_row, prev_col)) = current {
+                    if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
+                        cell.selected = false;
+                    }
+                }
+
+                self.mouse_handler.select_cell(new_row, new_col);
+                if let Some(cell) = self.grid.get_cell_mut(new_row, new_col) {
+                    cell.selected = true;
+                } else {
+                    let mut cell = Cell::default();
+                    cell.selected = true;
+                    self.grid.set_cell(new_row, new_col, cell);
+                }
+
+                self.ensure_cell_visible(new_row, new_col);
+                web_sys::console::log_1(&format!("Navigated to cell: ({}, {})", new_row, new_col).into());
+
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Ensure a cell is visible in the viewport
@@ -864,6 +994,127 @@ impl DataGrid {
             cell.font_bold = bold;
             cell.font_italic = italic;
             self.grid.set_cell(row, col, cell);
+        }
+    }
+
+    /// Insert a row at the specified position
+    pub fn insert_row(&mut self, at_index: usize) {
+        self.grid.insert_row(at_index);
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Delete a row at the specified position
+    pub fn delete_row(&mut self, index: usize) {
+        self.grid.delete_row(index);
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Insert a column at the specified position
+    pub fn insert_column(&mut self, at_index: usize) {
+        self.grid.insert_column(at_index);
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Delete a column at the specified position
+    pub fn delete_column(&mut self, index: usize) {
+        self.grid.delete_column(index);
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Search for text in grid cells (case-insensitive)
+    pub fn search_text(&mut self, query: String) -> usize {
+        self.search_query = query.to_lowercase();
+        self.search_results.clear();
+        self.current_search_index = None;
+
+        if self.search_query.is_empty() {
+            return 0;
+        }
+
+        // Search through all cells
+        for row in 0..self.grid.row_count() {
+            for col in 0..self.grid.col_count() {
+                let cell_text = self.grid.get_value_string(row, col).to_lowercase();
+                if cell_text.contains(&self.search_query) {
+                    self.search_results.push((row, col));
+                }
+            }
+        }
+
+        if !self.search_results.is_empty() {
+            self.current_search_index = Some(0);
+            let (row, col) = self.search_results[0];
+            self.select_single_cell(row, col);
+            self.ensure_cell_visible(row, col);
+        }
+
+        self.search_results.len()
+    }
+
+    /// Move to next search result
+    pub fn search_next(&mut self) -> bool {
+        if self.search_results.is_empty() {
+            return false;
+        }
+
+        if let Some(current_idx) = self.current_search_index {
+            let next_idx = (current_idx + 1) % self.search_results.len();
+            self.current_search_index = Some(next_idx);
+
+            let (row, col) = self.search_results[next_idx];
+            self.select_single_cell(row, col);
+            self.ensure_cell_visible(row, col);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Move to previous search result
+    pub fn search_prev(&mut self) -> bool {
+        if self.search_results.is_empty() {
+            return false;
+        }
+
+        if let Some(current_idx) = self.current_search_index {
+            let prev_idx = if current_idx == 0 {
+                self.search_results.len() - 1
+            } else {
+                current_idx - 1
+            };
+            self.current_search_index = Some(prev_idx);
+
+            let (row, col) = self.search_results[prev_idx];
+            self.select_single_cell(row, col);
+            self.ensure_cell_visible(row, col);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Clear search results
+    pub fn clear_search(&mut self) {
+        self.search_query.clear();
+        self.search_results.clear();
+        self.current_search_index = None;
+    }
+
+    /// Get search result count
+    pub fn get_search_result_count(&self) -> usize {
+        self.search_results.len()
+    }
+
+    /// Get current search index (1-based for display)
+    pub fn get_current_search_index(&self) -> i32 {
+        if let Some(idx) = self.current_search_index {
+            (idx + 1) as i32
+        } else {
+            -1
         }
     }
 }

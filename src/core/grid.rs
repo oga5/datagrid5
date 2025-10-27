@@ -207,6 +207,106 @@ impl Grid {
 
         result
     }
+
+    /// Insert a new row at the specified position
+    pub fn insert_row(&mut self, at_index: usize) {
+        if at_index > self.rows {
+            return;
+        }
+
+        // Move all cells at or after the insertion point down by one row
+        let mut new_cells = HashMap::new();
+        for ((row, col), cell) in self.cells.drain() {
+            if row >= at_index {
+                new_cells.insert((row + 1, col), cell);
+            } else {
+                new_cells.insert((row, col), cell);
+            }
+        }
+        self.cells = new_cells;
+
+        // Insert new row height
+        self.row_heights.insert(at_index, self.default_row_height);
+        self.rows += 1;
+    }
+
+    /// Delete a row at the specified position
+    pub fn delete_row(&mut self, index: usize) {
+        if index >= self.rows || self.rows <= 1 {
+            return;
+        }
+
+        // Remove cells in the deleted row and shift remaining cells up
+        let mut new_cells = HashMap::new();
+        for ((row, col), cell) in self.cells.drain() {
+            if row == index {
+                // Skip cells in deleted row
+                continue;
+            } else if row > index {
+                // Shift rows down
+                new_cells.insert((row - 1, col), cell);
+            } else {
+                new_cells.insert((row, col), cell);
+            }
+        }
+        self.cells = new_cells;
+
+        // Remove row height
+        if index < self.row_heights.len() {
+            self.row_heights.remove(index);
+        }
+        self.rows -= 1;
+    }
+
+    /// Insert a new column at the specified position
+    pub fn insert_column(&mut self, at_index: usize) {
+        if at_index > self.cols {
+            return;
+        }
+
+        // Move all cells at or after the insertion point right by one column
+        let mut new_cells = HashMap::new();
+        for ((row, col), cell) in self.cells.drain() {
+            if col >= at_index {
+                new_cells.insert((row, col + 1), cell);
+            } else {
+                new_cells.insert((row, col), cell);
+            }
+        }
+        self.cells = new_cells;
+
+        // Insert new column width
+        self.col_widths.insert(at_index, self.default_col_width);
+        self.cols += 1;
+    }
+
+    /// Delete a column at the specified position
+    pub fn delete_column(&mut self, index: usize) {
+        if index >= self.cols || self.cols <= 1 {
+            return;
+        }
+
+        // Remove cells in the deleted column and shift remaining cells left
+        let mut new_cells = HashMap::new();
+        for ((row, col), cell) in self.cells.drain() {
+            if col == index {
+                // Skip cells in deleted column
+                continue;
+            } else if col > index {
+                // Shift columns left
+                new_cells.insert((row, col - 1), cell);
+            } else {
+                new_cells.insert((row, col), cell);
+            }
+        }
+        self.cells = new_cells;
+
+        // Remove column width
+        if index < self.col_widths.len() {
+            self.col_widths.remove(index);
+        }
+        self.cols -= 1;
+    }
 }
 
 #[cfg(test)]

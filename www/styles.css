@@ -114,6 +114,34 @@ button:active {
     font-weight: 700;
 }
 
+.search-panel {
+    display: flex;
+    gap: 10px;
+    padding: 15px 30px;
+    background: #f0f4ff;
+    border-bottom: 1px solid #e0e0e0;
+    align-items: center;
+}
+
+.search-panel input[type="text"] {
+    flex: 1;
+    max-width: 300px;
+    padding: 10px 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.95em;
+}
+
+.search-panel button {
+    padding: 10px 15px;
+}
+
+.search-panel #search-results {
+    color: #667eea;
+    font-weight: 600;
+    min-width: 100px;
+}
+
 .canvas-container {
     padding: 20px;
     background: #fafafa;

@@ -43,6 +43,15 @@
             </div>
         </div>
 
+        <div class="search-panel">
+            <input type="text" id="search-input" placeholder="Search in grid..." />
+            <button id="search-btn">Search</button>
+            <button id="search-prev-btn">◀ Prev</button>
+            <button id="search-next-btn">Next ▶</button>
+            <button id="search-clear-btn">Clear</button>
+            <span id="search-results">-</span>
+        </div>
+
         <div class="canvas-container" id="canvas-container">
             <canvas id="webgl-canvas" width="1200" height="600"></canvas>
             <canvas id="text-canvas" width="1200" height="600" tabindex="0"></canvas>
@@ -421,8 +430,9 @@
                     return;
                 }
 
-                // Handle normal keyboard navigation
-                const handled = grid.handle_keyboard(e);
+                // Handle keyboard navigation with modifiers
+                const ctrl = e.ctrlKey || e.metaKey;
+                const handled = grid.handle_keyboard_with_modifiers(e, ctrl);
                 if (handled) {
                     e.preventDefault();
                     updateInfo();
@@ -517,6 +527,62 @@
                 renderLoop();
                 console.log('Applied test font styles to cells');
             });
+
+            // Search button
+            document.getElementById('search-btn').addEventListener('click', () => {
+                if (!grid) return;
+                const query = document.getElementById('search-input').value;
+                if (query) {
+                    const count = grid.search_text(query);
+                    updateSearchResults(count);
+                    renderLoop();
+                }
+            });
+
+            // Search next
+            document.getElementById('search-next-btn').addEventListener('click', () => {
+                if (!grid) return;
+                grid.search_next();
+                updateSearchResults();
+                renderLoop();
+            });
+
+            // Search previous
+            document.getElementById('search-prev-btn').addEventListener('click', () => {
+                if (!grid) return;
+                grid.search_prev();
+                updateSearchResults();
+                renderLoop();
+            });
+
+            // Clear search
+            document.getElementById('search-clear-btn').addEventListener('click', () => {
+                if (!grid) return;
+                grid.clear_search();
+                document.getElementById('search-input').value = '';
+                document.getElementById('search-results').textContent = '-';
+                renderLoop();
+            });
+
+            // Search on Enter key
+            document.getElementById('search-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('search-btn').click();
+                }
+            });
+        }
+
+        function updateSearchResults(count) {
+            if (!grid) return;
+            const resultCount = count !== undefined ? count : grid.get_search_result_count();
+            const currentIndex = grid.get_current_search_index();
+
+            if (resultCount > 0) {
+                document.getElementById('search-results').textContent =
+                    `${currentIndex} / ${resultCount} results`;
+            } else {
+                document.getElementById('search-results').textContent = 'No results';
+            }
         }
 
         // Initialize on load

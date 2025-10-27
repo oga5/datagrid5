@@ -34,7 +34,23 @@ impl KeyboardHandler {
             // Tab key
             "Tab" => Some(NavigationCommand::Tab),
 
+            // Delete key
+            "Delete" => Some(NavigationCommand::Delete),
+
             _ => None,
+        }
+    }
+
+    /// Handle keyboard event with modifier keys
+    pub fn handle_key_with_modifiers(&self, key: &str, ctrl: bool) -> Option<NavigationCommand> {
+        if ctrl {
+            match key {
+                "Home" => Some(NavigationCommand::DocumentStart),
+                "End" => Some(NavigationCommand::DocumentEnd),
+                _ => self.handle_key(key),
+            }
+        } else {
+            self.handle_key(key)
         }
     }
 }
@@ -59,4 +75,7 @@ pub enum NavigationCommand {
     Enter,
     Escape,
     Tab,
+    Delete,
+    DocumentStart,
+    DocumentEnd,
 }
