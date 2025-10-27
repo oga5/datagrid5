@@ -113,8 +113,13 @@ impl TextRenderer {
         let first_col = viewport.first_visible_col;
         let last_col = viewport.last_visible_col.min(grid.col_count().saturating_sub(1));
 
-        // Render visible cells
+        // Render visible cells (skip filtered rows)
         for row in first_row..=last_row {
+            // Skip filtered (hidden) rows
+            if grid.is_row_filtered(row) {
+                continue;
+            }
+
             for col in first_col..=last_col {
                 self.render_cell_with_search(grid, viewport, row, col, search_results, current_search_index);
             }

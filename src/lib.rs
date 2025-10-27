@@ -950,6 +950,20 @@ impl DataGrid {
         result
     }
 
+    /// Cut selected cells (copy and then clear)
+    pub fn cut_selected_cells(&mut self) -> String {
+        // First copy the cells
+        let clipboard_text = self.copy_selected_cells();
+
+        // Then clear all selected cells
+        let cells_to_clear: Vec<(usize, usize)> = self.selected_cells.iter().copied().collect();
+        for (row, col) in cells_to_clear {
+            self.grid.set_value(row, col, CellValue::Empty);
+        }
+
+        clipboard_text
+    }
+
     /// Paste cells from TSV (Tab-Separated Values) format
     /// Pastes starting from the current focus cell
     pub fn paste_cells(&mut self, tsv_text: String) -> Result<(), String> {
@@ -1408,6 +1422,93 @@ impl DataGrid {
     /// Get redo stack size
     pub fn get_redo_count(&self) -> usize {
         self.redo_stack.len()
+    }
+
+    /// Auto-fit column width to content
+    pub fn auto_fit_column(&mut self, col: usize) {
+        if col >= self.grid.col_count() {
+            return;
+        }
+
+        let padding = 20.0; // Padding on both sides
+        let min_width = 50.0;
+        let max_width = 400.0;
+
+        // Measure all cells in this column
+        let mut max_text_width = 0.0;
+
+        for row in 0..self.grid.row_count() {
+            let text = self.grid.get_value_string(row, col);
+            if !text.is_empty() {
+                let text_width = self.text_renderer.measure_text(&text);
+                max_text_width = max_text_width.max(text_width);
+            }
+        }
+
+        // Also measure column header
+        let header_text = Grid::get_col_name(col);
+        let header_width = self.text_renderer.measure_text(&header_text);
+        max_text_width = max_text_width.max(header_width);
+
+        // Calculate optimal width with padding
+        let optimal_width = (max_text_width + padding).clamp(min_width, max_width);
+
+        self.grid.set_col_width(col, optimal_width);
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Auto-fit all columns to content
+    pub fn auto_fit_all_columns(&mut self) {
+        for col in 0..self.grid.col_count() {
+            self.auto_fit_column(col);
+        }
+    }
+
+    /// Set all columns to equal width
+    pub fn set_all_columns_equal_width(&mut self, width: f32) {
+        for col in 0..self.grid.col_count() {
+            self.grid.set_col_width(col, width);
+        }
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Filter column by text (case-insensitive contains)
+    pub fn filter_column_by_text(&mut self, col: usize, text: String) {
+        let filter_text = text.to_lowercase();
+        self.grid.apply_column_filter(col, |value| {
+            let cell_text = match value {
+                CellValue::Text(t) => t.to_lowercase(),
+                CellValue::Number(n) => n.to_string(),
+                CellValue::Boolean(b) => b.to_string(),
+                CellValue::Empty => String::new(),
+            };
+            cell_text.contains(&filter_text)
+        });
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Filter column by empty cells
+    pub fn filter_column_show_non_empty(&mut self, col: usize) {
+        self.grid.apply_column_filter(col, |value| {
+            !matches!(value, CellValue::Empty)
+        });
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Clear all column filters
+    pub fn clear_column_filters(&mut self) {
+        self.grid.clear_filters();
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Check if a row is filtered (hidden)
+    pub fn is_row_filtered(&self, row: usize) -> bool {
+        self.grid.is_row_filtered(row)
+    }
+
+    /// Get visible row count
+    pub fn get_visible_row_count(&self) -> usize {
+        self.grid.visible_row_count()
     }
 }
 

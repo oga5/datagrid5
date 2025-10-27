@@ -89,6 +89,7 @@
                 <li><strong>Shift+クリック / Shift+Click:</strong> 範囲選択 / Range selection</li>
                 <li><strong>Ctrl/Cmd+クリック / Ctrl/Cmd+Click:</strong> 複数選択 / Multi selection</li>
                 <li><strong>Ctrl/Cmd+C:</strong> 選択したセルをコピー / Copy selected cells</li>
+                <li><strong>Ctrl/Cmd+X:</strong> 選択したセルを切り取り / Cut selected cells</li>
                 <li><strong>Ctrl/Cmd+V:</strong> セルに貼り付け / Paste to cells</li>
                 <li><strong>Ctrl/Cmd+A:</strong> 全選択 / Select all cells</li>
                 <li><strong>行ヘッダークリック / Row Header Click:</strong> 行全体を選択 / Select entire row</li>
@@ -413,6 +414,22 @@
                             console.log('Copied to clipboard:', tsvData);
                         } catch (err) {
                             console.error('Failed to copy to clipboard:', err);
+                        }
+                    }
+                    return;
+                }
+
+                // Handle cut (Ctrl+X or Cmd+X)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+                    e.preventDefault();
+                    const tsvData = grid.cut_selected_cells();
+                    if (tsvData) {
+                        try {
+                            await navigator.clipboard.writeText(tsvData);
+                            console.log('Cut to clipboard:', tsvData);
+                            renderLoop();
+                        } catch (err) {
+                            console.error('Failed to cut to clipboard:', err);
                         }
                     }
                     return;

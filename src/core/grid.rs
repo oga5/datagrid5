@@ -1,5 +1,5 @@
 use super::cell::{Cell, CellValue};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Main grid data structure optimized for sparse data
 pub struct Grid {
@@ -31,6 +31,9 @@ pub struct Grid {
     // Freeze state
     pub frozen_rows: usize,
     pub frozen_cols: usize,
+
+    // Filter state
+    filtered_rows: HashSet<usize>, // Rows that are hidden by filters
 }
 
 impl Grid {
@@ -54,6 +57,7 @@ impl Grid {
             sort_ascending: true,
             frozen_rows: 0,
             frozen_cols: 0,
+            filtered_rows: HashSet::new(),
         }
     }
 
@@ -386,6 +390,62 @@ impl Grid {
             }
         }
         self.row_heights = new_row_heights;
+    }
+
+    /// Apply filter to a column
+    pub fn apply_column_filter<F>(&mut self, col: usize, predicate: F)
+    where
+        F: Fn(&CellValue) -> bool,
+    {
+        self.filtered_rows.clear();
+
+        for row in 0..self.rows {
+            let value = self.get_value(row, col);
+            if !predicate(value) {
+                self.filtered_rows.insert(row);
+            }
+        }
+    }
+
+    /// Clear all filters
+    pub fn clear_filters(&mut self) {
+        self.filtered_rows.clear();
+    }
+
+    /// Check if a row is filtered (hidden)
+    pub fn is_row_filtered(&self, row: usize) -> bool {
+        self.filtered_rows.contains(&row)
+    }
+
+    /// Get count of visible (non-filtered) rows
+    pub fn visible_row_count(&self) -> usize {
+        self.rows - self.filtered_rows.len()
+    }
+
+    /// Get frozen row bounds (y positions)
+    pub fn frozen_row_bounds(&self) -> (f32, f32) {
+        if self.frozen_rows == 0 {
+            return (0.0, 0.0);
+        }
+
+        let mut y = 0.0;
+        for row in 0..self.frozen_rows.min(self.rows) {
+            y += self.row_height(row);
+        }
+        (0.0, y)
+    }
+
+    /// Get frozen column bounds (x positions)
+    pub fn frozen_col_bounds(&self) -> (f32, f32) {
+        if self.frozen_cols == 0 {
+            return (0.0, 0.0);
+        }
+
+        let mut x = 0.0;
+        for col in 0..self.frozen_cols.min(self.cols) {
+            x += self.col_width(col);
+        }
+        (0.0, x)
     }
 }
 
