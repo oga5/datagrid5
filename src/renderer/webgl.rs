@@ -102,67 +102,159 @@ impl WebGLRenderer {
         self.context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
     }
 
-    /// Render the grid
+    /// Render the grid with freeze support
     pub fn render(&self, grid: &Grid, viewport: &Viewport) {
         self.clear();
 
         self.context.use_program(Some(&self.shader_program.program));
 
+        // Set resolution uniform (same for all regions)
+        self.context
+            .uniform2f(Some(&self.u_resolution), self.canvas_width, self.canvas_height);
+
         // Calculate header offset
         let header_offset_x = if grid.show_headers { grid.row_header_width } else { 0.0 };
         let header_offset_y = if grid.show_headers { grid.col_header_height } else { 0.0 };
 
-        // Set uniforms (apply header offset)
-        self.context
-            .uniform2f(Some(&self.u_resolution), self.canvas_width, self.canvas_height);
-        self.context
-            .uniform2f(
+        let frozen_rows = grid.frozen_rows;
+        let frozen_cols = grid.frozen_cols;
+
+        // Render in 4 regions to support frozen rows/columns:
+        // 1. Top-left: frozen rows × frozen cols (no scroll)
+        // 2. Top-right: frozen rows × scrollable cols (horizontal scroll only)
+        // 3. Bottom-left: scrollable rows × frozen cols (vertical scroll only)
+        // 4. Bottom-right: scrollable rows × scrollable cols (both scroll)
+
+        // Region 1: Frozen rows × Frozen cols (top-left) - no scroll
+        if frozen_rows > 0 && frozen_cols > 0 {
+            self.context.uniform2f(
+                Some(&self.u_translation),
+                header_offset_x,
+                header_offset_y,
+            );
+            self.render_region(grid, viewport, 0, frozen_rows, 0, frozen_cols);
+        }
+
+        // Region 2: Frozen rows × Scrollable cols (top-right) - horizontal scroll
+        if frozen_rows > 0 {
+            self.context.uniform2f(
                 Some(&self.u_translation),
                 -viewport.scroll_x + header_offset_x,
+                header_offset_y,
+            );
+            self.render_region(
+                grid,
+                viewport,
+                0,
+                frozen_rows,
+                frozen_cols.max(viewport.first_visible_col),
+                viewport.last_visible_col.min(grid.col_count().saturating_sub(1)) + 1,
+            );
+        }
+
+        // Region 3: Scrollable rows × Frozen cols (bottom-left) - vertical scroll
+        if frozen_cols > 0 {
+            self.context.uniform2f(
+                Some(&self.u_translation),
+                header_offset_x,
                 -viewport.scroll_y + header_offset_y,
             );
+            self.render_region(
+                grid,
+                viewport,
+                frozen_rows.max(viewport.first_visible_row),
+                viewport.last_visible_row.min(grid.row_count().saturating_sub(1)) + 1,
+                0,
+                frozen_cols,
+            );
+        }
 
-        // Render grid lines
-        self.render_grid_lines(grid, viewport);
-
-        // Render cell backgrounds
-        self.render_cell_backgrounds(grid, viewport);
-
-        // Render cell borders
-        self.render_cell_borders(grid, viewport);
+        // Region 4: Scrollable rows × Scrollable cols (bottom-right) - both scroll
+        self.context.uniform2f(
+            Some(&self.u_translation),
+            -viewport.scroll_x + header_offset_x,
+            -viewport.scroll_y + header_offset_y,
+        );
+        self.render_region(
+            grid,
+            viewport,
+            frozen_rows.max(viewport.first_visible_row),
+            viewport.last_visible_row.min(grid.row_count().saturating_sub(1)) + 1,
+            frozen_cols.max(viewport.first_visible_col),
+            viewport.last_visible_col.min(grid.col_count().saturating_sub(1)) + 1,
+        );
 
         // Note: Text rendering will be done via Canvas 2D API overlay
     }
 
-    /// Render grid lines
-    fn render_grid_lines(&self, grid: &Grid, viewport: &Viewport) {
+    /// Render a specific region of the grid
+    fn render_region(
+        &self,
+        grid: &Grid,
+        viewport: &Viewport,
+        row_start: usize,
+        row_end: usize,
+        col_start: usize,
+        col_end: usize,
+    ) {
+        if row_start >= row_end || col_start >= col_end {
+            return;
+        }
+
+        // Render grid lines for this region
+        self.render_grid_lines_region(grid, row_start, row_end, col_start, col_end);
+
+        // Render cell backgrounds for this region
+        self.render_cell_backgrounds_region(grid, row_start, row_end, col_start, col_end);
+
+        // Render cell borders for this region
+        self.render_cell_borders_region(grid, row_start, row_end, col_start, col_end);
+    }
+
+    /// Render grid lines for a specific region
+    fn render_grid_lines_region(
+        &self,
+        grid: &Grid,
+        row_start: usize,
+        row_end: usize,
+        col_start: usize,
+        col_end: usize,
+    ) {
         let mut positions: Vec<f32> = Vec::new();
         let mut colors: Vec<f32> = Vec::new();
 
         let line_color = [0.8, 0.8, 0.8, 1.0]; // Light gray
 
-        // Vertical lines (columns)
-        let mut x = 0.0;
-        for col in 0..=grid.col_count() {
-            if col > 0 {
-                x += grid.col_width(col - 1);
-            }
+        // Calculate region bounds
+        let x_start = grid.col_x_position(col_start);
+        let x_end = if col_end < grid.col_count() {
+            grid.col_x_position(col_end)
+        } else {
+            grid.total_width()
+        };
+        let y_start = grid.row_y_position(row_start);
+        let y_end = if row_end < grid.row_count() {
+            grid.row_y_position(row_end)
+        } else {
+            grid.total_height()
+        };
 
-            // Line from top to bottom
-            positions.extend_from_slice(&[x, 0.0, x, grid.total_height()]);
+        // Vertical lines (columns)
+        for col in col_start..=col_end.min(grid.col_count()) {
+            let x = grid.col_x_position(col);
+
+            // Line from top to bottom of region
+            positions.extend_from_slice(&[x, y_start, x, y_end]);
             colors.extend_from_slice(&line_color);
             colors.extend_from_slice(&line_color);
         }
 
         // Horizontal lines (rows)
-        let mut y = 0.0;
-        for row in 0..=grid.row_count() {
-            if row > 0 {
-                y += grid.row_height(row - 1);
-            }
+        for row in row_start..=row_end.min(grid.row_count()) {
+            let y = grid.row_y_position(row);
 
-            // Line from left to right
-            positions.extend_from_slice(&[0.0, y, grid.total_width(), y]);
+            // Line from left to right of region
+            positions.extend_from_slice(&[x_start, y, x_end, y]);
             colors.extend_from_slice(&line_color);
             colors.extend_from_slice(&line_color);
         }
@@ -170,50 +262,91 @@ impl WebGLRenderer {
         self.draw_lines(&positions, &colors);
     }
 
-    /// Render cell backgrounds
-    fn render_cell_backgrounds(&self, grid: &Grid, viewport: &Viewport) {
+    /// Render cell backgrounds for a specific region
+    fn render_cell_backgrounds_region(
+        &self,
+        grid: &Grid,
+        row_start: usize,
+        row_end: usize,
+        col_start: usize,
+        col_end: usize,
+    ) {
         let mut positions: Vec<f32> = Vec::new();
         let mut colors: Vec<f32> = Vec::new();
 
-        // Header background (row 0)
-        let header_color = [0.95, 0.95, 0.95, 1.0]; // Light gray
-        let mut x = 0.0;
-        for col in 0..grid.col_count() {
-            let width = grid.col_width(col);
-            let height = grid.row_height(0);
-
-            // Two triangles to form a rectangle
-            let x1 = x;
-            let y1 = 0.0;
-            let x2 = x + width;
-            let y2 = height;
-
-            positions.extend_from_slice(&[
-                x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2,
-            ]);
-
-            for _ in 0..6 {
-                colors.extend_from_slice(&header_color);
+        for row in row_start..row_end.min(grid.row_count()) {
+            if grid.is_row_filtered(row) {
+                continue;
             }
 
-            x += width;
+            for col in col_start..col_end.min(grid.col_count()) {
+                let x = grid.col_x_position(col);
+                let y = grid.row_y_position(row);
+                let width = grid.col_width(col);
+                let height = grid.row_height(row);
+
+                // Get cell and check for background color or selection
+                let cell = grid.get_cell(row, col);
+
+                let bg_color = if let Some(cell) = cell {
+                    if let Some(cell_color) = cell.bg_color {
+                        // Convert u32 RGBA to float array
+                        let r = ((cell_color >> 24) & 0xFF) as f32 / 255.0;
+                        let g = ((cell_color >> 16) & 0xFF) as f32 / 255.0;
+                        let b = ((cell_color >> 8) & 0xFF) as f32 / 255.0;
+                        let a = (cell_color & 0xFF) as f32 / 255.0;
+                        [r, g, b, a]
+                    } else if cell.selected {
+                        [0.8, 0.9, 1.0, 1.0] // Light blue selection
+                    } else {
+                        continue; // Skip cells without background
+                    }
+                } else {
+                    // No cell exists at this position, skip
+                    continue;
+                };
+
+                // Two triangles to form a rectangle
+                let x1 = x;
+                let y1 = y;
+                let x2 = x + width;
+                let y2 = y + height;
+
+                positions.extend_from_slice(&[
+                    x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2,
+                ]);
+
+                for _ in 0..6 {
+                    colors.extend_from_slice(&bg_color);
+                }
+            }
         }
 
-        self.draw_triangles(&positions, &colors);
+        if !positions.is_empty() {
+            self.draw_triangles(&positions, &colors);
+        }
     }
 
-    /// Render cell borders
-    fn render_cell_borders(&self, grid: &Grid, viewport: &Viewport) {
+    /// Render cell borders for a specific region
+    fn render_cell_borders_region(
+        &self,
+        grid: &Grid,
+        row_start: usize,
+        row_end: usize,
+        col_start: usize,
+        col_end: usize,
+    ) {
         let mut positions: Vec<f32> = Vec::new();
         let mut colors: Vec<f32> = Vec::new();
 
         let border_color = [0.6, 0.6, 0.6, 1.0]; // Dark gray
 
-        for row in viewport.first_visible_row..=viewport.last_visible_row.min(grid.row_count() - 1)
-        {
-            for col in
-                viewport.first_visible_col..=viewport.last_visible_col.min(grid.col_count() - 1)
-            {
+        for row in row_start..row_end.min(grid.row_count()) {
+            if grid.is_row_filtered(row) {
+                continue;
+            }
+
+            for col in col_start..col_end.min(grid.col_count()) {
                 let x = grid.col_x_position(col);
                 let y = grid.row_y_position(row);
                 let width = grid.col_width(col);
@@ -231,7 +364,9 @@ impl WebGLRenderer {
             }
         }
 
-        self.draw_lines(&positions, &colors);
+        if !positions.is_empty() {
+            self.draw_lines(&positions, &colors);
+        }
     }
 
     /// Draw lines

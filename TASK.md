@@ -34,11 +34,10 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - ✅ Search highlighting
   - ✅ Advanced search (case-sensitive, whole word, replace)
   - ✅ Column sorting (ascending/descending)
-  - ✅ Freeze rows/columns API
-  - ✅ Column auto-fit (width to content) ← **New!**
-  - ✅ Cut operation (Ctrl+X) ← **New!**
-  - ✅ Column filtering (text-based) ← **New!**
-  - ✅ Freeze rendering helpers ← **New!**
+  - ✅ Freeze rows/columns (complete implementation) ← **New!**
+  - ✅ Column auto-fit (width to content)
+  - ✅ Cut operation (Ctrl+X)
+  - ✅ Column filtering (text-based)
 - ✅ Phase 6-7: Search & Undo/Redo - **60% Complete**
   - ✅ Text search with highlighting
   - ✅ Replace functionality (current/all/selection)
@@ -203,8 +202,8 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] Freeze first N rows API
   - [x] Freeze first N columns API
   - [x] Frozen bounds calculation
-  - [ ] Complete freeze rendering implementation
-  - [ ] Scrollable content area with frozen regions
+  - [x] Complete freeze rendering implementation
+  - [x] Scrollable content area with frozen regions
 - [x] Advanced clipboard
   - [x] Cut operation (Ctrl+X)
   - [ ] SQL INSERT format export

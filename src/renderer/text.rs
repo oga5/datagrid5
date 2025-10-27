@@ -113,15 +113,51 @@ impl TextRenderer {
         let first_col = viewport.first_visible_col;
         let last_col = viewport.last_visible_col.min(grid.col_count().saturating_sub(1));
 
-        // Render visible cells (skip filtered rows)
-        for row in first_row..=last_row {
-            // Skip filtered (hidden) rows
-            if grid.is_row_filtered(row) {
-                continue;
-            }
+        // Get frozen bounds
+        let frozen_rows = grid.frozen_rows;
+        let frozen_cols = grid.frozen_cols;
 
-            for col in first_col..=last_col {
-                self.render_cell_with_search(grid, viewport, row, col, search_results, current_search_index);
+        // Render in 4 regions to support frozen rows/columns:
+        // 1. Top-left: frozen rows × frozen cols (always visible)
+        // 2. Top-right: frozen rows × scrollable cols
+        // 3. Bottom-left: scrollable rows × frozen cols
+        // 4. Bottom-right: scrollable rows × scrollable cols
+
+        // Region 1: Frozen rows × Frozen cols (top-left)
+        if frozen_rows > 0 && frozen_cols > 0 {
+            for row in 0..frozen_rows.min(grid.row_count()) {
+                if grid.is_row_filtered(row) { continue; }
+                for col in 0..frozen_cols.min(grid.col_count()) {
+                    self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, true, true);
+                }
+            }
+        }
+
+        // Region 2: Frozen rows × Scrollable cols (top-right)
+        if frozen_rows > 0 {
+            for row in 0..frozen_rows.min(grid.row_count()) {
+                if grid.is_row_filtered(row) { continue; }
+                for col in first_col.max(frozen_cols)..=last_col {
+                    self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, true, false);
+                }
+            }
+        }
+
+        // Region 3: Scrollable rows × Frozen cols (bottom-left)
+        if frozen_cols > 0 {
+            for row in first_row.max(frozen_rows)..=last_row {
+                if grid.is_row_filtered(row) { continue; }
+                for col in 0..frozen_cols.min(grid.col_count()) {
+                    self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, false, true);
+                }
+            }
+        }
+
+        // Region 4: Scrollable rows × Scrollable cols (bottom-right)
+        for row in first_row.max(frozen_rows)..=last_row {
+            if grid.is_row_filtered(row) { continue; }
+            for col in first_col.max(frozen_cols)..=last_col {
+                self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, false, false);
             }
         }
     }
@@ -129,6 +165,132 @@ impl TextRenderer {
     /// Render a single cell's text
     fn render_cell(&self, grid: &Grid, viewport: &Viewport, row: usize, col: usize) {
         self.render_cell_with_search(grid, viewport, row, col, &[], None);
+    }
+
+    /// Render cell with frozen row/column support
+    fn render_cell_with_search_frozen(
+        &self,
+        grid: &Grid,
+        viewport: &Viewport,
+        row: usize,
+        col: usize,
+        search_results: &[(usize, usize)],
+        current_search_index: Option<usize>,
+        is_frozen_row: bool,
+        is_frozen_col: bool,
+    ) {
+        let text = grid.get_value_string(row, col);
+        if text.is_empty() {
+            return;
+        }
+
+        // Calculate cell position on canvas
+        let grid_x = grid.col_x_position(col);
+        let grid_y = grid.row_y_position(row);
+
+        // Apply header offset if headers are shown
+        let header_offset_x = if grid.show_headers { grid.row_header_width } else { 0.0 };
+        let header_offset_y = if grid.show_headers { grid.col_header_height } else { 0.0 };
+
+        // For frozen rows/cols, don't apply scroll offset
+        let scroll_x = if is_frozen_col { 0.0 } else { viewport.scroll_x };
+        let scroll_y = if is_frozen_row { 0.0 } else { viewport.scroll_y };
+
+        let canvas_x = grid_x - scroll_x + header_offset_x;
+        let canvas_y = grid_y - scroll_y + header_offset_y;
+
+        let width = grid.col_width(col);
+        let height = grid.row_height(row);
+
+        // Check if cell is visible
+        if canvas_x + width < 0.0 || canvas_x > viewport.canvas_width
+            || canvas_y + height < 0.0 || canvas_y > viewport.canvas_height
+        {
+            return;
+        }
+
+        // Get cell data
+        let cell = grid.get_cell(row, col);
+        let is_selected = cell.map(|c| c.selected).unwrap_or(false);
+
+        // Check if this cell is a search result
+        let is_search_match = search_results.contains(&(row, col));
+        let is_current_match = if let Some(idx) = current_search_index {
+            idx < search_results.len() && search_results[idx] == (row, col)
+        } else {
+            false
+        };
+
+        // Draw cell background
+        if let Some(cell) = cell {
+            if let Some(bg_color) = cell.bg_color {
+                let bg_str = u32_to_rgba_string(bg_color);
+                self.context.set_fill_style(&bg_str.into());
+                self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+            } else if is_current_match {
+                self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+                self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+            } else if is_search_match {
+                self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
+                self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+            } else if is_selected {
+                self.context.set_fill_style(&self.selected_bg_color.clone().into());
+                self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+            }
+        } else if is_current_match {
+            self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+            self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+        } else if is_search_match {
+            self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
+            self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+        } else if is_selected {
+            self.context.set_fill_style(&self.selected_bg_color.clone().into());
+            self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+        }
+
+        // Set text color
+        let text_color = if let Some(cell) = cell {
+            if let Some(fg_color) = cell.fg_color {
+                u32_to_rgba_string(fg_color)
+            } else if is_selected {
+                self.selected_text_color.clone()
+            } else if row == 0 {
+                self.header_text_color.clone()
+            } else {
+                self.text_color.clone()
+            }
+        } else {
+            self.text_color.clone()
+        };
+        self.context.set_fill_style(&text_color.into());
+
+        // Set font style
+        if let Some(cell) = cell {
+            let mut font_weight = "400".to_string();
+            let mut font_style = "normal".to_string();
+
+            if cell.font_bold {
+                font_weight = "700".to_string();
+            }
+            if cell.font_italic {
+                font_style = "italic".to_string();
+            }
+
+            let font_string = format!("{} {} {}px {}", font_style, font_weight, self.font_config.size, self.font_config.family);
+            self.context.set_font(&font_string);
+        } else {
+            self.context.set_font(&self.font_string);
+        }
+
+        // Draw text with padding
+        let padding = 5.0;
+        let text_x = canvas_x + padding;
+        let text_y = canvas_y + height / 2.0 + self.font_config.size / 3.0;
+
+        let _ = self.context.fill_text(&text, text_x as f64, text_y as f64);
+
+        // Reset font
+        self.context.set_font(&self.font_string);
     }
 
     /// Render a single cell's text with search highlighting
