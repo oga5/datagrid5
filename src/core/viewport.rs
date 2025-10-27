@@ -126,8 +126,12 @@ impl Viewport {
 
     /// Convert canvas coordinates to grid cell position
     pub fn canvas_to_cell(&self, canvas_x: f32, canvas_y: f32, grid: &Grid) -> Option<(usize, usize)> {
-        let grid_x = canvas_x + self.scroll_x;
-        let grid_y = canvas_y + self.scroll_y;
+        // Subtract header offset if headers are shown
+        let header_offset_x = if grid.show_headers { grid.row_header_width } else { 0.0 };
+        let header_offset_y = if grid.show_headers { grid.col_header_height } else { 0.0 };
+
+        let grid_x = canvas_x - header_offset_x + self.scroll_x;
+        let grid_y = canvas_y - header_offset_y + self.scroll_y;
 
         // Find row
         let mut y = 0.0;

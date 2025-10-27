@@ -84,6 +84,11 @@ impl TextRenderer {
         // Clear canvas first
         self.clear(viewport.canvas_width, viewport.canvas_height);
 
+        // Render headers if enabled
+        if grid.show_headers {
+            self.render_headers(grid, viewport);
+        }
+
         let first_row = viewport.first_visible_row;
         let last_row = viewport.last_visible_row.min(grid.row_count().saturating_sub(1));
         let first_col = viewport.first_visible_col;
@@ -107,8 +112,13 @@ impl TextRenderer {
         // Calculate cell position on canvas
         let grid_x = grid.col_x_position(col);
         let grid_y = grid.row_y_position(row);
-        let canvas_x = grid_x - viewport.scroll_x;
-        let canvas_y = grid_y - viewport.scroll_y;
+
+        // Apply header offset if headers are shown
+        let header_offset_x = if grid.show_headers { grid.row_header_width } else { 0.0 };
+        let header_offset_y = if grid.show_headers { grid.col_header_height } else { 0.0 };
+
+        let canvas_x = grid_x - viewport.scroll_x + header_offset_x;
+        let canvas_y = grid_y - viewport.scroll_y + header_offset_y;
 
         let width = grid.col_width(col);
         let height = grid.row_height(row);
@@ -176,8 +186,13 @@ impl TextRenderer {
     pub fn render_cell_selection(&self, grid: &Grid, viewport: &Viewport, row: usize, col: usize) {
         let grid_x = grid.col_x_position(col);
         let grid_y = grid.row_y_position(row);
-        let canvas_x = grid_x - viewport.scroll_x;
-        let canvas_y = grid_y - viewport.scroll_y;
+
+        // Apply header offset if headers are shown
+        let header_offset_x = if grid.show_headers { grid.row_header_width } else { 0.0 };
+        let header_offset_y = if grid.show_headers { grid.col_header_height } else { 0.0 };
+
+        let canvas_x = grid_x - viewport.scroll_x + header_offset_x;
+        let canvas_y = grid_y - viewport.scroll_y + header_offset_y;
 
         let width = grid.col_width(col);
         let height = grid.row_height(row);
@@ -220,5 +235,144 @@ impl TextRenderer {
     pub fn set_selection_colors(&mut self, bg_color: String, text_color: String) {
         self.selected_bg_color = bg_color;
         self.selected_text_color = text_color;
+    }
+
+    /// Render row and column headers
+    fn render_headers(&self, grid: &Grid, viewport: &Viewport) {
+        let row_header_width = grid.row_header_width;
+        let col_header_height = grid.col_header_height;
+
+        // Header background color
+        let header_bg = "#f0f0f0";
+        let header_border = "#cccccc";
+
+        // Draw top-left corner cell (all-select button area)
+        self.context.set_fill_style(&header_bg.into());
+        self.context.fill_rect(0.0, 0.0, row_header_width as f64, col_header_height as f64);
+
+        // Border for corner
+        self.context.set_stroke_style(&header_border.into());
+        self.context.set_line_width(1.0);
+        self.context.stroke_rect(0.0, 0.0, row_header_width as f64, col_header_height as f64);
+
+        // Render column headers
+        self.render_column_headers(grid, viewport, row_header_width, col_header_height, header_bg, header_border);
+
+        // Render row headers
+        self.render_row_headers(grid, viewport, row_header_width, col_header_height, header_bg, header_border);
+    }
+
+    /// Render column headers (A, B, C, ...)
+    fn render_column_headers(
+        &self,
+        grid: &Grid,
+        viewport: &Viewport,
+        row_header_width: f32,
+        col_header_height: f32,
+        header_bg: &str,
+        header_border: &str,
+    ) {
+        let first_col = viewport.first_visible_col;
+        let last_col = viewport.last_visible_col.min(grid.col_count().saturating_sub(1));
+
+        for col in first_col..=last_col {
+            let grid_x = grid.col_x_position(col);
+            let canvas_x = grid_x - viewport.scroll_x + row_header_width;
+            let width = grid.col_width(col);
+
+            // Skip if not visible
+            if canvas_x + width < row_header_width || canvas_x > viewport.canvas_width {
+                continue;
+            }
+
+            // Draw header background
+            self.context.set_fill_style(&header_bg.into());
+            self.context.fill_rect(
+                canvas_x as f64,
+                0.0,
+                width as f64,
+                col_header_height as f64,
+            );
+
+            // Draw header border
+            self.context.set_stroke_style(&header_border.into());
+            self.context.set_line_width(1.0);
+            self.context.stroke_rect(
+                canvas_x as f64,
+                0.0,
+                width as f64,
+                col_header_height as f64,
+            );
+
+            // Draw column name (A, B, C, ...)
+            let col_name = Grid::get_col_name(col);
+            self.context.set_fill_style(&self.header_text_color.clone().into());
+            self.context.set_text_align("center");
+
+            let text_x = canvas_x + width / 2.0;
+            let text_y = col_header_height / 2.0;
+
+            let _ = self.context.fill_text(&col_name, text_x as f64, text_y as f64);
+
+            // Reset text align
+            self.context.set_text_align("left");
+        }
+    }
+
+    /// Render row headers (1, 2, 3, ...)
+    fn render_row_headers(
+        &self,
+        grid: &Grid,
+        viewport: &Viewport,
+        row_header_width: f32,
+        col_header_height: f32,
+        header_bg: &str,
+        header_border: &str,
+    ) {
+        let first_row = viewport.first_visible_row;
+        let last_row = viewport.last_visible_row.min(grid.row_count().saturating_sub(1));
+
+        for row in first_row..=last_row {
+            let grid_y = grid.row_y_position(row);
+            let canvas_y = grid_y - viewport.scroll_y + col_header_height;
+            let height = grid.row_height(row);
+
+            // Skip if not visible
+            if canvas_y + height < col_header_height || canvas_y > viewport.canvas_height {
+                continue;
+            }
+
+            // Draw header background
+            self.context.set_fill_style(&header_bg.into());
+            self.context.fill_rect(
+                0.0,
+                canvas_y as f64,
+                row_header_width as f64,
+                height as f64,
+            );
+
+            // Draw header border
+            self.context.set_stroke_style(&header_border.into());
+            self.context.set_line_width(1.0);
+            self.context.stroke_rect(
+                0.0,
+                canvas_y as f64,
+                row_header_width as f64,
+                height as f64,
+            );
+
+            // Draw row number (1, 2, 3, ...)
+            let row_number = format!("{}", row + 1);
+            self.context.set_fill_style(&self.header_text_color.clone().into());
+            self.context.set_text_align("center");
+
+            let text_x = row_header_width / 2.0;
+            let text_y = canvas_y + height / 2.0;
+
+            let _ = self.context.fill_text(&row_number, text_x as f64, text_y as f64);
+
+            // Reset text align
+            self.context.set_text_align("left");
+        }
     }
 }

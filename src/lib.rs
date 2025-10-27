@@ -635,6 +635,59 @@ impl DataGrid {
         self.selected_cells.len()
     }
 
+    /// Select all cells (Ctrl+A)
+    pub fn select_all(&mut self) {
+        self.clear_selection();
+
+        for row in 0..self.grid.row_count() {
+            for col in 0..self.grid.col_count() {
+                self.selected_cells.insert((row, col));
+                if let Some(cell) = self.grid.get_cell_mut(row, col) {
+                    cell.selected = true;
+                }
+            }
+        }
+
+        // Set anchor to first cell
+        self.selection_anchor = Some((0, 0));
+    }
+
+    /// Select entire row
+    pub fn select_row(&mut self, row: usize) {
+        if row >= self.grid.row_count() {
+            return;
+        }
+
+        self.clear_selection();
+
+        for col in 0..self.grid.col_count() {
+            self.selected_cells.insert((row, col));
+            if let Some(cell) = self.grid.get_cell_mut(row, col) {
+                cell.selected = true;
+            }
+        }
+
+        self.selection_anchor = Some((row, 0));
+    }
+
+    /// Select entire column
+    pub fn select_col(&mut self, col: usize) {
+        if col >= self.grid.col_count() {
+            return;
+        }
+
+        self.clear_selection();
+
+        for row in 0..self.grid.row_count() {
+            self.selected_cells.insert((row, col));
+            if let Some(cell) = self.grid.get_cell_mut(row, col) {
+                cell.selected = true;
+            }
+        }
+
+        self.selection_anchor = Some((0, col));
+    }
+
     /// Copy selected cells to TSV (Tab-Separated Values) format
     /// Returns a string with cells separated by tabs and rows separated by newlines
     pub fn copy_selected_cells(&self) -> String {

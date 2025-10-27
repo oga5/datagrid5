@@ -108,11 +108,19 @@ impl WebGLRenderer {
 
         self.context.use_program(Some(&self.shader_program.program));
 
-        // Set uniforms
+        // Calculate header offset
+        let header_offset_x = if grid.show_headers { grid.row_header_width } else { 0.0 };
+        let header_offset_y = if grid.show_headers { grid.col_header_height } else { 0.0 };
+
+        // Set uniforms (apply header offset)
         self.context
             .uniform2f(Some(&self.u_resolution), self.canvas_width, self.canvas_height);
         self.context
-            .uniform2f(Some(&self.u_translation), -viewport.scroll_x, -viewport.scroll_y);
+            .uniform2f(
+                Some(&self.u_translation),
+                -viewport.scroll_x + header_offset_x,
+                -viewport.scroll_y + header_offset_y,
+            );
 
         // Render grid lines
         self.render_grid_lines(grid, viewport);

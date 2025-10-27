@@ -64,6 +64,10 @@
                 <li><strong>Ctrl/Cmd+クリック / Ctrl/Cmd+Click:</strong> 複数選択 / Multi selection</li>
                 <li><strong>Ctrl/Cmd+C:</strong> 選択したセルをコピー / Copy selected cells</li>
                 <li><strong>Ctrl/Cmd+V:</strong> セルに貼り付け / Paste to cells</li>
+                <li><strong>Ctrl/Cmd+A:</strong> 全選択 / Select all cells</li>
+                <li><strong>行ヘッダークリック / Row Header Click:</strong> 行全体を選択 / Select entire row</li>
+                <li><strong>列ヘッダークリック / Column Header Click:</strong> 列全体を選択 / Select entire column</li>
+                <li><strong>左上角クリック / Top-Left Corner Click:</strong> 全選択 / Select all</li>
             </ul>
         </div>
 
@@ -256,6 +260,48 @@
                 const x = e.offsetX;
                 const y = e.offsetY;
 
+                // Header dimensions (should match Rust code)
+                const ROW_HEADER_WIDTH = 60;
+                const COL_HEADER_HEIGHT = 30;
+
+                // Check if clicking on top-left corner (select all)
+                if (x < ROW_HEADER_WIDTH && y < COL_HEADER_HEIGHT) {
+                    grid.select_all();
+                    renderLoop();
+                    updateInfo();
+                    return;
+                }
+
+                // Check if clicking on row header
+                if (x < ROW_HEADER_WIDTH && y >= COL_HEADER_HEIGHT) {
+                    // For row header click, we need to calculate which row
+                    // Temporarily use a simplified approach - click position in header area
+                    const dimensions = grid.get_dimensions();
+                    const avgRowHeight = 600 / dimensions[0]; // Approximate
+                    const row = Math.floor((y - COL_HEADER_HEIGHT) / avgRowHeight);
+                    if (row >= 0 && row < dimensions[0]) {
+                        grid.select_row(row);
+                        renderLoop();
+                        updateInfo();
+                        console.log(`Selected row ${row + 1}`);
+                        return;
+                    }
+                }
+
+                // Check if clicking on column header
+                if (y < COL_HEADER_HEIGHT && x >= ROW_HEADER_WIDTH) {
+                    const dimensions = grid.get_dimensions();
+                    const avgColWidth = 1200 / dimensions[1]; // Approximate
+                    const col = Math.floor((x - ROW_HEADER_WIDTH) / avgColWidth);
+                    if (col >= 0 && col < dimensions[1]) {
+                        grid.select_col(col);
+                        renderLoop();
+                        updateInfo();
+                        console.log(`Selected column ${col}`);
+                        return;
+                    }
+                }
+
                 // Check if clicking on resize handle
                 const resizeType = grid.check_resize_handle(x, y);
                 if (resizeType !== 'none') {
@@ -360,6 +406,16 @@
                     } catch (err) {
                         console.error('Failed to paste from clipboard:', err);
                     }
+                    return;
+                }
+
+                // Handle select all (Ctrl+A or Cmd+A)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                    e.preventDefault();
+                    grid.select_all();
+                    renderLoop();
+                    updateInfo();
+                    console.log('Selected all cells');
                     return;
                 }
 

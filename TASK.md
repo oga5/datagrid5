@@ -18,14 +18,20 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 - **Real-time Resize**: Live feedback vs preview rectangle
 - **Smart Type Detection**: Auto-detect Number/Boolean/Text on paste
 
-### 📊 Feature Coverage: 48% (56/116 features)
+### 📊 Feature Coverage: 52% (64/116 features from original)
 - ✅ Phase 1-4: Core, Rendering, Text, Interaction - **100% Complete**
-- ✅ Phase 5: Advanced Features - **20% Complete** (4/20 feature groups)
+- ✅ Phase 5: Advanced Features - **30% Complete** (6/20 feature groups)
+  - ✅ Column resizing
+  - ✅ Row resizing
+  - ✅ Multi-cell selection
+  - ✅ Copy/Paste support
+  - ✅ Row/Column headers ← **New!**
+  - ✅ Advanced selection (SelectAll/Row/Col) ← **New!**
 - ⏳ Phase 6-9: Search, Undo/Redo, Optimization, Testing - **0% Complete**
 
 ### 🎯 Next Priorities
-1. Row/Column headers (行番号・列名表示)
-2. Advanced selection (SelectAll/SelectRow/SelectCol)
+1. ~~Row/Column headers~~ ✅ **Complete!**
+2. ~~Advanced selection~~ ✅ **Complete!**
 3. Cell styling API (色・フォント設定)
 4. Row/Column operations (挿入・削除)
 5. Search functionality (テキスト検索)
@@ -134,16 +140,18 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] Rectangular selection support
   - [x] Automatic type detection on paste
   - [x] Clipboard API integration
-- [ ] Row/Column headers
-  - [ ] Row number display
-  - [ ] Column name/letter display
-  - [ ] Header click handlers
-  - [ ] Header styling
-- [ ] Advanced selection
-  - [ ] SelectAll (Ctrl+A)
-  - [ ] SelectRow (click row header)
-  - [ ] SelectCol (click column header)
-  - [ ] All-select button (top-left corner)
+- [x] Row/Column headers
+  - [x] Row number display (1, 2, 3, ...)
+  - [x] Column name/letter display (A, B, C, ... Z, AA, AB, ...)
+  - [x] Header click handlers
+  - [x] Header styling (gray background, borders)
+  - [x] Fixed header positioning
+  - [x] Header offset for cell rendering
+- [x] Advanced selection
+  - [x] SelectAll (Ctrl+A)
+  - [x] SelectRow (click row header)
+  - [x] SelectCol (click column header)
+  - [x] All-select button (top-left corner)
 - [ ] Cell styling API
   - [ ] Set background color
   - [ ] Set foreground color

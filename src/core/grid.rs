@@ -18,6 +18,11 @@ pub struct Grid {
     // Default dimensions
     default_col_width: f32,
     default_row_height: f32,
+
+    // Header dimensions
+    pub row_header_width: f32,
+    pub col_header_height: f32,
+    pub show_headers: bool,
 }
 
 impl Grid {
@@ -34,6 +39,9 @@ impl Grid {
             row_heights: vec![default_row_height; rows],
             default_col_width,
             default_row_height,
+            row_header_width: 60.0,
+            col_header_height: 30.0,
+            show_headers: true,
         }
     }
 
@@ -181,6 +189,23 @@ impl Grid {
                 self.set_value(row, col, value);
             }
         }
+    }
+
+    /// Get column name (A, B, C, ... Z, AA, AB, ...)
+    pub fn get_col_name(col: usize) -> String {
+        let mut result = String::new();
+        let mut n = col;
+
+        loop {
+            let remainder = n % 26;
+            result.insert(0, (b'A' + remainder as u8) as char);
+            if n < 26 {
+                break;
+            }
+            n = n / 26 - 1;
+        }
+
+        result
     }
 }
 
