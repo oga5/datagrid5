@@ -79,10 +79,12 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] Page Up/Down
   - [x] Home/End keys
   - [x] Auto-scroll to keep selected cell visible
-- [ ] Cell editing 🚧
-  - [ ] Edit mode activation
-  - [ ] Input field overlay
-  - [ ] Value validation
+- [x] Cell editing
+  - [x] Edit mode activation (double-click)
+  - [x] Input field overlay
+  - [x] Enter to confirm, Escape to cancel
+  - [x] Blur to save
+  - [x] Value update and validation
 
 ### Phase 5: Advanced Features 🚀
 - [ ] Column resizing

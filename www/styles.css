@@ -150,6 +150,24 @@ button:active {
     outline-offset: 2px;
 }
 
+/* Cell editor */
+#cell-editor {
+    position: absolute;
+    z-index: 10;
+    border: 2px solid #667eea;
+    padding: 4px;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    box-sizing: border-box;
+    background: white;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+#cell-editor:focus {
+    outline: none;
+    border-color: #5568d3;
+}
+
 .instructions {
     padding: 30px;
     background: white;

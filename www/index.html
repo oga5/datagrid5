@@ -41,9 +41,10 @@
             </div>
         </div>
 
-        <div class="canvas-container">
+        <div class="canvas-container" id="canvas-container">
             <canvas id="webgl-canvas" width="1200" height="600"></canvas>
             <canvas id="text-canvas" width="1200" height="600" tabindex="0"></canvas>
+            <input type="text" id="cell-editor" style="display: none;" />
         </div>
 
         <div class="instructions">
@@ -55,6 +56,9 @@
                 <li><strong>矢印キー / Arrow Keys:</strong> セル間を移動 / Navigate between cells</li>
                 <li><strong>Page Up/Down:</strong> ページスクロール / Scroll by page</li>
                 <li><strong>Home/End:</strong> 行の最初/最後のセルへ移動 / Jump to first/last cell in row</li>
+                <li><strong>ダブルクリック / Double Click:</strong> セルを編集 / Edit cell</li>
+                <li><strong>Enter:</strong> 編集を確定 / Confirm edit</li>
+                <li><strong>Escape:</strong> 編集をキャンセル / Cancel edit</li>
             </ul>
         </div>
 
@@ -138,6 +142,97 @@
                 grid.get_viewport_info();
         }
 
+        // Cell editing functions
+        let editingRow = null;
+        let editingCol = null;
+
+        function startCellEdit(row, col) {
+            if (!grid) return;
+
+            const editor = document.getElementById('cell-editor');
+            const container = document.getElementById('canvas-container');
+
+            // Get cell position and size
+            const rect = grid.get_cell_edit_rect(row, col);
+            const [x, y, width, height] = rect;
+
+            // Get current cell value
+            const currentValue = grid.get_cell_value(row, col);
+
+            // Position and show editor
+            editor.style.position = 'absolute';
+            editor.style.left = `${x + 20}px`; // 20px padding from container
+            editor.style.top = `${y + 20}px`;
+            editor.style.width = `${width}px`;
+            editor.style.height = `${height}px`;
+            editor.style.display = 'block';
+            editor.value = currentValue;
+
+            // Store editing cell
+            editingRow = row;
+            editingCol = col;
+
+            // Focus and select all text
+            editor.focus();
+            editor.select();
+
+            // Setup editor event handlers
+            setupEditorEvents(editor, row, col);
+        }
+
+        function endCellEdit(save = false) {
+            if (!grid || editingRow === null || editingCol === null) return;
+
+            const editor = document.getElementById('cell-editor');
+
+            if (save) {
+                // Save the value
+                const newValue = editor.value;
+                grid.update_cell_value(editingRow, editingCol, newValue);
+            }
+
+            // Hide editor
+            editor.style.display = 'none';
+            editor.value = '';
+
+            // End edit mode in grid
+            grid.end_edit();
+
+            // Clear editing state
+            editingRow = null;
+            editingCol = null;
+
+            // Refocus canvas
+            document.getElementById('text-canvas').focus();
+        }
+
+        function setupEditorEvents(editor, row, col) {
+            // Remove existing listeners to avoid duplicates
+            const newEditor = editor.cloneNode(true);
+            editor.parentNode.replaceChild(newEditor, editor);
+
+            // Enter to save
+            newEditor.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    endCellEdit(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    endCellEdit(false);
+                }
+            });
+
+            // Click outside to save
+            newEditor.addEventListener('blur', () => {
+                // Small delay to allow other events to process
+                setTimeout(() => {
+                    if (grid && grid.is_editing()) {
+                        endCellEdit(true);
+                    }
+                }, 100);
+            });
+        }
+
         // Event handlers
         function setupEventHandlers() {
             // Use text canvas for event handling (it's on top)
@@ -192,6 +287,16 @@
             // Focus canvas on click to enable keyboard events
             canvas.addEventListener('click', () => {
                 canvas.focus();
+            });
+
+            // Double-click to edit
+            canvas.addEventListener('dblclick', (e) => {
+                if (grid && !grid.is_editing()) {
+                    const cellPos = grid.handle_double_click(e);
+                    if (cellPos) {
+                        startCellEdit(cellPos[0], cellPos[1]);
+                    }
+                }
             });
 
             // Window resize

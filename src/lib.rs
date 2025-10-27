@@ -25,6 +25,8 @@ pub struct DataGrid {
     keyboard_handler: KeyboardHandler,
     webgl_canvas: HtmlCanvasElement,
     text_canvas: HtmlCanvasElement,
+    is_editing: bool,
+    editing_cell: Option<(usize, usize)>,
 }
 
 #[wasm_bindgen]
@@ -82,6 +84,8 @@ impl DataGrid {
             keyboard_handler,
             webgl_canvas,
             text_canvas,
+            is_editing: false,
+            editing_cell: None,
         })
     }
 
@@ -330,6 +334,72 @@ impl DataGrid {
             self.viewport.set_scroll(scroll_x, scroll_y, &self.grid);
             self.viewport.update_visible_range(&self.grid);
         }
+    }
+
+    /// Start editing a cell (called from JavaScript)
+    pub fn start_edit(&mut self, row: usize, col: usize) -> bool {
+        // Check if cell is valid
+        if row >= self.grid.row_count() || col >= self.grid.col_count() {
+            return false;
+        }
+
+        // Check if cell is editable
+        if let Some(cell) = self.grid.get_cell(row, col) {
+            if !cell.editable {
+                return false;
+            }
+        }
+
+        self.is_editing = true;
+        self.editing_cell = Some((row, col));
+
+        web_sys::console::log_1(&format!("Started editing cell: ({}, {})", row, col).into());
+        true
+    }
+
+    /// End editing mode
+    pub fn end_edit(&mut self) {
+        self.is_editing = false;
+        self.editing_cell = None;
+        web_sys::console::log_1(&"Ended editing".into());
+    }
+
+    /// Check if currently editing
+    pub fn is_editing(&self) -> bool {
+        self.is_editing
+    }
+
+    /// Update cell value during editing
+    pub fn update_cell_value(&mut self, row: usize, col: usize, value: String) {
+        if self.is_editing && self.editing_cell == Some((row, col)) {
+            self.set_cell_value(row, col, &value);
+            web_sys::console::log_1(&format!("Updated cell ({}, {}) to: {}", row, col, value).into());
+        }
+    }
+
+    /// Get cell position for editing (returns canvas coordinates)
+    pub fn get_cell_edit_rect(&self, row: usize, col: usize) -> Vec<f32> {
+        let x = self.grid.col_x_position(col) - self.viewport.scroll_x;
+        let y = self.grid.row_y_position(row) - self.viewport.scroll_y;
+        let width = self.grid.col_width(col);
+        let height = self.grid.row_height(row);
+
+        vec![x, y, width, height]
+    }
+
+    /// Handle double-click for editing
+    pub fn handle_double_click(&mut self, event: MouseEvent) -> Option<Vec<usize>> {
+        let x = event.offset_x() as f32;
+        let y = event.offset_y() as f32;
+
+        // Get cell at click position
+        if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
+            if self.start_edit(row, col) {
+                return Some(vec![row, col]);
+            }
+        }
+
+        None
     }
 }
 
