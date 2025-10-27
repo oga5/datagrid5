@@ -24,6 +24,8 @@
             </div>
             <button id="recreate-btn">Recreate Grid</button>
             <button id="fill-data-btn">Fill Sample Data</button>
+            <button id="test-colors-btn">Test Cell Colors</button>
+            <button id="test-fonts-btn">Test Font Styles</button>
         </div>
 
         <div class="info-panel">
@@ -467,6 +469,53 @@
             // Fill data button (placeholder for now)
             document.getElementById('fill-data-btn').addEventListener('click', () => {
                 console.log('Fill data functionality coming soon');
+            });
+
+            // Test cell colors button
+            document.getElementById('test-colors-btn').addEventListener('click', () => {
+                if (!grid) return;
+
+                // Set background colors (RGBA as u32: 0xRRGGBBAA)
+                grid.set_cell_bg_color(1, 1, 0xFF6B6BFF); // Red
+                grid.set_cell_bg_color(1, 2, 0x4ECDC4FF); // Turquoise
+                grid.set_cell_bg_color(1, 3, 0xFFE66DFF); // Yellow
+                grid.set_cell_bg_color(2, 1, 0x95E1D3FF); // Mint
+                grid.set_cell_bg_color(2, 2, 0xF38181FF); // Light red
+                grid.set_cell_bg_color(2, 3, 0xAA96DAFF); // Purple
+
+                // Set foreground colors
+                grid.set_cell_fg_color(3, 1, 0xFF0000FF); // Red text
+                grid.set_cell_fg_color(3, 2, 0x0000FFFF); // Blue text
+                grid.set_cell_fg_color(3, 3, 0x00FF00FF); // Green text
+
+                // Combined: background + foreground
+                grid.set_cell_bg_color(4, 1, 0x000000FF); // Black bg
+                grid.set_cell_fg_color(4, 1, 0xFFFFFFFF); // White text
+
+                renderLoop();
+                console.log('Applied test colors to cells');
+            });
+
+            // Test font styles button
+            document.getElementById('test-fonts-btn').addEventListener('click', () => {
+                if (!grid) return;
+
+                // Bold text
+                grid.set_cell_font_style(5, 1, true, false);
+
+                // Italic text
+                grid.set_cell_font_style(5, 2, false, true);
+
+                // Bold + Italic
+                grid.set_cell_font_style(5, 3, true, true);
+
+                // Combined with colors
+                grid.set_cell_style(6, 1, 0xFFD93DFF, 0x000000FF, true, false); // Yellow bg, black bold text
+                grid.set_cell_style(6, 2, 0x6C5CE7FF, 0xFFFFFFFF, false, true); // Purple bg, white italic text
+                grid.set_cell_style(6, 3, 0x00B894FF, 0xFFFFFFFF, true, true);  // Green bg, white bold+italic text
+
+                renderLoop();
+                console.log('Applied test font styles to cells');
             });
         }
 

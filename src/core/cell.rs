@@ -44,6 +44,8 @@ pub struct Cell {
     pub selected: bool,
     pub bg_color: Option<u32>, // RGBA color as u32
     pub fg_color: Option<u32>,
+    pub font_bold: bool,
+    pub font_italic: bool,
 }
 
 impl Cell {
@@ -54,6 +56,8 @@ impl Cell {
             selected: false,
             bg_color: None,
             fg_color: None,
+            font_bold: false,
+            font_italic: false,
         }
     }
 

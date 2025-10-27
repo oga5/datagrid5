@@ -2,6 +2,15 @@ use crate::core::{Grid, Viewport};
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
+/// Convert u32 RGBA color (0xRRGGBBAA) to CSS rgba() string
+fn u32_to_rgba_string(color: u32) -> String {
+    let r = ((color >> 24) & 0xFF) as u8;
+    let g = ((color >> 16) & 0xFF) as u8;
+    let b = ((color >> 8) & 0xFF) as u8;
+    let a = (color & 0xFF) as f32 / 255.0;
+    format!("rgba({}, {}, {}, {})", r, g, b, a)
+}
+
 /// Font configuration for text rendering
 #[derive(Debug, Clone)]
 pub struct FontConfig {
@@ -130,14 +139,33 @@ impl TextRenderer {
             return;
         }
 
-        // Check if cell is selected
-        let is_selected = grid
-            .get_cell(row, col)
-            .map(|cell| cell.selected)
-            .unwrap_or(false);
+        // Get cell data
+        let cell = grid.get_cell(row, col);
+        let is_selected = cell.map(|c| c.selected).unwrap_or(false);
 
-        // Draw selection background
-        if is_selected {
+        // Draw cell background (custom color or selection)
+        if let Some(cell) = cell {
+            if let Some(bg_color) = cell.bg_color {
+                // Use custom background color
+                let bg_str = u32_to_rgba_string(bg_color);
+                self.context.set_fill_style(&bg_str.into());
+                self.context.fill_rect(
+                    canvas_x as f64,
+                    canvas_y as f64,
+                    width as f64,
+                    height as f64,
+                );
+            } else if is_selected {
+                // Use selection background
+                self.context.set_fill_style(&self.selected_bg_color.clone().into());
+                self.context.fill_rect(
+                    canvas_x as f64,
+                    canvas_y as f64,
+                    width as f64,
+                    height as f64,
+                );
+            }
+        } else if is_selected {
             self.context.set_fill_style(&self.selected_bg_color.clone().into());
             self.context.fill_rect(
                 canvas_x as f64,
@@ -147,15 +175,40 @@ impl TextRenderer {
             );
         }
 
-        // Set text color
-        let text_color = if is_selected {
-            &self.selected_text_color
-        } else if row == 0 {
-            &self.header_text_color
+        // Set text color (custom or default)
+        let text_color = if let Some(cell) = cell {
+            if let Some(fg_color) = cell.fg_color {
+                u32_to_rgba_string(fg_color)
+            } else if is_selected {
+                self.selected_text_color.clone()
+            } else if row == 0 {
+                self.header_text_color.clone()
+            } else {
+                self.text_color.clone()
+            }
         } else {
-            &self.text_color
+            self.text_color.clone()
         };
-        self.context.set_fill_style(&text_color.clone().into());
+        self.context.set_fill_style(&text_color.into());
+
+        // Set font style (bold/italic)
+        if let Some(cell) = cell {
+            if cell.font_bold || cell.font_italic {
+                let mut font_style = String::new();
+                if cell.font_italic {
+                    font_style.push_str("italic ");
+                }
+                if cell.font_bold {
+                    font_style.push_str("bold ");
+                }
+                font_style.push_str(&format!("{}px {}", self.font_config.size, self.font_config.family));
+                self.context.set_font(&font_style);
+            } else {
+                self.context.set_font(&self.font_string);
+            }
+        } else {
+            self.context.set_font(&self.font_string);
+        }
 
         // Text padding
         let padding = 4.0;
@@ -178,7 +231,7 @@ impl TextRenderer {
         // Draw text
         let _ = self.context.fill_text(&text, text_x as f64, text_y as f64);
 
-        // Restore context
+        // Restore context (also restores font)
         let _ = self.context.restore();
     }
 

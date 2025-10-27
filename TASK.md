@@ -18,21 +18,22 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 - **Real-time Resize**: Live feedback vs preview rectangle
 - **Smart Type Detection**: Auto-detect Number/Boolean/Text on paste
 
-### 📊 Feature Coverage: 52% (64/116 features from original)
+### 📊 Feature Coverage: 55% (71/116 features from original)
 - ✅ Phase 1-4: Core, Rendering, Text, Interaction - **100% Complete**
-- ✅ Phase 5: Advanced Features - **30% Complete** (6/20 feature groups)
+- ✅ Phase 5: Advanced Features - **35% Complete** (7/20 feature groups)
   - ✅ Column resizing
   - ✅ Row resizing
   - ✅ Multi-cell selection
   - ✅ Copy/Paste support
-  - ✅ Row/Column headers ← **New!**
-  - ✅ Advanced selection (SelectAll/Row/Col) ← **New!**
+  - ✅ Row/Column headers
+  - ✅ Advanced selection (SelectAll/Row/Col)
+  - ✅ Cell styling API ← **New!**
 - ⏳ Phase 6-9: Search, Undo/Redo, Optimization, Testing - **0% Complete**
 
 ### 🎯 Next Priorities
 1. ~~Row/Column headers~~ ✅ **Complete!**
 2. ~~Advanced selection~~ ✅ **Complete!**
-3. Cell styling API (色・フォント設定)
+3. ~~Cell styling API~~ ✅ **Complete!**
 4. Row/Column operations (挿入・削除)
 5. Search functionality (テキスト検索)
 
@@ -152,11 +153,15 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] SelectRow (click row header)
   - [x] SelectCol (click column header)
   - [x] All-select button (top-left corner)
-- [ ] Cell styling API
-  - [ ] Set background color
-  - [ ] Set foreground color
-  - [ ] Set font style
-  - [ ] Custom cell borders
+- [x] Cell styling API
+  - [x] Set background color (set_cell_bg_color)
+  - [x] Set foreground color (set_cell_fg_color)
+  - [x] Set font style (set_cell_font_style: bold, italic)
+  - [x] Combined style setter (set_cell_style)
+  - [x] Clear color methods
+  - [x] RGBA color support (u32 format)
+  - [x] Rendering integration (text & WebGL)
+  - [ ] Custom cell borders (individual cell borders)
 - [ ] Row operations
   - [ ] Insert row(s)
   - [ ] Delete row(s)

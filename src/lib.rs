@@ -791,6 +791,81 @@ impl DataGrid {
 
         Ok(())
     }
+
+    /// Set background color for a cell (RGBA as u32: 0xRRGGBBAA)
+    pub fn set_cell_bg_color(&mut self, row: usize, col: usize, color: u32) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.bg_color = Some(color);
+        } else {
+            // Create cell if it doesn't exist
+            let mut cell = Cell::empty();
+            cell.bg_color = Some(color);
+            self.grid.set_cell(row, col, cell);
+        }
+    }
+
+    /// Set foreground (text) color for a cell (RGBA as u32: 0xRRGGBBAA)
+    pub fn set_cell_fg_color(&mut self, row: usize, col: usize, color: u32) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.fg_color = Some(color);
+        } else {
+            let mut cell = Cell::empty();
+            cell.fg_color = Some(color);
+            self.grid.set_cell(row, col, cell);
+        }
+    }
+
+    /// Set font style for a cell
+    pub fn set_cell_font_style(&mut self, row: usize, col: usize, bold: bool, italic: bool) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.font_bold = bold;
+            cell.font_italic = italic;
+        } else {
+            let mut cell = Cell::empty();
+            cell.font_bold = bold;
+            cell.font_italic = italic;
+            self.grid.set_cell(row, col, cell);
+        }
+    }
+
+    /// Clear background color for a cell
+    pub fn clear_cell_bg_color(&mut self, row: usize, col: usize) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.bg_color = None;
+        }
+    }
+
+    /// Clear foreground color for a cell
+    pub fn clear_cell_fg_color(&mut self, row: usize, col: usize) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.fg_color = None;
+        }
+    }
+
+    /// Set cell style (background, foreground, font) in one call
+    pub fn set_cell_style(
+        &mut self,
+        row: usize,
+        col: usize,
+        bg_color: Option<u32>,
+        fg_color: Option<u32>,
+        bold: bool,
+        italic: bool,
+    ) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.bg_color = bg_color;
+            cell.fg_color = fg_color;
+            cell.font_bold = bold;
+            cell.font_italic = italic;
+        } else {
+            let mut cell = Cell::empty();
+            cell.bg_color = bg_color;
+            cell.fg_color = fg_color;
+            cell.font_bold = bold;
+            cell.font_italic = italic;
+            self.grid.set_cell(row, col, cell);
+        }
+    }
 }
 
 /// Initialize the library
