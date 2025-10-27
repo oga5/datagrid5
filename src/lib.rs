@@ -57,7 +57,6 @@ pub struct DataGrid {
     // Undo/Redo state
     undo_stack: Vec<EditAction>,
     redo_stack: Vec<EditAction>,
-    max_undo_size: usize,
 }
 
 #[wasm_bindgen]
@@ -131,7 +130,6 @@ impl DataGrid {
             search_whole_word: false,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            max_undo_size: 100,
         })
     }
 
@@ -262,11 +260,6 @@ impl DataGrid {
             };
 
             self.undo_stack.push(action);
-
-            // Limit undo stack size
-            if self.undo_stack.len() > self.max_undo_size {
-                self.undo_stack.remove(0);
-            }
 
             // Clear redo stack on new edit
             self.redo_stack.clear();

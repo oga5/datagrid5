@@ -247,7 +247,7 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 - [x] Undo implementation
   - [x] Undo last edit (Ctrl+Z)
   - [x] Undo stack management
-  - [x] Maximum history size (100 actions)
+  - [x] Unlimited history (limited only by available memory)
 - [x] Redo implementation
   - [x] Redo last undo (Ctrl+Y)
   - [x] Redo stack management
