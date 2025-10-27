@@ -145,6 +145,11 @@ button:active {
     cursor: grabbing;
 }
 
+#text-canvas:focus {
+    outline: 3px solid #667eea;
+    outline-offset: 2px;
+}
+
 .instructions {
     padding: 30px;
     background: white;

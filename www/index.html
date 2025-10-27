@@ -43,7 +43,7 @@
 
         <div class="canvas-container">
             <canvas id="webgl-canvas" width="1200" height="600"></canvas>
-            <canvas id="text-canvas" width="1200" height="600"></canvas>
+            <canvas id="text-canvas" width="1200" height="600" tabindex="0"></canvas>
         </div>
 
         <div class="instructions">
@@ -52,6 +52,9 @@
                 <li><strong>マウスドラッグ / Mouse Drag:</strong> グリッドをパン / Pan the grid</li>
                 <li><strong>マウスホイール / Mouse Wheel:</strong> スクロール / Scroll</li>
                 <li><strong>セルクリック / Click Cell:</strong> セル選択（コンソールに表示） / Select cell (shown in console)</li>
+                <li><strong>矢印キー / Arrow Keys:</strong> セル間を移動 / Navigate between cells</li>
+                <li><strong>Page Up/Down:</strong> ページスクロール / Scroll by page</li>
+                <li><strong>Home/End:</strong> 行の最初/最後のセルへ移動 / Jump to first/last cell in row</li>
             </ul>
         </div>
 
@@ -173,6 +176,22 @@
                     grid.handle_wheel(e);
                     updateInfo();
                 }
+            });
+
+            // Keyboard events
+            window.addEventListener('keydown', (e) => {
+                if (grid) {
+                    const handled = grid.handle_keyboard(e);
+                    if (handled) {
+                        e.preventDefault();
+                        updateInfo();
+                    }
+                }
+            });
+
+            // Focus canvas on click to enable keyboard events
+            canvas.addEventListener('click', () => {
+                canvas.focus();
             });
 
             // Window resize

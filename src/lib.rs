@@ -4,10 +4,10 @@ mod renderer;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{HtmlCanvasElement, MouseEvent, WheelEvent};
+use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
 
 use core::{Cell, CellValue, Grid, Viewport};
-use input::MouseHandler;
+use input::{KeyboardHandler, MouseHandler, NavigationCommand};
 use renderer::{TextRenderer, WebGLRenderer};
 
 // Use wee_alloc as the global allocator for smaller WASM size
@@ -22,6 +22,7 @@ pub struct DataGrid {
     webgl_renderer: WebGLRenderer,
     text_renderer: TextRenderer,
     mouse_handler: MouseHandler,
+    keyboard_handler: KeyboardHandler,
     webgl_canvas: HtmlCanvasElement,
     text_canvas: HtmlCanvasElement,
 }
@@ -70,6 +71,7 @@ impl DataGrid {
             .map_err(|e| JsValue::from_str(&e))?;
 
         let mouse_handler = MouseHandler::new();
+        let keyboard_handler = KeyboardHandler::new();
 
         Ok(DataGrid {
             grid,
@@ -77,6 +79,7 @@ impl DataGrid {
             webgl_renderer,
             text_renderer,
             mouse_handler,
+            keyboard_handler,
             webgl_canvas,
             text_canvas,
         })
@@ -193,6 +196,140 @@ impl DataGrid {
             self.viewport.first_visible_col,
             self.viewport.last_visible_col
         )
+    }
+
+    /// Handle keyboard event
+    pub fn handle_keyboard(&mut self, event: KeyboardEvent) -> bool {
+        let key = event.key();
+
+        // Get navigation command from key
+        if let Some(command) = self.keyboard_handler.handle_key(&key) {
+            // Get current selected cell
+            let current = self.mouse_handler.selected_cell;
+
+            let new_selection = match command {
+                NavigationCommand::MoveUp => {
+                    current.and_then(|(row, col)| {
+                        if row > 0 {
+                            Some((row - 1, col))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveDown => {
+                    current.and_then(|(row, col)| {
+                        if row < self.grid.row_count() - 1 {
+                            Some((row + 1, col))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveLeft => {
+                    current.and_then(|(row, col)| {
+                        if col > 0 {
+                            Some((row, col - 1))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveRight => {
+                    current.and_then(|(row, col)| {
+                        if col < self.grid.col_count() - 1 {
+                            Some((row, col + 1))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::PageUp => {
+                    current.map(|(row, col)| {
+                        let page_size = self.viewport.visible_row_count();
+                        let new_row = row.saturating_sub(page_size);
+                        (new_row, col)
+                    })
+                }
+                NavigationCommand::PageDown => {
+                    current.map(|(row, col)| {
+                        let page_size = self.viewport.visible_row_count();
+                        let new_row = (row + page_size).min(self.grid.row_count() - 1);
+                        (new_row, col)
+                    })
+                }
+                NavigationCommand::Home => {
+                    current.map(|(row, _)| (row, 0))
+                }
+                NavigationCommand::End => {
+                    current.map(|(row, _)| (row, self.grid.col_count() - 1))
+                }
+                NavigationCommand::Enter | NavigationCommand::Escape | NavigationCommand::Tab => {
+                    // Future: handle edit mode, etc.
+                    None
+                }
+            };
+
+            // Update selection if we have a new one
+            if let Some((new_row, new_col)) = new_selection {
+                // Clear previous selection
+                if let Some((prev_row, prev_col)) = current {
+                    if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
+                        cell.selected = false;
+                    }
+                }
+
+                // Set new selection
+                self.mouse_handler.select_cell(new_row, new_col);
+                if let Some(cell) = self.grid.get_cell_mut(new_row, new_col) {
+                    cell.selected = true;
+                } else {
+                    let mut cell = Cell::default();
+                    cell.selected = true;
+                    self.grid.set_cell(new_row, new_col, cell);
+                }
+
+                // Ensure selected cell is visible
+                self.ensure_cell_visible(new_row, new_col);
+
+                web_sys::console::log_1(&format!("Navigated to cell: ({}, {})", new_row, new_col).into());
+
+                return true; // Event handled
+            }
+        }
+
+        false // Event not handled
+    }
+
+    /// Ensure a cell is visible in the viewport
+    fn ensure_cell_visible(&mut self, row: usize, col: usize) {
+        let cell_x = self.grid.col_x_position(col);
+        let cell_y = self.grid.row_y_position(row);
+        let cell_width = self.grid.col_width(col);
+        let cell_height = self.grid.row_height(row);
+
+        let mut scroll_x = self.viewport.scroll_x;
+        let mut scroll_y = self.viewport.scroll_y;
+
+        // Check horizontal visibility
+        if cell_x < scroll_x {
+            scroll_x = cell_x;
+        } else if cell_x + cell_width > scroll_x + self.viewport.canvas_width {
+            scroll_x = cell_x + cell_width - self.viewport.canvas_width;
+        }
+
+        // Check vertical visibility
+        if cell_y < scroll_y {
+            scroll_y = cell_y;
+        } else if cell_y + cell_height > scroll_y + self.viewport.canvas_height {
+            scroll_y = cell_y + cell_height - self.viewport.canvas_height;
+        }
+
+        // Update scroll if changed
+        if scroll_x != self.viewport.scroll_x || scroll_y != self.viewport.scroll_y {
+            self.viewport.set_scroll(scroll_x, scroll_y, &self.grid);
+            self.viewport.update_visible_range(&self.grid);
+        }
     }
 }
 

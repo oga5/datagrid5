@@ -74,11 +74,12 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - [x] Click detection
   - [x] Drag to pan
   - [x] Scroll handling (mouse wheel)
-- [ ] Keyboard navigation
-  - [ ] Arrow key navigation
-  - [ ] Page Up/Down
-  - [ ] Home/End keys
-- [ ] Cell editing
+- [x] Keyboard navigation
+  - [x] Arrow key navigation
+  - [x] Page Up/Down
+  - [x] Home/End keys
+  - [x] Auto-scroll to keep selected cell visible
+- [ ] Cell editing 🚧
   - [ ] Edit mode activation
   - [ ] Input field overlay
   - [ ] Value validation
