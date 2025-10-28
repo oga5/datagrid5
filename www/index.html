@@ -437,10 +437,10 @@
                     } else if (resizeType === 'row') {
                         canvas.style.cursor = 'row-resize';
                     } else {
-                        canvas.style.cursor = 'grab';
+                        canvas.style.cursor = 'cell';
                     }
 
-                    // Normal mouse move
+                    // Handle mouse move for drag selection
                     grid.handle_mouse_move(e);
                 }
             });
@@ -453,7 +453,7 @@
                     isResizingLocal = false;
                 }
                 grid.handle_mouse_up(e);
-                canvas.style.cursor = 'grab';
+                canvas.style.cursor = 'cell';
             });
 
             // Wheel event is now handled by native scroll container

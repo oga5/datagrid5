@@ -1,6 +1,7 @@
 /// Mouse event handler for grid interaction
 pub struct MouseHandler {
     pub is_dragging: bool,
+    pub is_selecting: bool,
     pub last_x: f32,
     pub last_y: f32,
     pub selected_cell: Option<(usize, usize)>,
@@ -10,6 +11,7 @@ impl MouseHandler {
     pub fn new() -> Self {
         Self {
             is_dragging: false,
+            is_selecting: false,
             last_x: 0.0,
             last_y: 0.0,
             selected_cell: None,
@@ -22,12 +24,19 @@ impl MouseHandler {
         self.last_y = y;
     }
 
+    pub fn start_selection(&mut self, x: f32, y: f32) {
+        self.is_selecting = true;
+        self.last_x = x;
+        self.last_y = y;
+    }
+
     pub fn mouse_up(&mut self) {
         self.is_dragging = false;
+        self.is_selecting = false;
     }
 
     pub fn mouse_move(&mut self, x: f32, y: f32) -> Option<(f32, f32)> {
-        if self.is_dragging {
+        if self.is_dragging || self.is_selecting {
             let dx = x - self.last_x;
             let dy = y - self.last_y;
             self.last_x = x;
