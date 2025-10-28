@@ -392,6 +392,135 @@ impl DataGrid {
         }
     }
 
+    /// Handle context menu (right-click) event
+    /// Returns JSON with context info: {"type": "row"|"column"|"cell", "row": N, "col": N}
+    /// Returns empty string if not on grid
+    pub fn handle_context_menu(&self, event: MouseEvent) -> String {
+        let x = event.offset_x() as f32;
+        let y = event.offset_y() as f32;
+
+        // Check if on row header
+        if let Some(row) = self.viewport.canvas_to_row_header(x, y, &self.grid) {
+            return format!(
+                r#"{{"type":"row","row":{},"col":null}}"#,
+                row
+            );
+        }
+
+        // Check if on column header
+        if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
+            return format!(
+                r#"{{"type":"column","row":null,"col":{}}}"#,
+                col
+            );
+        }
+
+        // Check if on cell
+        if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
+            return format!(
+                r#"{{"type":"cell","row":{},"col":{}}}"#,
+                row, col
+            );
+        }
+
+        // Not on grid
+        String::new()
+    }
+
+    /// Get row operations for context menu
+    /// Returns available operations for the given row
+    pub fn get_row_context_operations(&self, row: usize) -> Vec<String> {
+        let mut operations = vec![
+            "insert_row_above".to_string(),
+            "insert_row_below".to_string(),
+        ];
+
+        if self.grid.row_count() > 1 {
+            operations.push("delete_row".to_string());
+        }
+
+        operations.push("copy_row".to_string());
+        operations.push("cut_row".to_string());
+
+        if row > 0 {
+            operations.push("move_row_up".to_string());
+        }
+
+        if row < self.grid.row_count() - 1 {
+            operations.push("move_row_down".to_string());
+        }
+
+        operations
+    }
+
+    /// Execute row context menu operation
+    pub fn execute_row_operation(&mut self, operation: &str, row: usize) -> Result<String, JsValue> {
+        match operation {
+            "insert_row_above" => {
+                self.insert_row(row);
+                Ok(format!("Inserted row at {}", row))
+            }
+            "insert_row_below" => {
+                self.insert_row(row + 1);
+                Ok(format!("Inserted row at {}", row + 1))
+            }
+            "delete_row" => {
+                if self.grid.row_count() <= 1 {
+                    return Err(JsValue::from_str("Cannot delete the last row"));
+                }
+                self.delete_row(row);
+                Ok(format!("Deleted row {}", row))
+            }
+            "copy_row" => {
+                let mut cells = Vec::new();
+                for col in 0..self.grid.col_count() {
+                    cells.push(self.grid.get_value_string(row, col));
+                }
+                Ok(cells.join("\t"))
+            }
+            "cut_row" => {
+                let mut cells = Vec::new();
+                for col in 0..self.grid.col_count() {
+                    cells.push(self.grid.get_value_string(row, col));
+                    self.grid.set_value(row, col, CellValue::Empty);
+                    self.dirty_cells.insert((row, col));
+                }
+                Ok(cells.join("\t"))
+            }
+            "move_row_up" => {
+                if row == 0 {
+                    return Err(JsValue::from_str("Cannot move first row up"));
+                }
+                self.swap_rows(row, row - 1);
+                Ok(format!("Moved row {} up", row))
+            }
+            "move_row_down" => {
+                if row >= self.grid.row_count() - 1 {
+                    return Err(JsValue::from_str("Cannot move last row down"));
+                }
+                self.swap_rows(row, row + 1);
+                Ok(format!("Moved row {} down", row))
+            }
+            _ => Err(JsValue::from_str(&format!("Unknown operation: {}", operation)))
+        }
+    }
+
+    /// Swap two rows
+    fn swap_rows(&mut self, row1: usize, row2: usize) {
+        if row1 >= self.grid.row_count() || row2 >= self.grid.row_count() {
+            return;
+        }
+
+        for col in 0..self.grid.col_count() {
+            let val1 = self.grid.get_value(row1, col).clone();
+            let val2 = self.grid.get_value(row2, col).clone();
+            self.grid.set_value(row1, col, val2);
+            self.grid.set_value(row2, col, val1);
+            self.dirty_cells.insert((row1, col));
+            self.dirty_cells.insert((row2, col));
+        }
+    }
+
     /// Set cell value
     pub fn set_cell_value(&mut self, row: usize, col: usize, value: &str) {
         // Record old value for undo
@@ -2413,6 +2542,178 @@ impl DataGrid {
         if self.selected_cells.capacity() > self.selected_cells.len() * 2 {
             self.selected_cells.shrink_to_fit();
         }
+    }
+
+    // ============================================================================
+    // Worker Thread Support for Background Data Processing
+    // ============================================================================
+
+    /// Export grid data as JSON for worker thread processing
+    /// Returns JSON array: [{"row":0,"col":0,"value":"text","type":"text"}, ...]
+    pub fn export_grid_data_json(&self) -> String {
+        let mut data = Vec::new();
+
+        for row in 0..self.grid.row_count() {
+            for col in 0..self.grid.col_count() {
+                if let Some(cell) = self.grid.get_cell(row, col) {
+                    let value = self.grid.get_value(row, col);
+                    if !matches!(value, CellValue::Empty) {
+                        let (value_str, type_str) = match value {
+                            CellValue::Text(s) => (s.clone(), "text"),
+                            CellValue::Number(n) => (n.to_string(), "number"),
+                            CellValue::Boolean(b) => (b.to_string(), "boolean"),
+                            CellValue::Empty => continue,
+                        };
+
+                        data.push(format!(
+                            r#"{{"row":{},"col":{},"value":"{}","type":"{}"}}"#,
+                            row,
+                            col,
+                            value_str.replace("\"", "\\\""),
+                            type_str
+                        ));
+                    }
+                }
+            }
+        }
+
+        format!("[{}]", data.join(","))
+    }
+
+    /// Export a specific range of data as JSON for worker processing
+    /// Returns JSON array for the specified range
+    pub fn export_range_json(&self, start_row: usize, end_row: usize, start_col: usize, end_col: usize) -> String {
+        let mut data = Vec::new();
+
+        let end_row = end_row.min(self.grid.row_count() - 1);
+        let end_col = end_col.min(self.grid.col_count() - 1);
+
+        for row in start_row..=end_row {
+            for col in start_col..=end_col {
+                if let Some(_cell) = self.grid.get_cell(row, col) {
+                    let value = self.grid.get_value(row, col);
+                    if !matches!(value, CellValue::Empty) {
+                        let (value_str, type_str) = match value {
+                            CellValue::Text(s) => (s.clone(), "text"),
+                            CellValue::Number(n) => (n.to_string(), "number"),
+                            CellValue::Boolean(b) => (b.to_string(), "boolean"),
+                            CellValue::Empty => continue,
+                        };
+
+                        data.push(format!(
+                            r#"{{"row":{},"col":{},"value":"{}","type":"{}"}}"#,
+                            row,
+                            col,
+                            value_str.replace("\"", "\\\""),
+                            type_str
+                        ));
+                    }
+                }
+            }
+        }
+
+        format!("[{}]", data.join(","))
+    }
+
+    /// Import processed data from worker thread
+    /// Accepts JSON array: [{"row":0,"col":0,"value":"text","type":"text"}, ...]
+    pub fn import_worker_result(&mut self, result_json: &str) -> Result<usize, JsValue> {
+        let data: Vec<serde_json::Value> = serde_json::from_str(result_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid JSON: {}", e)))?;
+
+        let mut updated_count = 0;
+
+        for cell_data in data {
+            let row = cell_data["row"].as_u64().unwrap_or(0) as usize;
+            let col = cell_data["col"].as_u64().unwrap_or(0) as usize;
+
+            if row >= self.grid.row_count() || col >= self.grid.col_count() {
+                continue;
+            }
+
+            let cell_value = match cell_data["type"].as_str() {
+                Some("text") => CellValue::Text(cell_data["value"].as_str().unwrap_or("").to_string()),
+                Some("number") => {
+                    let val = cell_data["value"].as_f64()
+                        .or_else(|| cell_data["value"].as_str().and_then(|s| s.parse::<f64>().ok()))
+                        .unwrap_or(0.0);
+                    CellValue::Number(val)
+                }
+                Some("boolean") => {
+                    let val = cell_data["value"].as_bool()
+                        .or_else(|| cell_data["value"].as_str().map(|s| s == "true"))
+                        .unwrap_or(false);
+                    CellValue::Boolean(val)
+                }
+                _ => CellValue::Empty,
+            };
+
+            self.grid.set_value(row, col, cell_value);
+            self.dirty_cells.insert((row, col));
+            updated_count += 1;
+        }
+
+        Ok(updated_count)
+    }
+
+    /// Get grid metadata for worker thread (dimensions, frozen areas, etc.)
+    pub fn get_grid_metadata_json(&self) -> String {
+        format!(
+            r#"{{"rows":{},"cols":{},"frozen_rows":{},"frozen_cols":{}}}"#,
+            self.grid.row_count(),
+            self.grid.col_count(),
+            self.grid.frozen_rows,
+            self.grid.frozen_cols
+        )
+    }
+
+    /// Prepare data for sorting in worker thread
+    /// Returns JSON with data and sort configuration
+    pub fn prepare_sort_data(&self, sort_columns: Vec<usize>, ascending: Vec<bool>) -> String {
+        format!(
+            r#"{{"data":{},"sort_columns":{},"ascending":{}}}"#,
+            self.export_grid_data_json(),
+            serde_json::to_string(&sort_columns).unwrap_or_else(|_| "[]".to_string()),
+            serde_json::to_string(&ascending).unwrap_or_else(|_| "[]".to_string())
+        )
+    }
+
+    /// Apply sorted row indices from worker result
+    /// Takes array of row indices representing the new order
+    pub fn apply_sorted_indices(&mut self, indices_json: &str) -> Result<(), JsValue> {
+        let indices: Vec<usize> = serde_json::from_str(indices_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid indices JSON: {}", e)))?;
+
+        if indices.len() != self.grid.row_count() {
+            return Err(JsValue::from_str(&format!(
+                "Indices length {} does not match row count {}",
+                indices.len(),
+                self.grid.row_count()
+            )));
+        }
+
+        // Create a copy of all rows
+        let mut row_data: Vec<Vec<CellValue>> = Vec::new();
+        for row in 0..self.grid.row_count() {
+            let mut row_values = Vec::new();
+            for col in 0..self.grid.col_count() {
+                row_values.push(self.grid.get_value(row, col).clone());
+            }
+            row_data.push(row_values);
+        }
+
+        // Reorder rows according to indices
+        for (new_row, &old_row) in indices.iter().enumerate() {
+            if old_row >= row_data.len() {
+                continue;
+            }
+            for (col, value) in row_data[old_row].iter().enumerate() {
+                self.grid.set_value(new_row, col, value.clone());
+                self.dirty_cells.insert((new_row, col));
+            }
+        }
+
+        Ok(())
     }
 }
 

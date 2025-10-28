@@ -18,7 +18,7 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 - **Real-time Resize**: Live feedback vs preview rectangle
 - **Smart Type Detection**: Auto-detect Number/Boolean/Text on paste
 
-### 📊 Feature Coverage: 99% (135/137 features from original)
+### 📊 Feature Coverage: 100% (137/137 features from original) 🎉
 - ✅ Phase 1-4: Core, Rendering, Text, Interaction - **100% Complete**
 - ✅ Phase 5: Advanced Features - **100% Complete** (20/20 feature groups)
   - ✅ Column resizing
@@ -30,6 +30,7 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - ✅ Cell styling API
   - ✅ Custom cell borders
   - ✅ Row/Column operations (insert/delete, delete empty rows)
+  - ✅ Row context menu ← **New!**
   - ✅ Keyboard enhancements (Delete key, Ctrl+Home/End)
   - ✅ Text search with navigation
   - ✅ Search highlighting
@@ -47,10 +48,11 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
   - ✅ Modified cell search
   - ✅ Replace functionality (current/all/selection)
   - ✅ Undo/Redo system (unlimited history, row/column/style tracking)
-- ✅ Phase 8: Performance Optimization - **88% Complete** (7/8 features) ← **New!**
+- ✅ Phase 8: Performance Optimization - **100% Complete** (8/8 features) ← **New!**
   - ✅ Differential rendering (dirty cell tracking)
   - ✅ Lazy loading (batch data, visible range)
   - ✅ Memory pooling (capacity management, compaction)
+  - ✅ Worker thread for background data processing ← **New!**
 
 ### 🎯 Next Priorities
 1. ~~Row/Column headers~~ ✅ **Complete!**
@@ -198,9 +200,12 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 - [x] Row operations
   - [x] Insert row(s)
   - [x] Delete row(s)
-  - [x] Delete empty rows ← **New!**
+  - [x] Delete empty rows
   - [x] Check if row is empty
-  - [ ] Row context menu
+  - [x] Row context menu ← **New!**
+  - [x] Context menu event handling
+  - [x] Row copy/cut/paste operations
+  - [x] Row move up/down operations
 - [x] Column operations
   - [x] Auto-fit column width to content
   - [x] Auto-fit all columns
@@ -283,17 +288,20 @@ WebGL + WebAssemblyによる最高レベルのパフォーマンスを目指す�
 - [x] FPS monitoring
 - [x] Performance metrics API
 - [x] Render time tracking
-- [x] Memory pooling ← **New!**
+- [x] Memory pooling
 - [x] Memory usage tracking
 - [x] Memory compaction API
-- [x] Differential rendering ← **New!**
+- [x] Differential rendering
 - [x] Dirty cell tracking
 - [x] Partial re-render support
-- [x] Lazy loading for large datasets ← **New!**
+- [x] Lazy loading for large datasets
 - [x] Batch data loading API
 - [x] Visible range detection
 - [x] Range-based data loading
-- [ ] Worker thread for data processing
+- [x] Worker thread for data processing ← **New!**
+- [x] Export/import grid data as JSON
+- [x] Background sorting support
+- [x] Worker result application API
 
 ### Phase 9: Testing & Documentation 📚
 - [ ] Unit tests (Rust)

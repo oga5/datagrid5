@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Context Menu Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .grid-container {
+            width: 100%;
+            height: 600px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #E8F5E9;
+            border-left: 4px solid #4CAF50;
+            color: #2E7D32;
+            font-size: 14px;
+        }
+
+        /* Context Menu Styles */
+        .context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            padding: 4px 0;
+            min-width: 180px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .context-menu-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .context-menu-item.disabled {
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .context-menu-item.disabled:hover {
+            background-color: white;
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background-color: #e0e0e0;
+            margin: 4px 0;
+        }
+
+        .context-menu-label {
+            padding: 4px 16px;
+            font-size: 12px;
+            color: #666;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>DataGrid5 - Row Context Menu</h1>
+    <div class="description">
+        Right-click on row headers to open the context menu.
+        You can insert, delete, copy, cut, and move rows.
+    </div>
+
+    <div id="my-grid" class="grid-container"></div>
+
+    <!-- Context Menu -->
+    <div id="context-menu" class="context-menu">
+        <div class="context-menu-label" id="menu-title">Row Operations</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="insert_row_above">Insert Row Above</div>
+        <div class="context-menu-item" data-action="insert_row_below">Insert Row Below</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="copy_row">Copy Row</div>
+        <div class="context-menu-item" data-action="cut_row">Cut Row</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="move_row_up">Move Row Up</div>
+        <div class="context-menu-item" data-action="move_row_down">Move Row Down</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="delete_row">Delete Row</div>
+    </div>
+
+    <div class="controls">
+        <button onclick="loadSampleData()">Load Sample Data</button>
+        <button onclick="showInstructions()">Show Instructions</button>
+        <div id="info" class="info">Right-click on row headers to open context menu</div>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+
+        let grid;
+        let currentRow = null;
+        let copiedRowData = null;
+
+        async function initialize() {
+            await init();
+
+            const options = {
+                rows: 20,
+                cols: 5,
+                width: document.querySelector('.grid-container').clientWidth,
+                height: 600
+            };
+
+            try {
+                grid = DataGrid.from_container('my-grid', JSON.stringify(options));
+                window.grid = grid;
+
+                // Setup context menu
+                setupContextMenu();
+
+                document.getElementById('info').textContent = 'Grid initialized. Right-click on row headers!';
+                grid.render();
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                document.getElementById('info').textContent = 'Error: ' + error;
+            }
+        }
+
+        function setupContextMenu() {
+            const container = document.getElementById('my-grid');
+            const menu = document.getElementById('context-menu');
+
+            // Prevent default context menu on grid
+            container.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+
+                // Get context info from grid
+                const contextInfo = grid.handle_context_menu(e);
+
+                if (contextInfo) {
+                    try {
+                        const info = JSON.parse(contextInfo);
+
+                        if (info.type === 'row') {
+                            currentRow = info.row;
+                            showContextMenu(e.pageX, e.pageY, info.row);
+                        } else if (info.type === 'cell') {
+                            // Could add cell context menu here
+                            hideContextMenu();
+                        } else {
+                            hideContextMenu();
+                        }
+                    } catch (err) {
+                        console.error('Failed to parse context info:', err);
+                        hideContextMenu();
+                    }
+                } else {
+                    hideContextMenu();
+                }
+            });
+
+            // Hide menu on click outside
+            document.addEventListener('click', () => {
+                hideContextMenu();
+            });
+
+            // Handle menu item clicks
+            menu.addEventListener('click', (e) => {
+                const item = e.target.closest('.context-menu-item');
+                if (!item || item.classList.contains('disabled')) return;
+
+                const action = item.dataset.action;
+                executeAction(action, currentRow);
+                hideContextMenu();
+            });
+        }
+
+        function showContextMenu(x, y, row) {
+            const menu = document.getElementById('context-menu');
+            const title = document.getElementById('menu-title');
+
+            title.textContent = `Row ${row + 1} Operations`;
+
+            // Get available operations
+            const operations = grid.get_row_context_operations(row);
+
+            // Enable/disable menu items
+            const items = menu.querySelectorAll('.context-menu-item');
+            items.forEach(item => {
+                const action = item.dataset.action;
+                if (operations.includes(action)) {
+                    item.classList.remove('disabled');
+                } else {
+                    item.classList.add('disabled');
+                }
+            });
+
+            // Position menu
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            menu.style.display = 'block';
+        }
+
+        function hideContextMenu() {
+            const menu = document.getElementById('context-menu');
+            menu.style.display = 'none';
+        }
+
+        function executeAction(action, row) {
+            if (row === null) return;
+
+            try {
+                const result = grid.execute_row_operation(action, row);
+
+                // Handle special cases
+                if (action === 'copy_row' || action === 'cut_row') {
+                    copiedRowData = result;
+                    navigator.clipboard.writeText(result).catch(err => {
+                        console.warn('Failed to write to clipboard:', err);
+                    });
+                    showInfo(`${action === 'copy_row' ? 'Copied' : 'Cut'} row ${row + 1} to clipboard`);
+                } else {
+                    showInfo(result);
+                }
+
+                grid.render();
+            } catch (error) {
+                showInfo('Error: ' + error, true);
+            }
+        }
+
+        function showInfo(message, isError = false) {
+            const info = document.getElementById('info');
+            info.textContent = message;
+            info.style.backgroundColor = isError ? '#FFEBEE' : '#E8F5E9';
+            info.style.borderLeftColor = isError ? '#F44336' : '#4CAF50';
+            info.style.color = isError ? '#C62828' : '#2E7D32';
+        }
+
+        window.loadSampleData = function() {
+            if (!grid) return;
+
+            const sampleData = [];
+
+            // Create sample product data
+            const products = [
+                ['Product', 'Price', 'Quantity', 'Category', 'In Stock'],
+                ['Laptop', 999.99, 15, 'Electronics', true],
+                ['Mouse', 29.99, 50, 'Electronics', true],
+                ['Keyboard', 79.99, 30, 'Electronics', true],
+                ['Monitor', 299.99, 8, 'Electronics', true],
+                ['Desk Chair', 199.99, 12, 'Furniture', true],
+                ['Standing Desk', 399.99, 5, 'Furniture', false],
+                ['Notebook', 4.99, 100, 'Stationery', true],
+                ['Pen Set', 12.99, 75, 'Stationery', true],
+                ['Coffee Mug', 9.99, 40, 'Kitchen', true],
+                ['Water Bottle', 14.99, 35, 'Kitchen', true],
+            ];
+
+            for (let row = 0; row < products.length; row++) {
+                for (let col = 0; col < products[row].length; col++) {
+                    sampleData.push({
+                        row,
+                        col,
+                        value: products[row][col]
+                    });
+                }
+            }
+
+            try {
+                grid.load_data_json(JSON.stringify(sampleData));
+                grid.render();
+                showInfo('Sample data loaded. Try right-clicking on row headers!');
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            }
+        };
+
+        window.showInstructions = function() {
+            showInfo('Right-click on row headers (numbers on the left) to open the context menu. Try inserting, deleting, or moving rows!');
+        };
+
+        initialize();
+    </script>
+</body>
+</html>
