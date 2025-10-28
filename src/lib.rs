@@ -376,6 +376,9 @@ impl DataGrid {
         self.webgl_renderer.resize(width, height);
         self.viewport.resize(width, height);
         self.viewport.update_visible_range(&self.grid);
+
+        // Mark for full re-render after resize
+        self.needs_full_render = true;
     }
 
     /// Handle mouse wheel event for scrolling
