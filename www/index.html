@@ -190,6 +190,8 @@
         }
 
         // Setup virtual scroll container
+        let isInternalScroll = false; // Flag to prevent scroll event loops
+
         function setupVirtualScroll() {
             if (!grid) return;
 
@@ -203,6 +205,12 @@
             let scrollTimeout = null;
             scrollContainer.addEventListener('scroll', (e) => {
                 if (!grid) return;
+
+                // Skip if this is a programmatic scroll from keyboard navigation
+                if (isInternalScroll) {
+                    isInternalScroll = false;
+                    return;
+                }
 
                 // Get scroll position from container
                 const scrollX = scrollContainer.scrollLeft;
@@ -238,6 +246,24 @@
             scrollContent.style.height = totalHeight + 'px';
 
             console.log(`Virtual scroll size: ${totalWidth} x ${totalHeight}`);
+        }
+
+        // Sync scroll container position with grid internal scroll
+        function syncScrollPosition() {
+            if (!grid) return;
+
+            const scrollContainer = document.getElementById('scroll-container');
+
+            // Get current scroll position from grid
+            const viewport = JSON.parse(grid.get_viewport_info_array());
+            const [canvasWidth, canvasHeight, scrollY, scrollX] = viewport;
+
+            // Set flag to prevent scroll event loop
+            isInternalScroll = true;
+
+            // Update scroll container to match grid's internal scroll
+            scrollContainer.scrollLeft = scrollX;
+            scrollContainer.scrollTop = scrollY;
         }
 
         // Cell editing functions
@@ -526,6 +552,7 @@
                 const handled = grid.handle_keyboard_with_modifiers(e, ctrl);
                 if (handled) {
                     e.preventDefault();
+                    syncScrollPosition();
                     updateInfo();
                 }
             });
