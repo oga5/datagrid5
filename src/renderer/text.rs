@@ -100,6 +100,8 @@ impl TextRenderer {
         search_results: &[(usize, usize)],
         current_search_index: Option<usize>
     ) {
+        web_sys::console::log_1(&"TextRenderer::render_with_search() called".into());
+
         // Clear canvas first
         self.clear(viewport.canvas_width, viewport.canvas_height);
 
@@ -154,12 +156,15 @@ impl TextRenderer {
         }
 
         // Region 4: Scrollable rows × Scrollable cols (bottom-right)
+        let mut rendered_count = 0;
         for row in first_row.max(frozen_rows)..=last_row {
             if grid.is_row_filtered(row) { continue; }
             for col in first_col.max(frozen_cols)..=last_col {
                 self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, false, false);
+                rendered_count += 1;
             }
         }
+        web_sys::console::log_1(&format!("TextRenderer: Attempted to render {} cells", rendered_count).into());
     }
 
     /// Render a single cell's text
@@ -282,12 +287,22 @@ impl TextRenderer {
             self.context.set_font(&self.font_string);
         }
 
-        // Draw text with padding
+        // Draw text with padding and clipping
         let padding = 5.0;
         let text_x = canvas_x + padding;
         let text_y = canvas_y + height / 2.0 + self.font_config.size / 3.0;
 
+        // Save canvas state and set up clipping region
+        self.context.save();
+        self.context.begin_path();
+        self.context.rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+        self.context.clip();
+
+        // Draw text within clipping region
         let _ = self.context.fill_text(&text, text_x as f64, text_y as f64);
+
+        // Restore canvas state (removes clipping)
+        self.context.restore();
 
         // Reset font
         self.context.set_font(&self.font_string);
@@ -526,6 +541,8 @@ impl TextRenderer {
 
     /// Render row and column headers
     fn render_headers(&self, grid: &Grid, viewport: &Viewport) {
+        web_sys::console::log_1(&"TextRenderer::render_headers() called".into());
+
         let row_header_width = grid.row_header_width;
         let col_header_height = grid.col_header_height;
 

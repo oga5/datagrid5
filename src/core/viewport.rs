@@ -51,8 +51,15 @@ impl Viewport {
 
     /// Set scroll position
     pub fn set_scroll(&mut self, x: f32, y: f32, grid: &Grid) {
-        let max_scroll_x = (grid.total_width() - self.canvas_width).max(0.0);
-        let max_scroll_y = (grid.total_height() - self.canvas_height).max(0.0);
+        // Calculate the actual viewport area (excluding headers)
+        let header_offset_x = if grid.show_headers { grid.row_header_width } else { 0.0 };
+        let header_offset_y = if grid.show_headers { grid.col_header_height } else { 0.0 };
+
+        let viewport_width = self.canvas_width - header_offset_x;
+        let viewport_height = self.canvas_height - header_offset_y;
+
+        let max_scroll_x = (grid.total_width() - viewport_width).max(0.0);
+        let max_scroll_y = (grid.total_height() - viewport_height).max(0.0);
 
         self.scroll_x = x.max(0.0).min(max_scroll_x);
         self.scroll_y = y.max(0.0).min(max_scroll_y);
@@ -67,18 +74,20 @@ impl Viewport {
     pub fn update_visible_range(&mut self, grid: &Grid) {
         // Calculate visible row range
         let mut y = 0.0;
+        let mut found_first_row = false;
         self.first_visible_row = 0;
         self.last_visible_row = grid.row_count().saturating_sub(1);
 
         for row in 0..grid.row_count() {
             let row_height = grid.row_height(row);
 
-            if y + row_height > self.scroll_y && self.first_visible_row == 0 {
+            if !found_first_row && y + row_height > self.scroll_y {
                 self.first_visible_row = row;
+                found_first_row = true;
             }
 
             if y > self.scroll_y + self.canvas_height {
-                self.last_visible_row = row;
+                self.last_visible_row = row.saturating_sub(1);
                 break;
             }
 
@@ -87,18 +96,20 @@ impl Viewport {
 
         // Calculate visible column range
         let mut x = 0.0;
+        let mut found_first_col = false;
         self.first_visible_col = 0;
         self.last_visible_col = grid.col_count().saturating_sub(1);
 
         for col in 0..grid.col_count() {
             let col_width = grid.col_width(col);
 
-            if x + col_width > self.scroll_x && self.first_visible_col == 0 {
+            if !found_first_col && x + col_width > self.scroll_x {
                 self.first_visible_col = col;
+                found_first_col = true;
             }
 
             if x > self.scroll_x + self.canvas_width {
-                self.last_visible_col = col;
+                self.last_visible_col = col.saturating_sub(1);
                 break;
             }
 

@@ -104,6 +104,7 @@ impl WebGLRenderer {
 
     /// Render the grid with freeze support
     pub fn render(&self, grid: &Grid, viewport: &Viewport) {
+        web_sys::console::log_1(&"WebGLRenderer::render() called".into());
         self.clear();
 
         self.context.use_program(Some(&self.shader_program.program));

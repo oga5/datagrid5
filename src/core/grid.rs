@@ -169,6 +169,14 @@ impl Grid {
         }
     }
 
+    /// Get cell value
+    pub fn get_value(&self, row: usize, col: usize) -> CellValue {
+        self.cells
+            .get(&(row, col))
+            .map(|cell| cell.value.clone())
+            .unwrap_or(CellValue::Empty)
+    }
+
     /// Get cell value as string
     pub fn get_value_string(&self, row: usize, col: usize) -> String {
         self.cells
@@ -421,14 +429,19 @@ impl Grid {
                 }
                 (CellValue::Boolean(ba), CellValue::Boolean(bb)) => ba.cmp(bb),
                 (CellValue::Text(ta), CellValue::Text(tb)) => ta.cmp(tb),
+                (CellValue::Date(da), CellValue::Date(db)) => da.cmp(db),
                 (CellValue::Empty, CellValue::Empty) => std::cmp::Ordering::Equal,
                 (CellValue::Empty, _) => std::cmp::Ordering::Greater, // Empty values go to the end
                 (_, CellValue::Empty) => std::cmp::Ordering::Less,
-                // Mixed types: Number < Boolean < Text
+                // Mixed types: Number < Boolean < Date < Text
                 (CellValue::Number(_), _) => std::cmp::Ordering::Less,
                 (_, CellValue::Number(_)) => std::cmp::Ordering::Greater,
+                (CellValue::Boolean(_), CellValue::Date(_)) => std::cmp::Ordering::Less,
                 (CellValue::Boolean(_), CellValue::Text(_)) => std::cmp::Ordering::Less,
+                (CellValue::Date(_), CellValue::Boolean(_)) => std::cmp::Ordering::Greater,
+                (CellValue::Date(_), CellValue::Text(_)) => std::cmp::Ordering::Less,
                 (CellValue::Text(_), CellValue::Boolean(_)) => std::cmp::Ordering::Greater,
+                (CellValue::Text(_), CellValue::Date(_)) => std::cmp::Ordering::Greater,
             };
 
             if ascending {
@@ -593,7 +606,7 @@ impl Grid {
 
         for row in 0..self.rows {
             let value = self.get_value(row, col);
-            if !predicate(value) {
+            if !predicate(&value) {
                 self.filtered_rows.insert(row);
             }
         }

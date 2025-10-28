@@ -24,6 +24,7 @@ web-sys = { version = "0.3", features = [
     "console",
     "Performance",
     "CanvasRenderingContext2d",
+    "TextMetrics",
     "ImageData",
     "HtmlElement",
     "MouseEvent",

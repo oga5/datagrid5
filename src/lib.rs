@@ -133,8 +133,9 @@ impl DataGrid {
         // Clear container
         container.set_inner_html("");
 
-        // Set container style
-        container.set_attribute("style", "position: relative; width: 100%; height: 100%;")?;
+        // Set container style - don't use height: 100% as it causes layout issues with absolute positioned canvases
+        let container_style = format!("position: relative; width: 100%; height: {}px;", height);
+        container.set_attribute("style", &container_style)?;
 
         // Create WebGL canvas
         let webgl_canvas = document
@@ -354,6 +355,8 @@ impl DataGrid {
 
     /// Render the grid
     pub fn render(&self) {
+        web_sys::console::log_1(&"DataGrid::render() called".into());
+
         // Render WebGL layer (grid lines and backgrounds)
         self.webgl_renderer.render(&self.grid, &self.viewport);
 
@@ -364,6 +367,13 @@ impl DataGrid {
             &self.search_results,
             self.current_search_index
         );
+
+        web_sys::console::log_1(&format!("DataGrid::render() completed. Viewport: first_row={}, last_row={}, first_col={}, last_col={}",
+            self.viewport.first_visible_row,
+            self.viewport.last_visible_row,
+            self.viewport.first_visible_col,
+            self.viewport.last_visible_col
+        ).into());
     }
 
     /// Resize the grid
@@ -656,10 +666,47 @@ impl DataGrid {
         ]
     }
 
+    /// Get viewport information as JSON string
+    /// Returns: "[canvas_width, canvas_height, scroll_y, scroll_x]"
+    pub fn get_viewport_info_array(&self) -> String {
+        format!(
+            "[{},{},{},{}]",
+            self.viewport.canvas_width,
+            self.viewport.canvas_height,
+            self.viewport.scroll_y,
+            self.viewport.scroll_x
+        )
+    }
+
+    /// Get maximum scroll values as JSON string
+    /// Returns: "[max_scroll_x, max_scroll_y]"
+    pub fn get_max_scroll(&self) -> String {
+        let header_offset_x = if self.grid.show_headers { self.grid.row_header_width } else { 0.0 };
+        let header_offset_y = if self.grid.show_headers { self.grid.col_header_height } else { 0.0 };
+
+        let viewport_width = self.viewport.canvas_width - header_offset_x;
+        let viewport_height = self.viewport.canvas_height - header_offset_y;
+
+        let max_scroll_x = (self.grid.total_width() - viewport_width).max(0.0);
+        let max_scroll_y = (self.grid.total_height() - viewport_height).max(0.0);
+
+        format!("[{},{}]", max_scroll_x, max_scroll_y)
+    }
+
+    /// Set scroll position
+    pub fn set_scroll(&mut self, x: f32, y: f32) {
+        self.viewport.set_scroll(x, y, &self.grid);
+        self.viewport.update_visible_range(&self.grid);
+    }
+
     /// Set multiple cell values at once (for lazy loading/batch updates)
-    /// Takes array of [row, col, value_type, value_data]
+    /// Takes JSON array of [row, col, value_type, value_data]
     /// value_type: 0=empty, 1=text, 2=number, 3=boolean
-    pub fn set_cells_batch(&mut self, cells_data: Vec<Vec<String>>) {
+    /// Example: "[[0, 0, 1, \"text\"], [1, 1, 2, \"123\"]]"
+    pub fn set_cells_batch(&mut self, cells_data_json: &str) -> Result<(), JsValue> {
+        let cells_data: Vec<Vec<String>> = serde_json::from_str(cells_data_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid cells_data JSON: {}", e)))?;
+
         for cell_data in cells_data {
             if cell_data.len() < 4 {
                 continue;
@@ -684,6 +731,8 @@ impl DataGrid {
             self.grid.set_value(row, col, cell_value);
             self.dirty_cells.insert((row, col));
         }
+
+        Ok(())
     }
 
     /// Load grid data from JSON
@@ -691,14 +740,20 @@ impl DataGrid {
     /// Value can be string, number, boolean, date, or null (for empty)
     /// If column has data_type configured, value will be converted accordingly
     pub fn load_data_json(&mut self, data_json: &str) -> Result<(), JsValue> {
+        web_sys::console::log_1(&format!("load_data_json called with {} bytes", data_json.len()).into());
+
         let data: Vec<serde_json::Value> = serde_json::from_str(data_json)
             .map_err(|e| JsValue::from_str(&format!("Invalid JSON data: {}", e)))?;
 
+        web_sys::console::log_1(&format!("Parsed {} cell data entries", data.len()).into());
+
+        let mut loaded_count = 0;
         for cell_data in data {
             let row = cell_data["row"].as_u64().unwrap_or(0) as usize;
             let col = cell_data["col"].as_u64().unwrap_or(0) as usize;
 
             if row >= self.grid.row_count() || col >= self.grid.col_count() {
+                web_sys::console::log_1(&format!("Skipping cell ({}, {}) - out of bounds", row, col).into());
                 continue;
             }
 
@@ -736,9 +791,16 @@ impl DataGrid {
                 _ => CellValue::Empty,
             };
 
-            self.grid.set_value(row, col, cell_value);
+            self.grid.set_value(row, col, cell_value.clone());
             self.dirty_cells.insert((row, col));
+            loaded_count += 1;
+
+            if loaded_count <= 5 {
+                web_sys::console::log_1(&format!("Loaded cell ({}, {}): {:?}", row, col, cell_value).into());
+            }
         }
+
+        web_sys::console::log_1(&format!("load_data_json completed. Loaded {} cells, {} dirty cells", loaded_count, self.dirty_cells.len()).into());
 
         Ok(())
     }
@@ -1312,12 +1374,14 @@ impl DataGrid {
         self.selected_cells.clear();
     }
 
-    /// Get selected cells as a list of [row, col] pairs
-    pub fn get_selected_cells(&self) -> Vec<Vec<usize>> {
-        self.selected_cells
+    /// Get selected cells as a JSON array of [row, col] pairs
+    /// Returns: "[[row1, col1], [row2, col2], ...]"
+    pub fn get_selected_cells(&self) -> String {
+        let cells: Vec<Vec<usize>> = self.selected_cells
             .iter()
             .map(|(row, col)| vec![*row, *col])
-            .collect()
+            .collect();
+        serde_json::to_string(&cells).unwrap_or_else(|_| "[]".to_string())
     }
 
     /// Get selection count
@@ -2123,13 +2187,15 @@ impl DataGrid {
         }
     }
 
-    /// Get sort state for a column (returns: (is_sorted, is_ascending))
-    pub fn get_column_sort_state(&self, col: usize) -> (bool, bool) {
-        if self.grid.sort_column == Some(col) {
+    /// Get sort state for a column as JSON object
+    /// Returns: "{\"is_sorted\": true/false, \"is_ascending\": true/false}"
+    pub fn get_column_sort_state(&self, col: usize) -> String {
+        let (is_sorted, is_ascending) = if self.grid.sort_column == Some(col) {
             (true, self.grid.sort_ascending)
         } else {
             (false, true)
-        }
+        };
+        format!(r#"{{"is_sorted":{},"is_ascending":{}}}"#, is_sorted, is_ascending)
     }
 
     /// Add column to multi-column sort (for Shift+Click)
@@ -2174,22 +2240,25 @@ impl DataGrid {
         self.viewport.update_visible_range(&self.grid);
     }
 
-    /// Get multi-column sort state (returns array of [col, ascending] pairs)
-    pub fn get_multi_column_sort_state(&self) -> Vec<Vec<u32>> {
-        self.grid.sort_columns.iter()
+    /// Get multi-column sort state as JSON array of [col, ascending] pairs
+    /// Returns: "[[col1, 1], [col2, 0], ...]" where 1=ascending, 0=descending
+    pub fn get_multi_column_sort_state(&self) -> String {
+        let state: Vec<Vec<u32>> = self.grid.sort_columns.iter()
             .map(|(col, asc)| vec![*col as u32, if *asc { 1 } else { 0 }])
-            .collect()
+            .collect();
+        serde_json::to_string(&state).unwrap_or_else(|_| "[]".to_string())
     }
 
-    /// Check if a column is in multi-column sort (returns: (is_sorted, is_ascending, sort_priority))
-    pub fn get_column_multi_sort_state(&self, col: usize) -> (bool, bool, i32) {
+    /// Check if a column is in multi-column sort
+    /// Returns JSON: "{\"is_sorted\": bool, \"is_ascending\": bool, \"sort_priority\": number}"
+    pub fn get_column_multi_sort_state(&self, col: usize) -> String {
         if let Some((priority, (_, ascending))) = self.grid.sort_columns.iter()
             .enumerate()
             .find(|(_, (c, _))| *c == col)
         {
-            (true, *ascending, priority as i32)
+            format!(r#"{{"is_sorted":true,"is_ascending":{},"sort_priority":{}}}"#, ascending, priority)
         } else {
-            (false, true, -1)
+            r#"{"is_sorted":false,"is_ascending":true,"sort_priority":-1}"#.to_string()
         }
     }
 
@@ -2339,10 +2408,10 @@ impl DataGrid {
 
         let padding = 20.0; // Padding on both sides
         let min_width = 50.0;
-        let max_width = 400.0;
+        let max_width = 400.0_f32;
 
         // Measure all cells in this column
-        let mut max_text_width = 0.0;
+        let mut max_text_width = 0.0_f32;
 
         for row in 0..self.grid.row_count() {
             let text = self.grid.get_value_string(row, col);
@@ -2387,6 +2456,7 @@ impl DataGrid {
                 CellValue::Text(t) => t.to_lowercase(),
                 CellValue::Number(n) => n.to_string(),
                 CellValue::Boolean(b) => b.to_string(),
+                CellValue::Date(d) => d.to_lowercase(),
                 CellValue::Empty => String::new(),
             };
             cell_text.contains(&filter_text)
@@ -2758,13 +2828,20 @@ impl DataGrid {
 
     /// Prepare data for sorting in worker thread
     /// Returns JSON with data and sort configuration
-    pub fn prepare_sort_data(&self, sort_columns: Vec<usize>, ascending: Vec<bool>) -> String {
-        format!(
+    /// sort_columns_json: JSON array of column indices, e.g. "[0, 1]"
+    /// ascending_json: JSON array of booleans, e.g. "[true, false]"
+    pub fn prepare_sort_data(&self, sort_columns_json: &str, ascending_json: &str) -> Result<String, JsValue> {
+        let sort_columns: Vec<usize> = serde_json::from_str(sort_columns_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid sort_columns JSON: {}", e)))?;
+        let ascending: Vec<bool> = serde_json::from_str(ascending_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid ascending JSON: {}", e)))?;
+
+        Ok(format!(
             r#"{{"data":{},"sort_columns":{},"ascending":{}}}"#,
             self.export_grid_data_json(),
             serde_json::to_string(&sort_columns).unwrap_or_else(|_| "[]".to_string()),
             serde_json::to_string(&ascending).unwrap_or_else(|_| "[]".to_string())
-        )
+        ))
     }
 
     /// Apply sorted row indices from worker result
@@ -2786,7 +2863,7 @@ impl DataGrid {
         for row in 0..self.grid.row_count() {
             let mut row_values = Vec::new();
             for col in 0..self.grid.col_count() {
-                row_values.push(self.grid.get_value(row, col).clone());
+                row_values.push(self.grid.get_value(row, col));
             }
             row_data.push(row_values);
         }

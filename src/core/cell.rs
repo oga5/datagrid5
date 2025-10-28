@@ -19,6 +19,19 @@ pub enum CellValue {
     Date(String), // ISO 8601 format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS
 }
 
+impl PartialEq for CellValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (CellValue::Empty, CellValue::Empty) => true,
+            (CellValue::Text(a), CellValue::Text(b)) => a == b,
+            (CellValue::Number(a), CellValue::Number(b)) => a == b,
+            (CellValue::Boolean(a), CellValue::Boolean(b)) => a == b,
+            (CellValue::Date(a), CellValue::Date(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
 impl CellValue {
     pub fn to_string(&self) -> String {
         match self {

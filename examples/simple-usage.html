@@ -23,13 +23,79 @@
             line-height: 1.6;
         }
 
-        .grid-container {
+        .grid-wrapper {
+            position: relative;
             width: 100%;
             height: 600px;
+        }
+
+        .grid-container {
+            width: 100%;
+            height: 100%;
             background-color: white;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Vertical scrollbar */
+        .scrollbar-vertical {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 16px;
+            height: 100%;
+            background-color: #f0f0f0;
+            border-left: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        .scrollbar-vertical-thumb {
+            position: absolute;
+            left: 2px;
+            right: 2px;
+            background-color: #888;
+            border-radius: 6px;
+            cursor: pointer;
+            min-height: 30px;
+        }
+
+        .scrollbar-vertical-thumb:hover {
+            background-color: #666;
+        }
+
+        .scrollbar-vertical-thumb:active {
+            background-color: #555;
+        }
+
+        /* Horizontal scrollbar */
+        .scrollbar-horizontal {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: 16px;
+            background-color: #f0f0f0;
+            border-top: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        .scrollbar-horizontal-thumb {
+            position: absolute;
+            top: 2px;
+            bottom: 2px;
+            background-color: #888;
+            border-radius: 6px;
+            cursor: pointer;
+            min-width: 30px;
+        }
+
+        .scrollbar-horizontal-thumb:hover {
+            background-color: #666;
+        }
+
+        .scrollbar-horizontal-thumb:active {
+            background-color: #555;
         }
 
         .controls {
@@ -74,8 +140,16 @@
         Data is also loaded using a simple JSON format.
     </div>
 
-    <!-- Placeholder div for the grid -->
-    <div id="my-grid" class="grid-container"></div>
+    <!-- Placeholder div for the grid with scrollbars -->
+    <div class="grid-wrapper">
+        <div id="my-grid" class="grid-container"></div>
+        <div class="scrollbar-vertical" id="scrollbar-v">
+            <div class="scrollbar-vertical-thumb" id="scrollbar-v-thumb"></div>
+        </div>
+        <div class="scrollbar-horizontal" id="scrollbar-h">
+            <div class="scrollbar-horizontal-thumb" id="scrollbar-h-thumb"></div>
+        </div>
+    </div>
 
     <div class="controls">
         <button onclick="loadSampleData()">Load Sample Data</button>
@@ -110,11 +184,187 @@
                 // Make grid available globally for button handlers
                 window.grid = grid;
 
+                // Get the container element
+                const container = document.getElementById('my-grid');
+
+                // Add mouse wheel event handler for scrolling
+                container.addEventListener('wheel', (event) => {
+                    event.preventDefault();
+                    grid.handle_wheel(event);
+                    grid.render();
+                    updateScrollbars();
+                });
+
+                // Add mouse click event handler for cell selection
+                container.addEventListener('mousedown', (event) => {
+                    grid.handle_mouse_down_with_modifiers(event, event.shiftKey, event.ctrlKey || event.metaKey);
+                    grid.render();
+                });
+
+                // Setup custom scrollbars
+                setupScrollbars(grid);
+
                 // Render the grid
                 grid.render();
+                updateScrollbars();
             } catch (error) {
                 console.error('Failed to initialize grid:', error);
                 document.getElementById('info').textContent = 'Error: ' + error;
+            }
+        }
+
+        // Setup custom scrollbars
+        function setupScrollbars(grid) {
+            const vScrollbar = document.getElementById('scrollbar-v');
+            const vThumb = document.getElementById('scrollbar-v-thumb');
+            const hScrollbar = document.getElementById('scrollbar-h');
+            const hThumb = document.getElementById('scrollbar-h-thumb');
+
+            let isDraggingV = false;
+            let isDraggingH = false;
+            let dragStartY = 0;
+            let dragStartX = 0;
+            let scrollStartY = 0;
+            let scrollStartX = 0;
+
+            // Vertical scrollbar drag
+            vThumb.addEventListener('mousedown', (e) => {
+                isDraggingV = true;
+                dragStartY = e.clientY;
+                const viewport = JSON.parse(grid.get_viewport_info_array());
+                scrollStartY = viewport[2]; // scroll_y
+                e.preventDefault();
+            });
+
+            // Horizontal scrollbar drag
+            hThumb.addEventListener('mousedown', (e) => {
+                isDraggingH = true;
+                dragStartX = e.clientX;
+                const viewport = JSON.parse(grid.get_viewport_info_array());
+                scrollStartX = viewport[3]; // scroll_x
+                e.preventDefault();
+            });
+
+            // Mouse move handler
+            document.addEventListener('mousemove', (e) => {
+                if (isDraggingV) {
+                    const deltaY = e.clientY - dragStartY;
+                    const trackHeight = vScrollbar.clientHeight;
+                    const thumbHeight = vThumb.clientHeight;
+                    const scrollableHeight = trackHeight - thumbHeight;
+
+                    if (scrollableHeight > 0) {
+                        const scrollRatio = deltaY / scrollableHeight;
+                        const maxScroll = JSON.parse(grid.get_max_scroll());
+                        const newScrollY = scrollStartY + (scrollRatio * maxScroll[1]);
+
+                        grid.set_scroll(scrollStartX, newScrollY);
+                        grid.render();
+                        updateScrollbars();
+                    }
+                } else if (isDraggingH) {
+                    const deltaX = e.clientX - dragStartX;
+                    const trackWidth = hScrollbar.clientWidth;
+                    const thumbWidth = hThumb.clientWidth;
+                    const scrollableWidth = trackWidth - thumbWidth;
+
+                    if (scrollableWidth > 0) {
+                        const scrollRatio = deltaX / scrollableWidth;
+                        const maxScroll = JSON.parse(grid.get_max_scroll());
+                        const newScrollX = scrollStartX + (scrollRatio * maxScroll[0]);
+
+                        const viewport = JSON.parse(grid.get_viewport_info_array());
+                        grid.set_scroll(newScrollX, viewport[2]);
+                        grid.render();
+                        updateScrollbars();
+                    }
+                }
+            });
+
+            // Mouse up handler
+            document.addEventListener('mouseup', () => {
+                isDraggingV = false;
+                isDraggingH = false;
+            });
+
+            // Click on scrollbar track to jump
+            vScrollbar.addEventListener('click', (e) => {
+                if (e.target === vScrollbar) {
+                    const rect = vScrollbar.getBoundingClientRect();
+                    const clickY = e.clientY - rect.top;
+                    const trackHeight = vScrollbar.clientHeight;
+                    const ratio = clickY / trackHeight;
+                    const maxScroll = JSON.parse(grid.get_max_scroll());
+
+                    const viewport = JSON.parse(grid.get_viewport_info_array());
+                    grid.set_scroll(viewport[3], ratio * maxScroll[1]);
+                    grid.render();
+                    updateScrollbars();
+                }
+            });
+
+            hScrollbar.addEventListener('click', (e) => {
+                if (e.target === hScrollbar) {
+                    const rect = hScrollbar.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const trackWidth = hScrollbar.clientWidth;
+                    const ratio = clickX / trackWidth;
+                    const maxScroll = JSON.parse(grid.get_max_scroll());
+
+                    const viewport = JSON.parse(grid.get_viewport_info_array());
+                    grid.set_scroll(ratio * maxScroll[0], viewport[2]);
+                    grid.render();
+                    updateScrollbars();
+                }
+            });
+        }
+
+        // Update scrollbar positions based on current scroll
+        function updateScrollbars() {
+            if (!window.grid) return;
+
+            const vThumb = document.getElementById('scrollbar-v-thumb');
+            const hThumb = document.getElementById('scrollbar-h-thumb');
+            const vScrollbar = document.getElementById('scrollbar-v');
+            const hScrollbar = document.getElementById('scrollbar-h');
+
+            const viewport = JSON.parse(window.grid.get_viewport_info_array());
+            const maxScroll = JSON.parse(window.grid.get_max_scroll());
+
+            // Vertical scrollbar
+            const scrollY = viewport[2];
+            const maxScrollY = maxScroll[1];
+            const trackHeight = vScrollbar.clientHeight;
+
+            if (maxScrollY > 0) {
+                const contentHeight = maxScrollY + viewport[1]; // max_scroll + canvas_height
+                const thumbHeight = Math.max(30, (viewport[1] / contentHeight) * trackHeight);
+                const scrollRatio = scrollY / maxScrollY;
+                const thumbY = scrollRatio * (trackHeight - thumbHeight);
+
+                vThumb.style.height = thumbHeight + 'px';
+                vThumb.style.top = thumbY + 'px';
+                vScrollbar.style.display = 'block';
+            } else {
+                vScrollbar.style.display = 'none';
+            }
+
+            // Horizontal scrollbar
+            const scrollX = viewport[3];
+            const maxScrollX = maxScroll[0];
+            const trackWidth = hScrollbar.clientWidth;
+
+            if (maxScrollX > 0) {
+                const contentWidth = maxScrollX + viewport[0]; // max_scroll + canvas_width
+                const thumbWidth = Math.max(30, (viewport[0] / contentWidth) * trackWidth);
+                const scrollRatio = scrollX / maxScrollX;
+                const thumbX = scrollRatio * (trackWidth - thumbWidth);
+
+                hThumb.style.width = thumbWidth + 'px';
+                hThumb.style.left = thumbX + 'px';
+                hScrollbar.style.display = 'block';
+            } else {
+                hScrollbar.style.display = 'none';
             }
         }
 
