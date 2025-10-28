@@ -104,6 +104,114 @@ pub struct DataGrid {
 
 #[wasm_bindgen]
 impl DataGrid {
+    /// Create a new DataGrid from a container div ID with JSON options
+    /// Creates canvases automatically inside the div
+    pub fn from_container(container_id: &str, options_json: &str) -> Result<DataGrid, JsValue> {
+        // Set panic hook for better error messages
+        #[cfg(feature = "console_error_panic_hook")]
+        console_error_panic_hook::set_once();
+
+        let document = web_sys::window()
+            .ok_or("No window")?
+            .document()
+            .ok_or("No document")?;
+
+        // Get container div
+        let container = document
+            .get_element_by_id(container_id)
+            .ok_or_else(|| JsValue::from_str(&format!("Container '{}' not found", container_id)))?;
+
+        // Parse options
+        let options: serde_json::Value = serde_json::from_str(options_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid JSON options: {}", e)))?;
+
+        let rows = options["rows"].as_u64().unwrap_or(100) as usize;
+        let cols = options["cols"].as_u64().unwrap_or(26) as usize;
+        let width = options["width"].as_u64().unwrap_or(800) as u32;
+        let height = options["height"].as_u64().unwrap_or(600) as u32;
+
+        // Clear container
+        container.set_inner_html("");
+
+        // Set container style
+        container.set_attribute("style", "position: relative; width: 100%; height: 100%;")?;
+
+        // Create WebGL canvas
+        let webgl_canvas = document
+            .create_element("canvas")
+            .map_err(|_| "Failed to create WebGL canvas")?
+            .dyn_into::<HtmlCanvasElement>()
+            .map_err(|_| "Failed to cast to canvas")?;
+
+        webgl_canvas.set_width(width);
+        webgl_canvas.set_height(height);
+        webgl_canvas.set_attribute("style", "position: absolute; top: 0; left: 0; z-index: 1;")?;
+
+        // Create text overlay canvas
+        let text_canvas = document
+            .create_element("canvas")
+            .map_err(|_| "Failed to create text canvas")?
+            .dyn_into::<HtmlCanvasElement>()
+            .map_err(|_| "Failed to cast to canvas")?;
+
+        text_canvas.set_width(width);
+        text_canvas.set_height(height);
+        text_canvas.set_attribute("style", "position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none;")?;
+
+        // Append canvases to container
+        container.append_child(&webgl_canvas)?;
+        container.append_child(&text_canvas)?;
+
+        let canvas_width = width as f32;
+        let canvas_height = height as f32;
+
+        let grid = Grid::new(rows, cols);
+        let mut viewport = Viewport::new(canvas_width, canvas_height);
+        viewport.update_visible_range(&grid);
+
+        let webgl_renderer = WebGLRenderer::new(&webgl_canvas)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        let text_renderer = TextRenderer::new(&text_canvas)
+            .map_err(|e| JsValue::from_str(&e))?;
+
+        let mouse_handler = MouseHandler::new();
+        let keyboard_handler = KeyboardHandler::new();
+
+        Ok(DataGrid {
+            grid,
+            viewport,
+            webgl_renderer,
+            text_renderer,
+            mouse_handler,
+            keyboard_handler,
+            webgl_canvas,
+            text_canvas,
+            is_editing: false,
+            editing_cell: None,
+            is_resizing: false,
+            resizing_column: None,
+            resizing_row: None,
+            resize_start_pos: 0.0,
+            resize_start_size: 0.0,
+            selected_cells: HashSet::new(),
+            selection_anchor: None,
+            search_query: String::new(),
+            search_results: Vec::new(),
+            current_search_index: None,
+            search_case_sensitive: false,
+            search_whole_word: false,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            fps_samples: Vec::new(),
+            last_frame_time: 0.0,
+            frame_count: 0,
+            render_time_ms: 0.0,
+            dirty_cells: HashSet::new(),
+            needs_full_render: true,
+        })
+    }
+
     /// Create a new DataGrid instance with two canvas IDs (WebGL and text overlay)
     #[wasm_bindgen(constructor)]
     pub fn new(webgl_canvas_id: &str, text_canvas_id: &str, rows: usize, cols: usize) -> Result<DataGrid, JsValue> {
@@ -382,6 +490,42 @@ impl DataGrid {
             self.grid.set_value(row, col, cell_value);
             self.dirty_cells.insert((row, col));
         }
+    }
+
+    /// Load grid data from JSON
+    /// Accepts JSON array: [{"row": 0, "col": 0, "value": "text"}, ...]
+    /// Value can be string, number, boolean, or null (for empty)
+    pub fn load_data_json(&mut self, data_json: &str) -> Result<(), JsValue> {
+        let data: Vec<serde_json::Value> = serde_json::from_str(data_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid JSON data: {}", e)))?;
+
+        for cell_data in data {
+            let row = cell_data["row"].as_u64().unwrap_or(0) as usize;
+            let col = cell_data["col"].as_u64().unwrap_or(0) as usize;
+
+            if row >= self.grid.row_count() || col >= self.grid.col_count() {
+                continue;
+            }
+
+            let cell_value = match &cell_data["value"] {
+                serde_json::Value::Null => CellValue::Empty,
+                serde_json::Value::String(s) => CellValue::Text(s.clone()),
+                serde_json::Value::Number(n) => {
+                    if let Some(f) = n.as_f64() {
+                        CellValue::Number(f)
+                    } else {
+                        CellValue::Empty
+                    }
+                }
+                serde_json::Value::Bool(b) => CellValue::Boolean(*b),
+                _ => CellValue::Empty,
+            };
+
+            self.grid.set_value(row, col, cell_value);
+            self.dirty_cells.insert((row, col));
+        }
+
+        Ok(())
     }
 
     /// Load data for a specific range (for lazy loading)

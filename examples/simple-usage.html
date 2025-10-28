@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Simple Usage Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .grid-container {
+            width: 100%;
+            height: 600px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:active {
+            background-color: #3d8b40;
+        }
+
+        .info {
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>DataGrid5 - Simplified API Example</h1>
+    <div class="description">
+        This example demonstrates the simplified JavaScript API for DataGrid5.
+        The grid is created by simply specifying a div ID and passing options as JSON.
+        Data is also loaded using a simple JSON format.
+    </div>
+
+    <!-- Placeholder div for the grid -->
+    <div id="my-grid" class="grid-container"></div>
+
+    <div class="controls">
+        <button onclick="loadSampleData()">Load Sample Data</button>
+        <button onclick="loadLargeDataset()">Load Large Dataset (10k cells)</button>
+        <button onclick="clearGrid()">Clear Grid</button>
+        <button onclick="showStats()">Show Stats</button>
+        <div id="info" class="info"></div>
+    </div>
+
+    <script type="module">
+        // Import the WebAssembly module
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+
+        let grid;
+
+        async function initialize() {
+            // Initialize the WASM module
+            await init();
+
+            // Create grid with simplified API - just specify div ID and options in JSON
+            const options = {
+                rows: 100,
+                cols: 26,
+                width: document.querySelector('.grid-container').clientWidth,
+                height: 600
+            };
+
+            try {
+                grid = DataGrid.from_container('my-grid', JSON.stringify(options));
+                document.getElementById('info').textContent = 'Grid initialized successfully! (100 rows x 26 columns)';
+
+                // Make grid available globally for button handlers
+                window.grid = grid;
+
+                // Render the grid
+                grid.render();
+            } catch (error) {
+                console.error('Failed to initialize grid:', error);
+                document.getElementById('info').textContent = 'Error: ' + error;
+            }
+        }
+
+        // Load sample data using JSON format
+        window.loadSampleData = function() {
+            if (!window.grid) {
+                alert('Grid not initialized yet!');
+                return;
+            }
+
+            // Simple JSON data format: array of {row, col, value}
+            const sampleData = [
+                { row: 0, col: 0, value: "Product" },
+                { row: 0, col: 1, value: "Price" },
+                { row: 0, col: 2, value: "Quantity" },
+                { row: 0, col: 3, value: "In Stock" },
+
+                { row: 1, col: 0, value: "Laptop" },
+                { row: 1, col: 1, value: 999.99 },
+                { row: 1, col: 2, value: 15 },
+                { row: 1, col: 3, value: true },
+
+                { row: 2, col: 0, value: "Mouse" },
+                { row: 2, col: 1, value: 29.99 },
+                { row: 2, col: 2, value: 50 },
+                { row: 2, col: 3, value: true },
+
+                { row: 3, col: 0, value: "Keyboard" },
+                { row: 3, col: 1, value: 79.99 },
+                { row: 3, col: 2, value: 0 },
+                { row: 3, col: 3, value: false },
+
+                { row: 4, col: 0, value: "Monitor" },
+                { row: 4, col: 1, value: 299.99 },
+                { row: 4, col: 2, value: 8 },
+                { row: 4, col: 3, value: true },
+            ];
+
+            try {
+                window.grid.load_data_json(JSON.stringify(sampleData));
+                window.grid.render();
+                document.getElementById('info').textContent = 'Loaded ' + sampleData.length + ' cells';
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                document.getElementById('info').textContent = 'Error loading data: ' + error;
+            }
+        };
+
+        // Load a large dataset to demonstrate performance
+        window.loadLargeDataset = function() {
+            if (!window.grid) {
+                alert('Grid not initialized yet!');
+                return;
+            }
+
+            const startTime = performance.now();
+            const largeData = [];
+
+            // Generate 10,000 cells (100 rows x 100 cols)
+            for (let row = 0; row < 100; row++) {
+                for (let col = 0; col < 10; col++) {
+                    if (col === 0) {
+                        largeData.push({ row, col, value: `Row ${row + 1}` });
+                    } else {
+                        largeData.push({ row, col, value: Math.random() * 1000 });
+                    }
+                }
+            }
+
+            try {
+                window.grid.load_data_json(JSON.stringify(largeData));
+                window.grid.render();
+                const endTime = performance.now();
+                const loadTime = (endTime - startTime).toFixed(2);
+                document.getElementById('info').textContent =
+                    `Loaded ${largeData.length} cells in ${loadTime}ms`;
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                document.getElementById('info').textContent = 'Error loading data: ' + error;
+            }
+        };
+
+        // Clear all grid data
+        window.clearGrid = function() {
+            if (!window.grid) {
+                alert('Grid not initialized yet!');
+                return;
+            }
+
+            window.grid.clear_all();
+            window.grid.render();
+            document.getElementById('info').textContent = 'Grid cleared';
+        };
+
+        // Show grid statistics
+        window.showStats = function() {
+            if (!window.grid) {
+                alert('Grid not initialized yet!');
+                return;
+            }
+
+            const memoryUsage = window.grid.get_memory_usage();
+            const dirtyCount = window.grid.get_dirty_cell_count();
+            const fps = window.grid.get_current_fps();
+
+            document.getElementById('info').innerHTML =
+                `<strong>Stats:</strong> Memory: ${(memoryUsage / 1024).toFixed(2)} KB | ` +
+                `Dirty cells: ${dirtyCount} | FPS: ${fps.toFixed(1)}`;
+        };
+
+        // Initialize when page loads
+        initialize();
+    </script>
+</body>
+</html>
