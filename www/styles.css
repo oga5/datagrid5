@@ -156,13 +156,31 @@ button:active {
     position: relative;
 }
 
-/* Stack canvases on top of each other */
-#webgl-canvas,
-#text-canvas {
-    position: absolute;
+/* Virtual scroll container with native scrollbars */
+#scroll-container {
+    position: relative;
+    overflow: auto;
+    width: 1200px;
+    height: 600px;
     border: 2px solid #ddd;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: white;
+}
+
+/* Virtual content area (defines scrollable size) */
+#scroll-content {
+    position: relative;
+    /* Size will be set dynamically via JavaScript */
+}
+
+/* Stack canvases on top of each other */
+#webgl-canvas,
+#text-canvas {
+    position: sticky;
+    top: 0;
+    left: 0;
+    pointer-events: none;
 }
 
 #webgl-canvas {
@@ -171,12 +189,12 @@ button:active {
 
 #text-canvas {
     z-index: 2;
-    cursor: grab;
+    cursor: cell;
     pointer-events: all;
 }
 
 #text-canvas:active {
-    cursor: grabbing;
+    cursor: cell;
 }
 
 #text-canvas:focus {

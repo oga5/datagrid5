@@ -405,8 +405,6 @@ impl DataGrid {
         let x = event.offset_x() as f32;
         let y = event.offset_y() as f32;
 
-        self.mouse_handler.mouse_down(x, y);
-
         // Check if clicked on column header (for sorting)
         if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
             web_sys::console::log_1(&format!("Clicked column header: {}", col).into());
@@ -426,12 +424,15 @@ impl DataGrid {
             if shift {
                 // Shift+Click: Range selection
                 self.select_range(row, col);
+                self.mouse_handler.start_selection(x, y);
             } else if ctrl {
                 // Ctrl+Click: Toggle selection
                 self.toggle_cell_selection(row, col);
+                self.mouse_handler.mouse_down(x, y);
             } else {
-                // Normal click: Single selection
+                // Normal click: Single selection and start drag selection
                 self.select_single_cell(row, col);
+                self.mouse_handler.start_selection(x, y);
             }
 
             self.mouse_handler.select_cell(row, col);
@@ -442,6 +443,7 @@ impl DataGrid {
                 self.clear_selection();
             }
             self.mouse_handler.selected_cell = None;
+            self.mouse_handler.mouse_down(x, y);
         }
     }
 
@@ -460,10 +462,13 @@ impl DataGrid {
         let x = event.offset_x() as f32;
         let y = event.offset_y() as f32;
 
-        if let Some((dx, dy)) = self.mouse_handler.mouse_move(x, y) {
-            // Pan the viewport when dragging
-            self.viewport.scroll_by(-dx, -dy, &self.grid);
-            self.viewport.update_visible_range(&self.grid);
+        if self.mouse_handler.is_selecting {
+            // Drag selection: extend range to current cell
+            if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
+                self.select_range(row, col);
+                self.mouse_handler.last_x = x;
+                self.mouse_handler.last_y = y;
+            }
         }
     }
 
@@ -691,6 +696,18 @@ impl DataGrid {
         let max_scroll_y = (self.grid.total_height() - viewport_height).max(0.0);
 
         format!("[{},{}]", max_scroll_x, max_scroll_y)
+    }
+
+    /// Get total content size (including headers) as JSON string
+    /// Returns: "[total_width, total_height]"
+    pub fn get_total_size(&self) -> String {
+        let header_offset_x = if self.grid.show_headers { self.grid.row_header_width } else { 0.0 };
+        let header_offset_y = if self.grid.show_headers { self.grid.col_header_height } else { 0.0 };
+
+        let total_width = self.grid.total_width() + header_offset_x;
+        let total_height = self.grid.total_height() + header_offset_y;
+
+        format!("[{},{}]", total_width, total_height)
     }
 
     /// Set scroll position
@@ -1050,21 +1067,28 @@ impl DataGrid {
             };
 
             if let Some((new_row, new_col)) = new_selection {
-                if let Some((prev_row, prev_col)) = current {
-                    if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
-                        cell.selected = false;
+                if shift {
+                    // Shift is pressed: extend selection (range selection)
+                    if self.selection_anchor.is_none() {
+                        // No anchor yet, set current cell as anchor
+                        if let Some((row, col)) = current {
+                            self.selection_anchor = Some((row, col));
+                        }
                     }
+                    // Extend selection to new cell
+                    self.select_range(new_row, new_col);
+                } else {
+                    // No shift: move selection to new cell
+                    if let Some((prev_row, prev_col)) = current {
+                        if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
+                            cell.selected = false;
+                        }
+                    }
+
+                    self.select_single_cell(new_row, new_col);
                 }
 
                 self.mouse_handler.select_cell(new_row, new_col);
-                if let Some(cell) = self.grid.get_cell_mut(new_row, new_col) {
-                    cell.selected = true;
-                } else {
-                    let mut cell = Cell::default();
-                    cell.selected = true;
-                    self.grid.set_cell(new_row, new_col, cell);
-                }
-
                 self.ensure_cell_visible(new_row, new_col);
                 web_sys::console::log_1(&format!("Navigated to cell: ({}, {})", new_row, new_col).into());
 

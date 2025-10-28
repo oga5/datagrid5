@@ -68,8 +68,12 @@
         </div>
 
         <div class="canvas-container" id="canvas-container">
-            <canvas id="webgl-canvas" width="1200" height="600"></canvas>
-            <canvas id="text-canvas" width="1200" height="600" tabindex="0"></canvas>
+            <div id="scroll-container">
+                <div id="scroll-content">
+                    <canvas id="webgl-canvas" width="1200" height="600"></canvas>
+                    <canvas id="text-canvas" width="1200" height="600" tabindex="0"></canvas>
+                </div>
+            </div>
             <input type="text" id="cell-editor" style="display: none;" />
         </div>
 
@@ -132,6 +136,9 @@
                 // Create new grid with two canvas layers
                 grid = new DataGrid('webgl-canvas', 'text-canvas', rows, cols);
 
+                // Setup virtual scroll
+                setupVirtualScroll();
+
                 // Update info
                 updateInfo();
 
@@ -182,6 +189,83 @@
                 viewportText + selectionText;
         }
 
+        // Setup virtual scroll container
+        let isInternalScroll = false; // Flag to prevent scroll event loops
+
+        function setupVirtualScroll() {
+            if (!grid) return;
+
+            const scrollContainer = document.getElementById('scroll-container');
+            const scrollContent = document.getElementById('scroll-content');
+
+            // Update virtual content size
+            updateVirtualScrollSize();
+
+            // Handle scroll events
+            let scrollTimeout = null;
+            scrollContainer.addEventListener('scroll', (e) => {
+                if (!grid) return;
+
+                // Skip if this is a programmatic scroll from keyboard navigation
+                if (isInternalScroll) {
+                    isInternalScroll = false;
+                    return;
+                }
+
+                // Get scroll position from container
+                const scrollX = scrollContainer.scrollLeft;
+                const scrollY = scrollContainer.scrollTop;
+
+                // Update grid scroll position
+                grid.set_scroll(scrollX, scrollY);
+
+                // Debounce render for smoother scrolling
+                if (scrollTimeout) {
+                    clearTimeout(scrollTimeout);
+                }
+                scrollTimeout = setTimeout(() => {
+                    updateInfo();
+                }, 100);
+            });
+
+            console.log('Virtual scroll setup complete');
+        }
+
+        // Update virtual scroll content size
+        function updateVirtualScrollSize() {
+            if (!grid) return;
+
+            const scrollContent = document.getElementById('scroll-content');
+
+            // Get total content size from grid
+            const totalSize = JSON.parse(grid.get_total_size());
+            const [totalWidth, totalHeight] = totalSize;
+
+            // Set virtual content size
+            scrollContent.style.width = totalWidth + 'px';
+            scrollContent.style.height = totalHeight + 'px';
+
+            console.log(`Virtual scroll size: ${totalWidth} x ${totalHeight}`);
+        }
+
+        // Sync scroll container position with grid internal scroll
+        function syncScrollPosition() {
+            if (!grid) return;
+
+            const scrollContainer = document.getElementById('scroll-container');
+
+            // Get current scroll position from grid
+            const viewport = JSON.parse(grid.get_viewport_info_array());
+            const [canvasWidth, canvasHeight, scrollY, scrollX] = viewport;
+
+            // Set flag to prevent scroll event loop
+            isInternalScroll = true;
+
+            // Update scroll container to match grid's internal scroll
+            scrollContainer.scrollLeft = scrollX;
+            scrollContainer.scrollTop = scrollY;
+        }
+
         // Cell editing functions
         let editingRow = null;
         let editingCol = null;
@@ -190,7 +274,8 @@
             if (!grid) return;
 
             const editor = document.getElementById('cell-editor');
-            const container = document.getElementById('canvas-container');
+            const scrollContainer = document.getElementById('scroll-container');
+            const canvasContainer = document.getElementById('canvas-container');
 
             // Get cell position and size
             const rect = grid.get_cell_edit_rect(row, col);
@@ -199,10 +284,16 @@
             // Get current cell value
             const currentValue = grid.get_cell_value(row, col);
 
+            // Calculate position relative to canvas-container
+            const scrollContainerRect = scrollContainer.getBoundingClientRect();
+            const canvasContainerRect = canvasContainer.getBoundingClientRect();
+            const offsetX = scrollContainerRect.left - canvasContainerRect.left;
+            const offsetY = scrollContainerRect.top - canvasContainerRect.top;
+
             // Position and show editor
             editor.style.position = 'absolute';
-            editor.style.left = `${x + 20}px`; // 20px padding from container
-            editor.style.top = `${y + 20}px`;
+            editor.style.left = `${x + offsetX - scrollContainer.scrollLeft}px`;
+            editor.style.top = `${y + offsetY - scrollContainer.scrollTop}px`;
             editor.style.width = `${width}px`;
             editor.style.height = `${height}px`;
             editor.style.display = 'block';
@@ -372,10 +463,10 @@
                     } else if (resizeType === 'row') {
                         canvas.style.cursor = 'row-resize';
                     } else {
-                        canvas.style.cursor = 'grab';
+                        canvas.style.cursor = 'cell';
                     }
 
-                    // Normal mouse move
+                    // Handle mouse move for drag selection
                     grid.handle_mouse_move(e);
                 }
             });
@@ -388,17 +479,11 @@
                     isResizingLocal = false;
                 }
                 grid.handle_mouse_up(e);
-                canvas.style.cursor = 'grab';
+                canvas.style.cursor = 'cell';
             });
 
-            // Wheel event for scrolling
-            canvas.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                if (grid) {
-                    grid.handle_wheel(e);
-                    updateInfo();
-                }
-            });
+            // Wheel event is now handled by native scroll container
+            // Removed custom wheel handler for smoother native scrolling
 
             // Keyboard events
             window.addEventListener('keydown', async (e) => {
@@ -467,6 +552,7 @@
                 const handled = grid.handle_keyboard_with_modifiers(e, ctrl);
                 if (handled) {
                     e.preventDefault();
+                    syncScrollPosition();
                     updateInfo();
                 }
             });
@@ -489,16 +575,17 @@
             // Window resize
             window.addEventListener('resize', () => {
                 if (grid) {
+                    const scrollContainer = document.getElementById('scroll-container');
                     const webglCanvas = document.getElementById('webgl-canvas');
                     const textCanvas = document.getElementById('text-canvas');
-                    const container = webglCanvas.parentElement;
-                    const width = container.clientWidth;
-                    const height = 600;
+                    const width = scrollContainer.clientWidth;
+                    const height = scrollContainer.clientHeight;
                     webglCanvas.width = width;
                     webglCanvas.height = height;
                     textCanvas.width = width;
                     textCanvas.height = height;
                     grid.resize(width, height);
+                    updateVirtualScrollSize();
                     updateInfo();
                 }
             });
