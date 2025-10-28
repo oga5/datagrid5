@@ -90,8 +90,43 @@ All 137 features from the original C++ GridControl have been successfully ported
 # Install wasm-pack
 curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-# Build the project
+# Clone the repository
+git clone https://github.com/oga5/datagrid5.git
+cd datagrid5
+
+# Build the project (using convenient script)
+./build.sh
+
+# Or build manually
 wasm-pack build --target web --release
+
+# Start development server
+./serve.sh
+
+# Or start server manually
+python3 -m http.server 8080
+```
+
+Open your browser and navigate to:
+- Main demo: http://localhost:8080/www/
+- Examples: http://localhost:8080/examples/
+- Full-screen example: http://localhost:8080/examples/full-screen-resize-example.html
+- Responsive example: http://localhost:8080/examples/responsive-resize-example.html
+
+### Build Script Options
+
+```bash
+# Development build (faster, larger file size)
+./build.sh --dev
+
+# Release build (optimized, smaller file size) [default]
+./build.sh --release
+
+# Clean build (removes previous artifacts)
+./build.sh --clean
+
+# Show help
+./build.sh --help
 ```
 
 ### Basic Usage
