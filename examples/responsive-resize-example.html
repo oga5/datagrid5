@@ -11,32 +11,53 @@
             box-sizing: border-box;
         }
 
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: Arial, sans-serif;
-            padding: 20px;
             background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            flex-shrink: 0;
+            padding: 20px;
+            background-color: white;
+            border-bottom: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         h1 {
             color: #333;
             margin-bottom: 10px;
+            font-size: 1.5em;
         }
 
         .description {
             color: #666;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             line-height: 1.6;
+            font-size: 0.9em;
         }
 
         .container {
+            flex: 1;
             display: flex;
             gap: 20px;
-            margin-bottom: 20px;
+            padding: 20px;
+            min-height: 0;
         }
 
         .main-panel {
             flex: 1;
             min-width: 0;
+            display: flex;
+            flex-direction: column;
         }
 
         .side-panel {
@@ -46,38 +67,84 @@
             border-radius: 4px;
             padding: 15px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            overflow-y: auto;
         }
 
+        /* Grid container fills available space */
         .grid-container {
-            width: 100%;
-            height: 600px;
+            flex: 1;
             background-color: white;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: relative;
-            resize: both;
-            overflow: auto;
-            min-width: 400px;
-            min-height: 300px;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
         }
 
-        .resize-handle {
+        /* Virtual scroll container with native scrollbars */
+        #scroll-container {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: white;
+            min-height: 0;
+        }
+
+        /* Virtual content area (defines scrollable size) */
+        #scroll-content {
+            position: relative;
+        }
+
+        /* Stack canvases */
+        #webgl-canvas,
+        #text-canvas {
+            position: sticky;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        #webgl-canvas {
+            z-index: 1;
+        }
+
+        #text-canvas {
+            z-index: 2;
+            cursor: cell;
+            pointer-events: all;
+        }
+
+        #text-canvas:focus {
+            outline: 3px solid #2196F3;
+            outline-offset: -3px;
+        }
+
+        /* Cell editor */
+        #cell-editor {
             position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 20px;
-            height: 20px;
-            cursor: nwse-resize;
-            background: linear-gradient(135deg, transparent 50%, #999 50%);
+            z-index: 10;
+            border: 2px solid #2196F3;
+            padding: 4px;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            box-sizing: border-box;
+            background: white;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        }
+
+        #cell-editor:focus {
+            outline: none;
+            border-color: #1976D2;
         }
 
         .controls {
-            margin-top: 20px;
-            padding: 15px;
+            flex-shrink: 0;
+            padding: 15px 20px;
             background-color: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            border-top: 1px solid #ddd;
         }
 
         button {
@@ -128,6 +195,7 @@
         h3 {
             margin-bottom: 10px;
             color: #333;
+            font-size: 1em;
         }
 
         .highlight {
@@ -138,16 +206,24 @@
     </style>
 </head>
 <body>
-    <h1>DataGrid5 - Responsive Resize Example</h1>
-    <div class="description">
-        This example demonstrates automatic grid resizing using ResizeObserver.<br>
-        <strong>Try:</strong> Drag the bottom-right corner of the grid, or use the preset size buttons.
+    <div class="header">
+        <h1>DataGrid5 - Responsive Resize Example</h1>
+        <div class="description">
+            This example demonstrates automatic grid resizing using ResizeObserver.<br>
+            <strong>Grid adjusts to fit browser window.</strong> Try resizing the browser or toggling the side panel.
+        </div>
     </div>
 
     <div class="container">
         <div class="main-panel">
-            <div id="my-grid" class="grid-container">
-                <div class="resize-handle"></div>
+            <div class="grid-container">
+                <div id="scroll-container">
+                    <div id="scroll-content">
+                        <canvas id="webgl-canvas"></canvas>
+                        <canvas id="text-canvas" tabindex="0"></canvas>
+                    </div>
+                </div>
+                <input type="text" id="cell-editor" style="display: none;" />
             </div>
         </div>
 
@@ -158,20 +234,13 @@
                 Height: <span class="highlight" id="height-value">0</span>px
             </div>
 
-            <h3>Preset Sizes</h3>
-            <div class="preset-buttons">
-                <button onclick="setSize(800, 600)">Standard (800×600)</button>
-                <button onclick="setSize(1200, 800)">Large (1200×800)</button>
-                <button onclick="setSize(600, 400)">Small (600×400)</button>
-                <button onclick="setSize(1600, 900)">Extra Large (1600×900)</button>
-            </div>
-
-            <h3 style="margin-top: 20px;">Features</h3>
+            <h3>Features</h3>
             <ul style="line-height: 1.8; color: #666; font-size: 14px;">
                 <li>✓ Auto-resize with container</li>
                 <li>✓ Viewport adjustment</li>
                 <li>✓ Scroll range update</li>
-                <li>✓ Smooth resizing</li>
+                <li>✓ Cell selection</li>
+                <li>✓ Keyboard navigation</li>
                 <li>✓ Maintains data & state</li>
             </ul>
         </div>
@@ -180,9 +249,9 @@
     <div class="controls">
         <button onclick="loadSampleData()">Load Sample Data</button>
         <button onclick="toggleSidePanel()">Toggle Side Panel</button>
-        <button onclick="resetSize()">Reset to Default</button>
+        <button onclick="fillMoreData()">Fill More Data</button>
         <div id="info" class="info">
-            Grid will automatically resize when container size changes
+            Grid will automatically resize when browser window changes
         </div>
     </div>
 
@@ -191,52 +260,122 @@
 
         let grid;
         let resizeObserver;
+        let animationFrameId = null;
+        let isInternalScroll = false;
 
         async function initialize() {
             await init();
 
-            const container = document.getElementById('my-grid');
+            const container = document.getElementById('scroll-container');
             const rect = container.getBoundingClientRect();
 
-            // Create grid
-            const options = {
-                rows: 100,
-                cols: 10,
-                width: rect.width,
-                height: rect.height,
-                columns: [
-                    { display_name: "ID", internal_name: "id", width: 60, data_type: "number" },
-                    { display_name: "Name", internal_name: "name", width: 150, data_type: "text" },
-                    { display_name: "Email", internal_name: "email", width: 200, data_type: "text" },
-                    { display_name: "Age", internal_name: "age", width: 60, data_type: "number" },
-                    { display_name: "City", internal_name: "city", width: 120, data_type: "text" },
-                    { display_name: "Joined", internal_name: "joined", width: 110, data_type: "date" },
-                    { display_name: "Active", internal_name: "active", width: 70, data_type: "boolean" },
-                    { display_name: "Score", internal_name: "score", width: 80, data_type: "number" },
-                    { display_name: "Status", internal_name: "status", width: 100, data_type: "text" },
-                    { display_name: "Notes", internal_name: "notes", width: 200, data_type: "text" }
-                ],
-                frozen_rows: 1,
-                show_headers: true
-            };
+            // Create canvases
+            const webglCanvas = document.getElementById('webgl-canvas');
+            const textCanvas = document.getElementById('text-canvas');
 
-            grid = DataGrid.from_container('my-grid', JSON.stringify(options));
+            webglCanvas.width = rect.width;
+            webglCanvas.height = rect.height;
+            textCanvas.width = rect.width;
+            textCanvas.height = rect.height;
+
+            // Create grid
+            grid = new DataGrid('webgl-canvas', 'text-canvas', 100, 26);
             window.grid = grid;
 
             // Update size display
             updateSizeDisplay(rect.width, rect.height);
 
+            // Setup virtual scroll
+            setupVirtualScroll();
+
             // Setup ResizeObserver for automatic resizing
             setupResizeObserver();
 
-            document.getElementById('info').textContent =
-                `Grid initialized at ${Math.round(rect.width)}×${Math.round(rect.height)}px. Resize observer active.`;
+            // Setup event handlers
+            setupEventHandlers();
 
+            // Start render loop
+            renderLoop();
+
+            document.getElementById('info').textContent =
+                `Grid initialized at ${Math.round(rect.width)}×${Math.round(rect.height)}px. Ready to use!`;
+        }
+
+        function renderLoop() {
+            if (!grid) return;
             grid.render();
+            animationFrameId = requestAnimationFrame(renderLoop);
+        }
+
+        function setupVirtualScroll() {
+            if (!grid) return;
+
+            const scrollContainer = document.getElementById('scroll-container');
+
+            // Update virtual content size
+            updateVirtualScrollSize();
+
+            // Handle scroll events
+            let scrollTimeout = null;
+            scrollContainer.addEventListener('scroll', (e) => {
+                if (!grid) return;
+
+                // Skip if this is a programmatic scroll from keyboard navigation
+                if (isInternalScroll) {
+                    isInternalScroll = false;
+                    return;
+                }
+
+                // Get scroll position from container
+                const scrollX = scrollContainer.scrollLeft;
+                const scrollY = scrollContainer.scrollTop;
+
+                // Update grid scroll position
+                grid.set_scroll(scrollX, scrollY);
+
+                // Debounce render for smoother scrolling
+                if (scrollTimeout) {
+                    clearTimeout(scrollTimeout);
+                }
+                scrollTimeout = setTimeout(() => {
+                    updateSizeDisplay();
+                }, 100);
+            });
+        }
+
+        function updateVirtualScrollSize() {
+            if (!grid) return;
+
+            const scrollContent = document.getElementById('scroll-content');
+
+            // Get total content size from grid
+            const totalSize = JSON.parse(grid.get_total_size());
+            const [totalWidth, totalHeight] = totalSize;
+
+            // Set virtual content size
+            scrollContent.style.width = totalWidth + 'px';
+            scrollContent.style.height = totalHeight + 'px';
+        }
+
+        function syncScrollPosition() {
+            if (!grid) return;
+
+            const scrollContainer = document.getElementById('scroll-container');
+
+            // Get current scroll position from grid
+            const viewport = JSON.parse(grid.get_viewport_info_array());
+            const [canvasWidth, canvasHeight, scrollY, scrollX] = viewport;
+
+            // Set flag to prevent scroll event loop
+            isInternalScroll = true;
+
+            // Update scroll container to match grid's internal scroll
+            scrollContainer.scrollLeft = scrollX;
+            scrollContainer.scrollTop = scrollY;
         }
 
         function setupResizeObserver() {
-            const container = document.getElementById('my-grid');
+            const container = document.getElementById('scroll-container');
 
             // Create ResizeObserver to watch container size changes
             resizeObserver = new ResizeObserver(entries => {
@@ -244,14 +383,23 @@
                     const width = entry.contentRect.width;
                     const height = entry.contentRect.height;
 
+                    // Update canvas dimensions
+                    const webglCanvas = document.getElementById('webgl-canvas');
+                    const textCanvas = document.getElementById('text-canvas');
+
+                    webglCanvas.width = width;
+                    webglCanvas.height = height;
+                    textCanvas.width = width;
+                    textCanvas.height = height;
+
                     // Resize the grid
                     grid.resize(width, height);
 
+                    // Update virtual scroll size
+                    updateVirtualScrollSize();
+
                     // Update display
                     updateSizeDisplay(width, height);
-
-                    // Re-render
-                    grid.render();
 
                     console.log(`Grid resized to ${Math.round(width)}×${Math.round(height)}px`);
                 }
@@ -261,12 +409,230 @@
             resizeObserver.observe(container);
 
             document.getElementById('info').textContent =
-                'ResizeObserver active! Try resizing the grid by dragging the corner.';
+                'ResizeObserver active! Grid adjusts automatically to browser size.';
         }
 
         function updateSizeDisplay(width, height) {
-            document.getElementById('width-value').textContent = Math.round(width);
-            document.getElementById('height-value').textContent = Math.round(height);
+            const container = document.getElementById('scroll-container');
+            const w = width !== undefined ? width : container.clientWidth;
+            const h = height !== undefined ? height : container.clientHeight;
+
+            document.getElementById('width-value').textContent = Math.round(w);
+            document.getElementById('height-value').textContent = Math.round(h);
+        }
+
+        function setupEventHandlers() {
+            const canvas = document.getElementById('text-canvas');
+            let isResizingLocal = false;
+
+            // Mouse events
+            canvas.addEventListener('mousedown', (e) => {
+                if (!grid) return;
+
+                const x = e.offsetX;
+                const y = e.offsetY;
+
+                // Check if clicking on resize handle
+                const resizeType = grid.check_resize_handle(x, y);
+                if (resizeType !== 'none') {
+                    isResizingLocal = true;
+                    grid.start_resize(x, y, resizeType);
+                    e.preventDefault();
+                } else {
+                    const shift = e.shiftKey;
+                    const ctrl = e.ctrlKey || e.metaKey;
+                    grid.handle_mouse_down_with_modifiers(e, shift, ctrl);
+                }
+            });
+
+            canvas.addEventListener('mouseup', (e) => {
+                if (!grid) return;
+
+                if (isResizingLocal) {
+                    grid.end_resize();
+                    isResizingLocal = false;
+                    updateVirtualScrollSize();
+                } else {
+                    grid.handle_mouse_up(e);
+                }
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (!grid) return;
+
+                const x = e.offsetX;
+                const y = e.offsetY;
+
+                if (isResizingLocal) {
+                    grid.update_resize(x, y);
+                } else {
+                    const resizeType = grid.check_resize_handle(x, y);
+                    if (resizeType === 'col') {
+                        canvas.style.cursor = 'col-resize';
+                    } else if (resizeType === 'row') {
+                        canvas.style.cursor = 'row-resize';
+                    } else {
+                        canvas.style.cursor = 'cell';
+                    }
+
+                    grid.handle_mouse_move(e);
+                }
+            });
+
+            canvas.addEventListener('mouseleave', (e) => {
+                if (!grid) return;
+
+                if (isResizingLocal) {
+                    grid.end_resize();
+                    isResizingLocal = false;
+                }
+                grid.handle_mouse_up(e);
+                canvas.style.cursor = 'cell';
+            });
+
+            // Keyboard events
+            window.addEventListener('keydown', async (e) => {
+                if (!grid) return;
+
+                // Copy
+                if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                    e.preventDefault();
+                    const tsvData = grid.copy_selected_cells();
+                    if (tsvData) {
+                        try {
+                            await navigator.clipboard.writeText(tsvData);
+                            console.log('Copied to clipboard');
+                        } catch (err) {
+                            console.error('Failed to copy:', err);
+                        }
+                    }
+                    return;
+                }
+
+                // Paste
+                if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                    e.preventDefault();
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                            grid.paste_cells(text);
+                        }
+                    } catch (err) {
+                        console.error('Failed to paste:', err);
+                    }
+                    return;
+                }
+
+                // Select all
+                if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                    e.preventDefault();
+                    grid.select_all();
+                    return;
+                }
+
+                // Keyboard navigation
+                const ctrl = e.ctrlKey || e.metaKey;
+                const handled = grid.handle_keyboard_with_modifiers(e, ctrl);
+                if (handled) {
+                    e.preventDefault();
+                    syncScrollPosition();
+                }
+            });
+
+            // Focus canvas on click
+            canvas.addEventListener('click', () => {
+                canvas.focus();
+            });
+
+            // Double-click to edit
+            canvas.addEventListener('dblclick', (e) => {
+                if (grid && !grid.is_editing()) {
+                    const cellPos = grid.handle_double_click(e);
+                    if (cellPos) {
+                        startCellEdit(cellPos[0], cellPos[1]);
+                    }
+                }
+            });
+        }
+
+        // Cell editing
+        let editingRow = null;
+        let editingCol = null;
+
+        function startCellEdit(row, col) {
+            if (!grid) return;
+
+            const editor = document.getElementById('cell-editor');
+            const scrollContainer = document.getElementById('scroll-container');
+            const gridContainer = document.querySelector('.grid-container');
+
+            const rect = grid.get_cell_edit_rect(row, col);
+            const [x, y, width, height] = rect;
+
+            const currentValue = grid.get_cell_value(row, col);
+
+            const scrollContainerRect = scrollContainer.getBoundingClientRect();
+            const gridContainerRect = gridContainer.getBoundingClientRect();
+            const offsetX = scrollContainerRect.left - gridContainerRect.left;
+            const offsetY = scrollContainerRect.top - gridContainerRect.top;
+
+            editor.style.left = `${x + offsetX - scrollContainer.scrollLeft}px`;
+            editor.style.top = `${y + offsetY - scrollContainer.scrollTop}px`;
+            editor.style.width = `${width}px`;
+            editor.style.height = `${height}px`;
+            editor.style.display = 'block';
+            editor.value = currentValue;
+
+            editingRow = row;
+            editingCol = col;
+
+            editor.focus();
+            editor.select();
+
+            setupEditorEvents(editor);
+        }
+
+        function endCellEdit(save = false) {
+            if (!grid || editingRow === null || editingCol === null) return;
+
+            const editor = document.getElementById('cell-editor');
+
+            if (save) {
+                grid.update_cell_value(editingRow, editingCol, editor.value);
+            }
+
+            editor.style.display = 'none';
+            editor.value = '';
+
+            grid.end_edit();
+
+            editingRow = null;
+            editingCol = null;
+
+            document.getElementById('text-canvas').focus();
+        }
+
+        function setupEditorEvents(editor) {
+            const newEditor = editor.cloneNode(true);
+            editor.parentNode.replaceChild(newEditor, editor);
+
+            newEditor.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    endCellEdit(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    endCellEdit(false);
+                }
+            });
+
+            newEditor.addEventListener('blur', () => {
+                setTimeout(() => {
+                    if (grid && grid.is_editing()) {
+                        endCellEdit(true);
+                    }
+                }, 100);
+            });
         }
 
         window.loadSampleData = function() {
@@ -275,42 +641,42 @@
             const data = [];
             const names = ["Alice", "Bob", "Charlie", "David", "Emma", "Frank", "Grace", "Henry"];
             const cities = ["Tokyo", "New York", "London", "Paris", "Sydney", "Berlin", "Toronto"];
-            const statuses = ["Active", "Pending", "Inactive", "Suspended"];
 
             // Header row
-            const headers = ["ID", "Name", "Email", "Age", "City", "Joined", "Active", "Score", "Status", "Notes"];
+            const headers = ["ID", "Name", "Email", "Age", "City", "Score", "Status"];
             for (let col = 0; col < headers.length; col++) {
-                data.push({ row: 0, col, value: headers[col] });
+                grid.update_cell_value(0, col, headers[col]);
             }
 
             // Data rows
-            for (let row = 1; row <= 50; row++) {
+            for (let row = 1; row <= 30; row++) {
                 const name = names[row % names.length];
-                data.push({ row, col: 0, value: 1000 + row });
-                data.push({ row, col: 1, value: `${name} ${row}` });
-                data.push({ row, col: 2, value: `${name.toLowerCase()}${row}@example.com` });
-                data.push({ row, col: 3, value: 20 + (row % 50) });
-                data.push({ row, col: 4, value: cities[row % cities.length] });
-                data.push({ row, col: 5, value: `2024-01-${String((row % 28) + 1).padStart(2, '0')}` });
-                data.push({ row, col: 6, value: row % 3 !== 0 });
-                data.push({ row, col: 7, value: Math.round(50 + Math.random() * 50) });
-                data.push({ row, col: 8, value: statuses[row % statuses.length] });
-                data.push({ row, col: 9, value: `Note for row ${row}` });
+                grid.update_cell_value(row, 0, String(1000 + row));
+                grid.update_cell_value(row, 1, `${name} ${row}`);
+                grid.update_cell_value(row, 2, `${name.toLowerCase()}${row}@example.com`);
+                grid.update_cell_value(row, 3, String(20 + (row % 50)));
+                grid.update_cell_value(row, 4, cities[row % cities.length]);
+                grid.update_cell_value(row, 5, String(Math.round(50 + Math.random() * 50)));
+                grid.update_cell_value(row, 6, row % 3 === 0 ? "Active" : "Pending");
             }
 
-            grid.load_data_json(JSON.stringify(data));
-            grid.render();
-
-            document.getElementById('info').textContent = 'Loaded 50 rows of sample data';
+            document.getElementById('info').textContent = 'Loaded 30 rows of sample data';
         };
 
-        window.setSize = function(width, height) {
-            const container = document.getElementById('my-grid');
-            container.style.width = width + 'px';
-            container.style.height = height + 'px';
+        window.fillMoreData = function() {
+            if (!grid) return;
 
-            document.getElementById('info').textContent =
-                `Set grid size to ${width}×${height}px`;
+            for (let row = 0; row < 50; row++) {
+                for (let col = 0; col < 20; col++) {
+                    if (row === 0) {
+                        grid.update_cell_value(row, col, `Col ${col + 1}`);
+                    } else {
+                        grid.update_cell_value(row, col, `R${row}C${col}`);
+                    }
+                }
+            }
+
+            document.getElementById('info').textContent = 'Filled 50 rows × 20 columns with data';
         };
 
         window.toggleSidePanel = function() {
@@ -320,16 +686,8 @@
                 document.getElementById('info').textContent = 'Side panel shown';
             } else {
                 sidePanel.style.display = 'none';
-                document.getElementById('info').textContent = 'Side panel hidden - grid expands to fill space';
+                document.getElementById('info').textContent = 'Side panel hidden - grid expands automatically';
             }
-        };
-
-        window.resetSize = function() {
-            const container = document.getElementById('my-grid');
-            container.style.width = '';
-            container.style.height = '600px';
-
-            document.getElementById('info').textContent = 'Reset to default size';
         };
 
         initialize();
