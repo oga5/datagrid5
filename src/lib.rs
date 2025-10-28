@@ -693,6 +693,18 @@ impl DataGrid {
         format!("[{},{}]", max_scroll_x, max_scroll_y)
     }
 
+    /// Get total content size (including headers) as JSON string
+    /// Returns: "[total_width, total_height]"
+    pub fn get_total_size(&self) -> String {
+        let header_offset_x = if self.grid.show_headers { self.grid.row_header_width } else { 0.0 };
+        let header_offset_y = if self.grid.show_headers { self.grid.col_header_height } else { 0.0 };
+
+        let total_width = self.grid.total_width() + header_offset_x;
+        let total_height = self.grid.total_height() + header_offset_y;
+
+        format!("[{},{}]", total_width, total_height)
+    }
+
     /// Set scroll position
     pub fn set_scroll(&mut self, x: f32, y: f32) {
         self.viewport.set_scroll(x, y, &self.grid);
