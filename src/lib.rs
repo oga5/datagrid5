@@ -7,9 +7,18 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
 
-use core::{Cell, CellValue, Grid, Viewport};
+use core::{cell::CellBorder, Cell, CellValue, Grid, Viewport};
 use input::{KeyboardHandler, MouseHandler, NavigationCommand};
 use renderer::{TextRenderer, WebGLRenderer};
+
+/// Cell style information for undo/redo
+#[derive(Clone, Debug)]
+struct CellStyle {
+    bg_color: Option<u32>,
+    fg_color: Option<u32>,
+    font_bold: bool,
+    font_italic: bool,
+}
 
 /// Action that can be undone/redone
 #[derive(Clone)]
@@ -19,6 +28,32 @@ enum EditAction {
         col: usize,
         old_value: CellValue,
         new_value: CellValue,
+    },
+    InsertRow {
+        index: usize,
+        // Store all cells in the row before deletion (for redo of delete)
+        cells: Vec<(usize, Cell)>, // (col, cell)
+    },
+    DeleteRow {
+        index: usize,
+        // Store all cells in the row for undo
+        cells: Vec<(usize, Cell)>, // (col, cell)
+    },
+    InsertColumn {
+        index: usize,
+        // Store all cells in the column before deletion (for redo of delete)
+        cells: Vec<(usize, Cell)>, // (row, cell)
+    },
+    DeleteColumn {
+        index: usize,
+        // Store all cells in the column for undo
+        cells: Vec<(usize, Cell)>, // (row, cell)
+    },
+    SetStyle {
+        row: usize,
+        col: usize,
+        old_style: CellStyle,
+        new_style: CellStyle,
     },
 }
 
@@ -57,6 +92,11 @@ pub struct DataGrid {
     // Undo/Redo state
     undo_stack: Vec<EditAction>,
     redo_stack: Vec<EditAction>,
+    // Performance monitoring
+    fps_samples: Vec<f64>,      // Store last N frame times
+    last_frame_time: f64,       // Timestamp of last frame
+    frame_count: u32,           // Total frame count
+    render_time_ms: f64,        // Last render time in ms
 }
 
 #[wasm_bindgen]
@@ -130,6 +170,10 @@ impl DataGrid {
             search_whole_word: false,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            fps_samples: Vec::new(),
+            last_frame_time: 0.0,
+            frame_count: 0,
+            render_time_ms: 0.0,
         })
     }
 
@@ -250,6 +294,11 @@ impl DataGrid {
         // Only record if value actually changed
         if old_value != new_value {
             self.grid.set_value(row, col, new_value.clone());
+
+            // Mark cell as modified
+            if let Some(cell) = self.grid.get_cell_mut(row, col) {
+                cell.modified = true;
+            }
 
             // Record action for undo
             let action = EditAction::SetValue {
@@ -1021,8 +1070,29 @@ impl DataGrid {
         Ok(())
     }
 
+    /// Helper: Get current cell style (for undo tracking)
+    fn get_cell_style(&self, row: usize, col: usize) -> CellStyle {
+        if let Some(cell) = self.grid.get_cell(row, col) {
+            CellStyle {
+                bg_color: cell.bg_color,
+                fg_color: cell.fg_color,
+                font_bold: cell.font_bold,
+                font_italic: cell.font_italic,
+            }
+        } else {
+            CellStyle {
+                bg_color: None,
+                fg_color: None,
+                font_bold: false,
+                font_italic: false,
+            }
+        }
+    }
+
     /// Set background color for a cell (RGBA as u32: 0xRRGGBBAA)
     pub fn set_cell_bg_color(&mut self, row: usize, col: usize, color: u32) {
+        let old_style = self.get_cell_style(row, col);
+
         if let Some(cell) = self.grid.get_cell_mut(row, col) {
             cell.bg_color = Some(color);
         } else {
@@ -1031,10 +1101,17 @@ impl DataGrid {
             cell.bg_color = Some(color);
             self.grid.set_cell(row, col, cell);
         }
+
+        let new_style = self.get_cell_style(row, col);
+        let action = EditAction::SetStyle { row, col, old_style, new_style };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
     }
 
     /// Set foreground (text) color for a cell (RGBA as u32: 0xRRGGBBAA)
     pub fn set_cell_fg_color(&mut self, row: usize, col: usize, color: u32) {
+        let old_style = self.get_cell_style(row, col);
+
         if let Some(cell) = self.grid.get_cell_mut(row, col) {
             cell.fg_color = Some(color);
         } else {
@@ -1042,10 +1119,17 @@ impl DataGrid {
             cell.fg_color = Some(color);
             self.grid.set_cell(row, col, cell);
         }
+
+        let new_style = self.get_cell_style(row, col);
+        let action = EditAction::SetStyle { row, col, old_style, new_style };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
     }
 
     /// Set font style for a cell
     pub fn set_cell_font_style(&mut self, row: usize, col: usize, bold: bool, italic: bool) {
+        let old_style = self.get_cell_style(row, col);
+
         if let Some(cell) = self.grid.get_cell_mut(row, col) {
             cell.font_bold = bold;
             cell.font_italic = italic;
@@ -1055,20 +1139,39 @@ impl DataGrid {
             cell.font_italic = italic;
             self.grid.set_cell(row, col, cell);
         }
+
+        let new_style = self.get_cell_style(row, col);
+        let action = EditAction::SetStyle { row, col, old_style, new_style };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
     }
 
     /// Clear background color for a cell
     pub fn clear_cell_bg_color(&mut self, row: usize, col: usize) {
+        let old_style = self.get_cell_style(row, col);
+
         if let Some(cell) = self.grid.get_cell_mut(row, col) {
             cell.bg_color = None;
         }
+
+        let new_style = self.get_cell_style(row, col);
+        let action = EditAction::SetStyle { row, col, old_style, new_style };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
     }
 
     /// Clear foreground color for a cell
     pub fn clear_cell_fg_color(&mut self, row: usize, col: usize) {
+        let old_style = self.get_cell_style(row, col);
+
         if let Some(cell) = self.grid.get_cell_mut(row, col) {
             cell.fg_color = None;
         }
+
+        let new_style = self.get_cell_style(row, col);
+        let action = EditAction::SetStyle { row, col, old_style, new_style };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
     }
 
     /// Set cell style (background, foreground, font) in one call
@@ -1081,6 +1184,8 @@ impl DataGrid {
         bold: bool,
         italic: bool,
     ) {
+        let old_style = self.get_cell_style(row, col);
+
         if let Some(cell) = self.grid.get_cell_mut(row, col) {
             cell.bg_color = bg_color;
             cell.fg_color = fg_color;
@@ -1094,10 +1199,90 @@ impl DataGrid {
             cell.font_italic = italic;
             self.grid.set_cell(row, col, cell);
         }
+
+        let new_style = self.get_cell_style(row, col);
+        let action = EditAction::SetStyle { row, col, old_style, new_style };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+    }
+
+    /// Set custom border for a cell (top, right, bottom, or left)
+    /// side: 0=top, 1=right, 2=bottom, 3=left
+    pub fn set_cell_border(&mut self, row: usize, col: usize, side: u8, color: u32, width: f32) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            let border = Some(CellBorder { color, width });
+            match side {
+                0 => cell.border_top = border,
+                1 => cell.border_right = border,
+                2 => cell.border_bottom = border,
+                3 => cell.border_left = border,
+                _ => {}
+            }
+        } else {
+            // Create cell if it doesn't exist
+            let mut cell = Cell::empty();
+            let border = Some(CellBorder { color, width });
+            match side {
+                0 => cell.border_top = border,
+                1 => cell.border_right = border,
+                2 => cell.border_bottom = border,
+                3 => cell.border_left = border,
+                _ => {}
+            }
+            self.grid.set_cell(row, col, cell);
+        }
+    }
+
+    /// Set all borders for a cell at once
+    pub fn set_cell_borders(&mut self, row: usize, col: usize, color: u32, width: f32) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            let border = Some(CellBorder { color, width });
+            cell.border_top = border.clone();
+            cell.border_right = border.clone();
+            cell.border_bottom = border.clone();
+            cell.border_left = border;
+        } else {
+            let mut cell = Cell::empty();
+            let border = Some(CellBorder { color, width });
+            cell.border_top = border.clone();
+            cell.border_right = border.clone();
+            cell.border_bottom = border.clone();
+            cell.border_left = border;
+            self.grid.set_cell(row, col, cell);
+        }
+    }
+
+    /// Clear border for a cell side
+    /// side: 0=top, 1=right, 2=bottom, 3=left, 4=all
+    pub fn clear_cell_border(&mut self, row: usize, col: usize, side: u8) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            match side {
+                0 => cell.border_top = None,
+                1 => cell.border_right = None,
+                2 => cell.border_bottom = None,
+                3 => cell.border_left = None,
+                4 => {
+                    // Clear all borders
+                    cell.border_top = None;
+                    cell.border_right = None;
+                    cell.border_bottom = None;
+                    cell.border_left = None;
+                }
+                _ => {}
+            }
+        }
     }
 
     /// Insert a row at the specified position
     pub fn insert_row(&mut self, at_index: usize) {
+        // Record action for undo (insert is opposite of delete, so we store as DeleteRow)
+        let action = EditAction::DeleteRow {
+            index: at_index,
+            cells: Vec::new(), // Empty row being inserted
+        };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+
         self.grid.insert_row(at_index);
         self.clear_selection();
         self.viewport.update_visible_range(&self.grid);
@@ -1105,6 +1290,16 @@ impl DataGrid {
 
     /// Delete a row at the specified position
     pub fn delete_row(&mut self, index: usize) {
+        // Save cells before deletion for undo
+        let cells = self.grid.get_row_cells(index);
+
+        let action = EditAction::InsertRow {
+            index,
+            cells,
+        };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+
         self.grid.delete_row(index);
         self.clear_selection();
         self.viewport.update_visible_range(&self.grid);
@@ -1112,6 +1307,14 @@ impl DataGrid {
 
     /// Insert a column at the specified position
     pub fn insert_column(&mut self, at_index: usize) {
+        // Record action for undo (insert is opposite of delete, so we store as DeleteColumn)
+        let action = EditAction::DeleteColumn {
+            index: at_index,
+            cells: Vec::new(), // Empty column being inserted
+        };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+
         self.grid.insert_column(at_index);
         self.clear_selection();
         self.viewport.update_visible_range(&self.grid);
@@ -1119,9 +1322,118 @@ impl DataGrid {
 
     /// Delete a column at the specified position
     pub fn delete_column(&mut self, index: usize) {
+        // Save cells before deletion for undo
+        let cells = self.grid.get_column_cells(index);
+
+        let action = EditAction::InsertColumn {
+            index,
+            cells,
+        };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+
         self.grid.delete_column(index);
         self.clear_selection();
         self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Delete all empty rows (rows with no non-empty cells)
+    pub fn delete_empty_rows(&mut self) -> usize {
+        let mut rows_to_delete = Vec::new();
+
+        // Find all empty rows
+        for row in 0..self.grid.row_count() {
+            let mut is_empty = true;
+            for col in 0..self.grid.col_count() {
+                if !self.grid.get_value(row, col).is_empty() {
+                    is_empty = false;
+                    break;
+                }
+            }
+            if is_empty {
+                rows_to_delete.push(row);
+            }
+        }
+
+        // Delete rows from bottom to top to maintain indices
+        let count = rows_to_delete.len();
+        for row in rows_to_delete.iter().rev() {
+            self.delete_row(*row);
+        }
+
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+        count
+    }
+
+    /// Check if a row is empty (all cells are empty)
+    pub fn is_row_empty(&self, row: usize) -> bool {
+        for col in 0..self.grid.col_count() {
+            if !self.grid.get_value(row, col).is_empty() {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Find all modified (edited) cells
+    pub fn find_modified_cells(&mut self) -> usize {
+        self.search_results.clear();
+        self.current_search_index = None;
+
+        for row in 0..self.grid.row_count() {
+            for col in 0..self.grid.col_count() {
+                if let Some(cell) = self.grid.get_cell(row, col) {
+                    if cell.modified {
+                        self.search_results.push((row, col));
+                    }
+                }
+            }
+        }
+
+        if !self.search_results.is_empty() {
+            self.current_search_index = Some(0);
+            let (row, col) = self.search_results[0];
+            self.select_single_cell(row, col);
+            self.ensure_cell_visible(row, col);
+        }
+
+        self.search_results.len()
+    }
+
+    /// Clear modified flags from all cells
+    pub fn clear_all_modified_flags(&mut self) {
+        for row in 0..self.grid.row_count() {
+            for col in 0..self.grid.col_count() {
+                if let Some(cell) = self.grid.get_cell_mut(row, col) {
+                    cell.modified = false;
+                }
+            }
+        }
+    }
+
+    /// Check if a cell is modified
+    pub fn is_cell_modified(&self, row: usize, col: usize) -> bool {
+        if let Some(cell) = self.grid.get_cell(row, col) {
+            cell.modified
+        } else {
+            false
+        }
+    }
+
+    /// Get count of modified cells
+    pub fn get_modified_cell_count(&self) -> usize {
+        let mut count = 0;
+        for row in 0..self.grid.row_count() {
+            for col in 0..self.grid.col_count() {
+                if let Some(cell) = self.grid.get_cell(row, col) {
+                    if cell.modified {
+                        count += 1;
+                    }
+                }
+            }
+        }
+        count
     }
 
     /// Search for text in grid cells (case-insensitive by default)
@@ -1211,6 +1523,52 @@ impl DataGrid {
         } else {
             false
         }
+    }
+
+    /// Search using regular expression
+    pub fn search_regex(&mut self, pattern: String, case_sensitive: bool) -> Result<usize, String> {
+        use regex::RegexBuilder;
+
+        // Build regex with case sensitivity option
+        let regex = match RegexBuilder::new(&pattern)
+            .case_insensitive(!case_sensitive)
+            .build()
+        {
+            Ok(re) => re,
+            Err(e) => return Err(format!("Invalid regex pattern: {}", e)),
+        };
+
+        self.search_query = pattern;
+        self.search_case_sensitive = case_sensitive;
+        self.search_whole_word = false; // Not applicable for regex
+        self.search_results.clear();
+        self.current_search_index = None;
+
+        // Search through all cells
+        for row in 0..self.grid.row_count() {
+            for col in 0..self.grid.col_count() {
+                let cell_text = self.grid.get_value_string(row, col);
+
+                if regex.is_match(&cell_text) {
+                    self.search_results.push((row, col));
+                }
+            }
+        }
+
+        if !self.search_results.is_empty() {
+            self.current_search_index = Some(0);
+            let (row, col) = self.search_results[0];
+            self.select_single_cell(row, col);
+            self.ensure_cell_visible(row, col);
+        }
+
+        Ok(self.search_results.len())
+    }
+
+    /// Validate regex pattern without performing search
+    pub fn validate_regex_pattern(&self, pattern: String) -> bool {
+        use regex::Regex;
+        Regex::new(&pattern).is_ok()
     }
 
     /// Clear search results
@@ -1348,6 +1706,67 @@ impl DataGrid {
         }
     }
 
+    /// Add column to multi-column sort (for Shift+Click)
+    pub fn add_multi_column_sort(&mut self, col: usize, ascending: bool) {
+        self.grid.add_sort_column(col, ascending);
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Toggle column in multi-column sort
+    pub fn toggle_multi_column_sort(&mut self, col: usize) {
+        // Check if column is already in sort list
+        let existing = self.grid.sort_columns.iter()
+            .find(|(c, _)| *c == col)
+            .map(|(_, asc)| *asc);
+
+        match existing {
+            Some(true) => {
+                // Currently ascending, switch to descending
+                self.add_multi_column_sort(col, false);
+            }
+            Some(false) => {
+                // Currently descending, remove from sort
+                self.grid.sort_columns.retain(|(c, _)| *c != col);
+                if self.grid.sort_columns.is_empty() {
+                    self.grid.sort_column = None;
+                } else {
+                    self.grid.sort_by_multiple_columns();
+                }
+                self.viewport.update_visible_range(&self.grid);
+            }
+            None => {
+                // Not in sort list, add as ascending
+                self.add_multi_column_sort(col, true);
+            }
+        }
+    }
+
+    /// Clear multi-column sort
+    pub fn clear_multi_column_sort(&mut self) {
+        self.grid.clear_multi_column_sort();
+        self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Get multi-column sort state (returns array of [col, ascending] pairs)
+    pub fn get_multi_column_sort_state(&self) -> Vec<Vec<u32>> {
+        self.grid.sort_columns.iter()
+            .map(|(col, asc)| vec![*col as u32, if *asc { 1 } else { 0 }])
+            .collect()
+    }
+
+    /// Check if a column is in multi-column sort (returns: (is_sorted, is_ascending, sort_priority))
+    pub fn get_column_multi_sort_state(&self, col: usize) -> (bool, bool, i32) {
+        if let Some((priority, (_, ascending))) = self.grid.sort_columns.iter()
+            .enumerate()
+            .find(|(_, (c, _))| *c == col)
+        {
+            (true, *ascending, priority as i32)
+        } else {
+            (false, true, -1)
+        }
+    }
+
     /// Freeze first N rows
     pub fn freeze_rows(&mut self, count: usize) {
         self.grid.frozen_rows = count.min(self.grid.row_count());
@@ -1376,6 +1795,37 @@ impl DataGrid {
                     // Restore old value without recording undo
                     self.grid.set_value(*row, *col, old_value.clone());
                 }
+                EditAction::InsertRow { index, cells } => {
+                    // Undo insert by deleting the row
+                    self.grid.delete_row(*index);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::DeleteRow { index, cells } => {
+                    // Undo delete by inserting the row back
+                    self.grid.insert_row(*index);
+                    self.grid.restore_row_cells(*index, cells);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::InsertColumn { index, cells } => {
+                    // Undo insert by deleting the column
+                    self.grid.delete_column(*index);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::DeleteColumn { index, cells } => {
+                    // Undo delete by inserting the column back
+                    self.grid.insert_column(*index);
+                    self.grid.restore_column_cells(*index, cells);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::SetStyle { row, col, old_style, new_style: _ } => {
+                    // Restore old style
+                    if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
+                        cell.bg_color = old_style.bg_color;
+                        cell.fg_color = old_style.fg_color;
+                        cell.font_bold = old_style.font_bold;
+                        cell.font_italic = old_style.font_italic;
+                    }
+                }
             }
 
             // Move action to redo stack
@@ -1393,6 +1843,37 @@ impl DataGrid {
                 EditAction::SetValue { row, col, old_value: _, new_value } => {
                     // Re-apply new value without recording undo
                     self.grid.set_value(*row, *col, new_value.clone());
+                }
+                EditAction::InsertRow { index, cells } => {
+                    // Redo insert
+                    self.grid.insert_row(*index);
+                    self.grid.restore_row_cells(*index, cells);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::DeleteRow { index, cells: _ } => {
+                    // Redo delete
+                    self.grid.delete_row(*index);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::InsertColumn { index, cells } => {
+                    // Redo insert
+                    self.grid.insert_column(*index);
+                    self.grid.restore_column_cells(*index, cells);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::DeleteColumn { index, cells: _ } => {
+                    // Redo delete
+                    self.grid.delete_column(*index);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::SetStyle { row, col, old_style: _, new_style } => {
+                    // Re-apply new style
+                    if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
+                        cell.bg_color = new_style.bg_color;
+                        cell.fg_color = new_style.fg_color;
+                        cell.font_bold = new_style.font_bold;
+                        cell.font_italic = new_style.font_italic;
+                    }
                 }
             }
 
@@ -1519,6 +2000,104 @@ pub fn init() {
     console_error_panic_hook::set_once();
 
     web_sys::console::log_1(&"DataGrid5 initialized".into());
+}
+
+// Performance monitoring methods (outside wasm_bindgen)
+impl DataGrid {
+    /// Update FPS measurement
+    fn update_fps(&mut self, current_time: f64) {
+        if self.last_frame_time > 0.0 {
+            let frame_time = current_time - self.last_frame_time;
+            self.fps_samples.push(frame_time);
+
+            // Keep only last 60 samples
+            if self.fps_samples.len() > 60 {
+                self.fps_samples.remove(0);
+            }
+        }
+
+        self.last_frame_time = current_time;
+        self.frame_count += 1;
+    }
+
+    /// Calculate current FPS
+    fn calculate_fps(&self) -> f64 {
+        if self.fps_samples.is_empty() {
+            return 0.0;
+        }
+
+        let avg_frame_time: f64 = self.fps_samples.iter().sum::<f64>() / self.fps_samples.len() as f64;
+        if avg_frame_time > 0.0 {
+            1000.0 / avg_frame_time
+        } else {
+            0.0
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl DataGrid {
+    /// Start performance benchmark (returns start time)
+    pub fn benchmark_start(&self) -> f64 {
+        web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now())
+            .unwrap_or(0.0)
+    }
+
+    /// End performance benchmark and return elapsed time in ms
+    pub fn benchmark_end(&self, start_time: f64) -> f64 {
+        let end_time = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now())
+            .unwrap_or(0.0);
+        end_time - start_time
+    }
+
+    /// Update FPS tracking (call this in render loop)
+    pub fn update_performance_metrics(&mut self) {
+        let current_time = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now())
+            .unwrap_or(0.0);
+
+        self.update_fps(current_time);
+    }
+
+    /// Get current FPS
+    pub fn get_fps(&self) -> f64 {
+        self.calculate_fps()
+    }
+
+    /// Get total frame count
+    pub fn get_frame_count(&self) -> u32 {
+        self.frame_count
+    }
+
+    /// Get last render time in ms
+    pub fn get_last_render_time(&self) -> f64 {
+        self.render_time_ms
+    }
+
+    /// Reset performance metrics
+    pub fn reset_performance_metrics(&mut self) {
+        self.fps_samples.clear();
+        self.last_frame_time = 0.0;
+        self.frame_count = 0;
+        self.render_time_ms = 0.0;
+    }
+
+    /// Run performance benchmark (render N frames and return average time)
+    pub fn run_benchmark(&mut self, frame_count: u32) -> f64 {
+        let start = self.benchmark_start();
+
+        for _ in 0..frame_count {
+            self.render();
+        }
+
+        let total_time = self.benchmark_end(start);
+        total_time / frame_count as f64
+    }
 }
 
 #[cfg(test)]

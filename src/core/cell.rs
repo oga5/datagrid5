@@ -36,16 +36,29 @@ impl fmt::Display for CellValue {
     }
 }
 
+/// Cell border configuration for individual borders
+#[derive(Clone, Debug)]
+pub struct CellBorder {
+    pub color: u32,      // RGBA color as u32
+    pub width: f32,      // Border width in pixels
+}
+
 /// Represents a single cell in the grid
 #[derive(Clone, Debug)]
 pub struct Cell {
     pub value: CellValue,
     pub editable: bool,
     pub selected: bool,
+    pub modified: bool, // Track if cell has been edited
     pub bg_color: Option<u32>, // RGBA color as u32
     pub fg_color: Option<u32>,
     pub font_bold: bool,
     pub font_italic: bool,
+    // Custom borders (top, right, bottom, left)
+    pub border_top: Option<CellBorder>,
+    pub border_right: Option<CellBorder>,
+    pub border_bottom: Option<CellBorder>,
+    pub border_left: Option<CellBorder>,
 }
 
 impl Cell {
@@ -54,10 +67,15 @@ impl Cell {
             value,
             editable: true,
             selected: false,
+            modified: false,
             bg_color: None,
             fg_color: None,
             font_bold: false,
             font_italic: false,
+            border_top: None,
+            border_right: None,
+            border_bottom: None,
+            border_left: None,
         }
     }
 

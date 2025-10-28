@@ -27,6 +27,7 @@ pub struct Grid {
     // Sort state
     pub sort_column: Option<usize>,
     pub sort_ascending: bool,
+    pub sort_columns: Vec<(usize, bool)>, // Multi-column sort: (col, ascending)
 
     // Freeze state
     pub frozen_rows: usize,
@@ -55,6 +56,7 @@ impl Grid {
             show_headers: true,
             sort_column: None,
             sort_ascending: true,
+            sort_columns: Vec::new(),
             frozen_rows: 0,
             frozen_cols: 0,
             filtered_rows: HashSet::new(),
@@ -390,6 +392,122 @@ impl Grid {
             }
         }
         self.row_heights = new_row_heights;
+
+        // Clear multi-column sort when single column sort is used
+        self.sort_columns.clear();
+    }
+
+    /// Add column to multi-column sort (for Shift+Click)
+    pub fn add_sort_column(&mut self, col: usize, ascending: bool) {
+        if col >= self.cols {
+            return;
+        }
+
+        // Check if column already in sort list
+        if let Some(pos) = self.sort_columns.iter().position(|(c, _)| *c == col) {
+            // Update sort direction
+            self.sort_columns[pos] = (col, ascending);
+        } else {
+            // Add new column to sort list
+            self.sort_columns.push((col, ascending));
+        }
+
+        // Update primary sort column for compatibility
+        if !self.sort_columns.is_empty() {
+            self.sort_column = Some(self.sort_columns[0].0);
+            self.sort_ascending = self.sort_columns[0].1;
+        }
+
+        // Perform multi-column sort
+        self.sort_by_multiple_columns();
+    }
+
+    /// Sort by multiple columns
+    pub fn sort_by_multiple_columns(&mut self) {
+        if self.sort_columns.is_empty() {
+            return;
+        }
+
+        // Collect all row indices and their values in all sort columns
+        let mut row_values: Vec<(usize, Vec<CellValue>)> = Vec::new();
+
+        for row in 0..self.rows {
+            let mut values = Vec::new();
+            for (col, _) in &self.sort_columns {
+                values.push(self.get_value(row, *col).clone());
+            }
+            row_values.push((row, values));
+        }
+
+        // Sort rows based on multiple column values
+        row_values.sort_by(|(_, values_a), (_, values_b)| {
+            for (i, (col, ascending)) in self.sort_columns.iter().enumerate() {
+                if i >= values_a.len() || i >= values_b.len() {
+                    break;
+                }
+
+                let a = &values_a[i];
+                let b = &values_b[i];
+
+                let cmp = match (a, b) {
+                    (CellValue::Number(na), CellValue::Number(nb)) => {
+                        na.partial_cmp(nb).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                    (CellValue::Boolean(ba), CellValue::Boolean(bb)) => ba.cmp(bb),
+                    (CellValue::Text(ta), CellValue::Text(tb)) => ta.cmp(tb),
+                    (CellValue::Empty, CellValue::Empty) => std::cmp::Ordering::Equal,
+                    (CellValue::Empty, _) => std::cmp::Ordering::Greater,
+                    (_, CellValue::Empty) => std::cmp::Ordering::Less,
+                    (CellValue::Number(_), _) => std::cmp::Ordering::Less,
+                    (_, CellValue::Number(_)) => std::cmp::Ordering::Greater,
+                    (CellValue::Boolean(_), CellValue::Text(_)) => std::cmp::Ordering::Less,
+                    (CellValue::Text(_), CellValue::Boolean(_)) => std::cmp::Ordering::Greater,
+                };
+
+                let final_cmp = if *ascending { cmp } else { cmp.reverse() };
+
+                if final_cmp != std::cmp::Ordering::Equal {
+                    return final_cmp;
+                }
+            }
+
+            std::cmp::Ordering::Equal
+        });
+
+        // Create mapping from old row to new row
+        let mut row_mapping: HashMap<usize, usize> = HashMap::new();
+        for (new_row, (old_row, _)) in row_values.iter().enumerate() {
+            row_mapping.insert(*old_row, new_row);
+        }
+
+        // Remap all cells to new row positions
+        let mut new_cells = HashMap::new();
+        for ((old_row, col_idx), cell) in self.cells.drain() {
+            if let Some(&new_row) = row_mapping.get(&old_row) {
+                new_cells.insert((new_row, col_idx), cell);
+            }
+        }
+        self.cells = new_cells;
+
+        // Remap row heights
+        let mut new_row_heights = vec![self.default_row_height; self.rows];
+        for (old_row, new_row) in row_mapping {
+            if old_row < self.row_heights.len() && new_row < new_row_heights.len() {
+                new_row_heights[new_row] = self.row_heights[old_row];
+            }
+        }
+        self.row_heights = new_row_heights;
+    }
+
+    /// Clear multi-column sort
+    pub fn clear_multi_column_sort(&mut self) {
+        self.sort_columns.clear();
+        self.sort_column = None;
+    }
+
+    /// Get multi-column sort state
+    pub fn get_sort_columns(&self) -> &[(usize, bool)] {
+        &self.sort_columns
     }
 
     /// Apply filter to a column
@@ -446,6 +564,47 @@ impl Grid {
             x += self.col_width(col);
         }
         (0.0, x)
+    }
+    /// Get all cells in a specific row (for undo/redo)
+    pub fn get_row_cells(&self, row: usize) -> Vec<(usize, Cell)> {
+        self.cells
+            .iter()
+            .filter_map(|((r, c), cell)| {
+                if *r == row {
+                    Some((*c, cell.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Get all cells in a specific column (for undo/redo)
+    pub fn get_column_cells(&self, col: usize) -> Vec<(usize, Cell)> {
+        self.cells
+            .iter()
+            .filter_map(|((r, c), cell)| {
+                if *c == col {
+                    Some((*r, cell.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Restore cells for a specific row (for undo)
+    pub fn restore_row_cells(&mut self, row: usize, cells: &[(usize, Cell)]) {
+        for (col, cell) in cells {
+            self.cells.insert((row, *col), cell.clone());
+        }
+    }
+
+    /// Restore cells for a specific column (for undo)
+    pub fn restore_column_cells(&mut self, col: usize, cells: &[(usize, Cell)]) {
+        for (row, cell) in cells {
+            self.cells.insert((*row, col), cell.clone());
+        }
     }
 }
 
