@@ -1,5 +1,14 @@
 use std::fmt;
 
+/// Data type for column configuration
+#[derive(Clone, Debug, PartialEq)]
+pub enum DataType {
+    Text,
+    Number,
+    Date,
+    Boolean,
+}
+
 /// Represents the value stored in a grid cell
 #[derive(Clone, Debug)]
 pub enum CellValue {
@@ -7,6 +16,7 @@ pub enum CellValue {
     Text(String),
     Number(f64),
     Boolean(bool),
+    Date(String), // ISO 8601 format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS
 }
 
 impl CellValue {
@@ -16,6 +26,7 @@ impl CellValue {
             CellValue::Text(s) => s.clone(),
             CellValue::Number(n) => n.to_string(),
             CellValue::Boolean(b) => b.to_string(),
+            CellValue::Date(d) => d.clone(),
         }
     }
 

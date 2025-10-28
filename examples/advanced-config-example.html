@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Advanced Configuration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .grid-container {
+            width: 100%;
+            height: 600px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            background-color: #673AB7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #5E35B1;
+        }
+
+        .info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #EDE7F6;
+            border-left: 4px solid #673AB7;
+            color: #4527A0;
+            font-size: 14px;
+        }
+
+        .config-display {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #263238;
+            color: #B0BEC5;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+
+        .config-display pre {
+            margin: 0;
+            color: #81C784;
+        }
+    </style>
+</head>
+<body>
+    <h1>DataGrid5 - Advanced Configuration Example</h1>
+    <div class="description">
+        This example demonstrates advanced grid configuration with:<br>
+        - Column definitions (display name, internal name, width, data type)<br>
+        - Data types: text, number, date, boolean<br>
+        - Frozen rows and columns<br>
+        - Read-only mode<br>
+        - Grid-wide options
+    </div>
+
+    <div id="my-grid" class="grid-container"></div>
+
+    <div class="controls">
+        <button onclick="loadEmployeeData()">Load Employee Data</button>
+        <button onclick="loadSalesData()">Load Sales Data</button>
+        <button onclick="toggleReadonly()">Toggle Readonly Mode</button>
+        <button onclick="showConfiguration()">Show Configuration JSON</button>
+        <div id="info" class="info">Grid initialized with advanced configuration</div>
+    </div>
+
+    <div id="config-display" class="config-display" style="display: none;">
+        <pre id="config-json"></pre>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+
+        let grid;
+        let isReadonly = false;
+
+        async function initialize() {
+            await init();
+
+            // Advanced grid configuration
+            const options = {
+                rows: 100,
+                cols: 7,
+                width: document.querySelector('.grid-container').clientWidth,
+                height: 600,
+
+                // Column configurations
+                columns: [
+                    {
+                        display_name: "ID",
+                        internal_name: "employee_id",
+                        width: 60,
+                        data_type: "number",
+                        editable: false,
+                        sortable: true
+                    },
+                    {
+                        display_name: "Name",
+                        internal_name: "full_name",
+                        width: 150,
+                        data_type: "text",
+                        editable: true,
+                        sortable: true
+                    },
+                    {
+                        display_name: "Department",
+                        internal_name: "dept",
+                        width: 120,
+                        data_type: "text",
+                        editable: true
+                    },
+                    {
+                        display_name: "Hire Date",
+                        internal_name: "hire_date",
+                        width: 110,
+                        data_type: "date",
+                        editable: true,
+                        sortable: true
+                    },
+                    {
+                        display_name: "Salary",
+                        internal_name: "annual_salary",
+                        width: 100,
+                        data_type: "number",
+                        editable: true
+                    },
+                    {
+                        display_name: "Active",
+                        internal_name: "is_active",
+                        width: 70,
+                        data_type: "boolean",
+                        editable: true
+                    },
+                    {
+                        display_name: "Notes",
+                        internal_name: "notes",
+                        width: 200,
+                        data_type: "text",
+                        editable: true
+                    }
+                ],
+
+                // Grid-wide options
+                frozen_rows: 1,           // Freeze header row
+                frozen_cols: 2,           // Freeze ID and Name columns
+                readonly: false,          // Editable by default
+                show_headers: true,       // Show column headers
+                show_grid_lines: true,    // Show grid lines
+                enable_context_menu: true, // Enable right-click menu
+                enable_row_selection: true,
+                enable_col_selection: true,
+                alternate_row_colors: true, // Alternate row colors
+
+                // Header dimensions
+                row_header_width: 50,
+                col_header_height: 35
+            };
+
+            try {
+                grid = DataGrid.from_container('my-grid', JSON.stringify(options));
+                window.grid = grid;
+
+                // Store configuration for display
+                window.gridConfig = options;
+
+                document.getElementById('info').textContent =
+                    'Grid initialized with 7 configured columns (ID, Name, Department, Hire Date, Salary, Active, Notes)';
+
+                grid.render();
+            } catch (error) {
+                console.error('Failed to initialize:', error);
+                document.getElementById('info').textContent = 'Error: ' + error;
+            }
+        }
+
+        window.loadEmployeeData = function() {
+            if (!grid) return;
+
+            const employees = [
+                // Header row
+                ["ID", "Name", "Department", "Hire Date", "Salary", "Active", "Notes"],
+                // Data rows
+                [1001, "John Smith", "Engineering", "2020-01-15", 95000, true, "Senior Developer"],
+                [1002, "Sarah Johnson", "Marketing", "2021-03-22", 75000, true, "Marketing Manager"],
+                [1003, "Mike Williams", "Engineering", "2019-07-10", 110000, true, "Tech Lead"],
+                [1004, "Emily Brown", "HR", "2022-02-01", 65000, true, "HR Specialist"],
+                [1005, "David Lee", "Sales", "2020-11-30", 80000, true, "Sales Representative"],
+                [1006, "Lisa Davis", "Engineering", "2021-08-15", 92000, true, "Software Engineer"],
+                [1007, "Tom Wilson", "Finance", "2018-05-20", 88000, true, "Financial Analyst"],
+                [1008, "Anna Martinez", "Marketing", "2022-06-12", 70000, true, "Content Specialist"],
+                [1009, "Chris Anderson", "Engineering", "2019-12-05", 105000, true, "Senior Engineer"],
+                [1010, "Jennifer Taylor", "Sales", "2021-04-18", 77000, false, "Former Employee"],
+            ];
+
+            const data = [];
+            for (let row = 0; row < employees.length; row++) {
+                for (let col = 0; col < employees[row].length; col++) {
+                    data.push({
+                        row: row,
+                        col: col,
+                        value: employees[row][col]
+                    });
+                }
+            }
+
+            try {
+                grid.load_data_json(JSON.stringify(data));
+                grid.render();
+
+                document.getElementById('info').textContent =
+                    `Loaded ${employees.length} employees. Notice: Row 0 and Columns 0-1 are frozen for easy navigation!`;
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            }
+        };
+
+        window.loadSalesData = function() {
+            if (!grid) return;
+
+            const sales = [
+                // Header row
+                ["Order ID", "Customer", "Product", "Order Date", "Amount", "Paid", "Status"],
+                // Data rows
+                [5001, "Acme Corp", "Widget Pro", "2024-01-10", 15500.50, true, "Shipped"],
+                [5002, "Tech Solutions", "Gadget Plus", "2024-01-12", 8200.00, true, "Delivered"],
+                [5003, "Global Industries", "Tool Set", "2024-01-15", 3400.75, true, "Processing"],
+                [5004, "Smart Systems", "Device X", "2024-01-18", 12000.00, false, "Pending"],
+                [5005, "Innovation Ltd", "Widget Pro", "2024-01-20", 15500.50, true, "Shipped"],
+                [5006, "Future Tech", "Super Tool", "2024-01-22", 25000.00, true, "Delivered"],
+                [5007, "Mega Corp", "Gadget Plus", "2024-01-25", 8200.00, false, "Cancelled"],
+                [5008, "Prime Industries", "Device Y", "2024-01-28", 18900.25, true, "Processing"],
+            ];
+
+            const data = [];
+            for (let row = 0; row < sales.length; row++) {
+                for (let col = 0; col < sales[row].length; col++) {
+                    data.push({
+                        row: row,
+                        col: col,
+                        value: sales[row][col]
+                    });
+                }
+            }
+
+            try {
+                grid.load_data_json(JSON.stringify(data));
+                grid.render();
+
+                document.getElementById('info').textContent =
+                    `Loaded ${sales.length} sales orders. Data types are automatically handled: numbers, dates, booleans, text!`;
+            } catch (error) {
+                console.error('Failed to load data:', error);
+            }
+        };
+
+        window.toggleReadonly = function() {
+            if (!grid) return;
+
+            isReadonly = !isReadonly;
+            // Note: readonly mode would need to be implemented in the grid
+            // For now, just show the status
+            document.getElementById('info').textContent =
+                isReadonly ? 'Readonly mode: ON (editing disabled)' : 'Readonly mode: OFF (editing enabled)';
+        };
+
+        window.showConfiguration = function() {
+            const display = document.getElementById('config-display');
+            const jsonDisplay = document.getElementById('config-json');
+
+            if (display.style.display === 'none') {
+                jsonDisplay.textContent = JSON.stringify(window.gridConfig, null, 2);
+                display.style.display = 'block';
+            } else {
+                display.style.display = 'none';
+            }
+        };
+
+        initialize();
+    </script>
+</body>
+</html>

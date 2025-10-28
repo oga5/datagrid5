@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
 
-use core::{cell::CellBorder, Cell, CellValue, Grid, Viewport};
+use core::{cell::CellBorder, Cell, CellValue, ColumnConfig, DataType, Grid, Viewport};
 use input::{KeyboardHandler, MouseHandler, NavigationCommand};
 use renderer::{TextRenderer, WebGLRenderer};
 
@@ -165,7 +165,69 @@ impl DataGrid {
         let canvas_width = width as f32;
         let canvas_height = height as f32;
 
-        let grid = Grid::new(rows, cols);
+        let mut grid = Grid::new(rows, cols);
+
+        // Parse column configurations
+        if let Some(columns) = options["columns"].as_array() {
+            for (col_idx, col_config) in columns.iter().enumerate() {
+                if col_idx >= cols {
+                    break;
+                }
+
+                let display_name = col_config["display_name"]
+                    .as_str()
+                    .unwrap_or(&Grid::column_index_to_letter(col_idx))
+                    .to_string();
+
+                let internal_name = col_config["internal_name"]
+                    .as_str()
+                    .unwrap_or(&format!("col_{}", col_idx))
+                    .to_string();
+
+                let col_width = col_config["width"].as_f64().unwrap_or(100.0) as f32;
+
+                let data_type = match col_config["data_type"].as_str() {
+                    Some("number") => DataType::Number,
+                    Some("date") => DataType::Date,
+                    Some("boolean") => DataType::Boolean,
+                    _ => DataType::Text,
+                };
+
+                let editable = col_config["editable"].as_bool().unwrap_or(true);
+                let visible = col_config["visible"].as_bool().unwrap_or(true);
+                let sortable = col_config["sortable"].as_bool().unwrap_or(true);
+                let filterable = col_config["filterable"].as_bool().unwrap_or(true);
+
+                let mut config = ColumnConfig::new(display_name, internal_name);
+                config.width = col_width;
+                config.data_type = data_type;
+                config.editable = editable;
+                config.visible = visible;
+                config.sortable = sortable;
+                config.filterable = filterable;
+
+                grid.set_column_config(col_idx, config);
+            }
+        }
+
+        // Apply grid-wide options
+        grid.frozen_rows = options["frozen_rows"].as_u64().unwrap_or(0) as usize;
+        grid.frozen_cols = options["frozen_cols"].as_u64().unwrap_or(0) as usize;
+        grid.readonly = options["readonly"].as_bool().unwrap_or(false);
+        grid.show_headers = options["show_headers"].as_bool().unwrap_or(true);
+        grid.show_grid_lines = options["show_grid_lines"].as_bool().unwrap_or(true);
+        grid.enable_context_menu = options["enable_context_menu"].as_bool().unwrap_or(true);
+        grid.enable_row_selection = options["enable_row_selection"].as_bool().unwrap_or(true);
+        grid.enable_col_selection = options["enable_col_selection"].as_bool().unwrap_or(true);
+        grid.alternate_row_colors = options["alternate_row_colors"].as_bool().unwrap_or(false);
+
+        if let Some(row_header_width) = options["row_header_width"].as_f64() {
+            grid.row_header_width = row_header_width as f32;
+        }
+        if let Some(col_header_height) = options["col_header_height"].as_f64() {
+            grid.col_header_height = col_header_height as f32;
+        }
+
         let mut viewport = Viewport::new(canvas_width, canvas_height);
         viewport.update_visible_range(&grid);
 
@@ -623,7 +685,8 @@ impl DataGrid {
 
     /// Load grid data from JSON
     /// Accepts JSON array: [{"row": 0, "col": 0, "value": "text"}, ...]
-    /// Value can be string, number, boolean, or null (for empty)
+    /// Value can be string, number, boolean, date, or null (for empty)
+    /// If column has data_type configured, value will be converted accordingly
     pub fn load_data_json(&mut self, data_json: &str) -> Result<(), JsValue> {
         let data: Vec<serde_json::Value> = serde_json::from_str(data_json)
             .map_err(|e| JsValue::from_str(&format!("Invalid JSON data: {}", e)))?;
@@ -636,9 +699,29 @@ impl DataGrid {
                 continue;
             }
 
+            // Get column data type if configured
+            let expected_type = self.grid.get_column_config(col)
+                .map(|c| c.data_type.clone());
+
             let cell_value = match &cell_data["value"] {
                 serde_json::Value::Null => CellValue::Empty,
-                serde_json::Value::String(s) => CellValue::Text(s.clone()),
+                serde_json::Value::String(s) => {
+                    // Convert based on column data type
+                    match expected_type {
+                        Some(DataType::Number) => {
+                            if let Ok(n) = s.parse::<f64>() {
+                                CellValue::Number(n)
+                            } else {
+                                CellValue::Text(s.clone())
+                            }
+                        }
+                        Some(DataType::Date) => CellValue::Date(s.clone()),
+                        Some(DataType::Boolean) => {
+                            CellValue::Boolean(s == "true" || s == "1")
+                        }
+                        _ => CellValue::Text(s.clone()),
+                    }
+                }
                 serde_json::Value::Number(n) => {
                     if let Some(f) = n.as_f64() {
                         CellValue::Number(f)
@@ -2562,6 +2645,7 @@ impl DataGrid {
                             CellValue::Text(s) => (s.clone(), "text"),
                             CellValue::Number(n) => (n.to_string(), "number"),
                             CellValue::Boolean(b) => (b.to_string(), "boolean"),
+                            CellValue::Date(d) => (d.clone(), "date"),
                             CellValue::Empty => continue,
                         };
 
@@ -2597,6 +2681,7 @@ impl DataGrid {
                             CellValue::Text(s) => (s.clone(), "text"),
                             CellValue::Number(n) => (n.to_string(), "number"),
                             CellValue::Boolean(b) => (b.to_string(), "boolean"),
+                            CellValue::Date(d) => (d.clone(), "date"),
                             CellValue::Empty => continue,
                         };
 
@@ -2645,6 +2730,7 @@ impl DataGrid {
                         .unwrap_or(false);
                     CellValue::Boolean(val)
                 }
+                Some("date") => CellValue::Date(cell_data["value"].as_str().unwrap_or("").to_string()),
                 _ => CellValue::Empty,
             };
 

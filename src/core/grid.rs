@@ -1,5 +1,48 @@
-use super::cell::{Cell, CellValue};
+use super::cell::{Cell, CellValue, DataType};
 use std::collections::{HashMap, HashSet};
+
+/// Column configuration
+#[derive(Clone, Debug)]
+pub struct ColumnConfig {
+    pub display_name: String,    // Display name shown in header
+    pub internal_name: String,   // Internal unique identifier
+    pub width: f32,              // Column width in pixels
+    pub data_type: DataType,     // Data type (Text, Number, Date, Boolean)
+    pub editable: bool,          // Can cells in this column be edited
+    pub visible: bool,           // Is column visible
+    pub sortable: bool,          // Can column be sorted
+    pub filterable: bool,        // Can column be filtered
+}
+
+impl ColumnConfig {
+    pub fn new(display_name: String, internal_name: String) -> Self {
+        Self {
+            display_name,
+            internal_name,
+            width: 100.0,
+            data_type: DataType::Text,
+            editable: true,
+            visible: true,
+            sortable: true,
+            filterable: true,
+        }
+    }
+
+    pub fn with_width(mut self, width: f32) -> Self {
+        self.width = width;
+        self
+    }
+
+    pub fn with_data_type(mut self, data_type: DataType) -> Self {
+        self.data_type = data_type;
+        self
+    }
+
+    pub fn with_editable(mut self, editable: bool) -> Self {
+        self.editable = editable;
+        self
+    }
+}
 
 /// Main grid data structure optimized for sparse data
 pub struct Grid {
@@ -8,6 +51,9 @@ pub struct Grid {
     // Sparse storage: only store non-empty cells
     // Key: (row, col), Value: Cell
     cells: HashMap<(usize, usize), Cell>,
+
+    // Column configurations
+    pub column_configs: Vec<ColumnConfig>,
 
     // Column widths (in pixels)
     col_widths: Vec<f32>,
@@ -35,6 +81,14 @@ pub struct Grid {
 
     // Filter state
     filtered_rows: HashSet<usize>, // Rows that are hidden by filters
+
+    // Grid-wide options
+    pub readonly: bool,              // Read-only mode (no editing)
+    pub enable_context_menu: bool,   // Enable right-click context menu
+    pub enable_row_selection: bool,  // Allow row selection
+    pub enable_col_selection: bool,  // Allow column selection
+    pub show_grid_lines: bool,       // Show grid lines
+    pub alternate_row_colors: bool,  // Alternate row background colors
 }
 
 impl Grid {
@@ -43,10 +97,19 @@ impl Grid {
         let default_col_width = 100.0;
         let default_row_height = 25.0;
 
+        // Create default column configs
+        let column_configs = (0..cols)
+            .map(|i| {
+                let col_letter = Self::column_index_to_letter(i);
+                ColumnConfig::new(col_letter.clone(), format!("col_{}", i))
+            })
+            .collect();
+
         Self {
             rows,
             cols,
             cells: HashMap::new(),
+            column_configs,
             col_widths: vec![default_col_width; cols],
             row_heights: vec![default_row_height; rows],
             default_col_width,
@@ -60,6 +123,12 @@ impl Grid {
             frozen_rows: 0,
             frozen_cols: 0,
             filtered_rows: HashSet::new(),
+            readonly: false,
+            enable_context_menu: true,
+            enable_row_selection: true,
+            enable_col_selection: true,
+            show_grid_lines: true,
+            alternate_row_colors: false,
         }
     }
 
@@ -455,11 +524,16 @@ impl Grid {
                     }
                     (CellValue::Boolean(ba), CellValue::Boolean(bb)) => ba.cmp(bb),
                     (CellValue::Text(ta), CellValue::Text(tb)) => ta.cmp(tb),
+                    (CellValue::Date(da), CellValue::Date(db)) => da.cmp(db),
                     (CellValue::Empty, CellValue::Empty) => std::cmp::Ordering::Equal,
                     (CellValue::Empty, _) => std::cmp::Ordering::Greater,
                     (_, CellValue::Empty) => std::cmp::Ordering::Less,
                     (CellValue::Number(_), _) => std::cmp::Ordering::Less,
                     (_, CellValue::Number(_)) => std::cmp::Ordering::Greater,
+                    (CellValue::Date(_), CellValue::Text(_)) => std::cmp::Ordering::Less,
+                    (CellValue::Date(_), CellValue::Boolean(_)) => std::cmp::Ordering::Less,
+                    (CellValue::Text(_), CellValue::Date(_)) => std::cmp::Ordering::Greater,
+                    (CellValue::Boolean(_), CellValue::Date(_)) => std::cmp::Ordering::Greater,
                     (CellValue::Boolean(_), CellValue::Text(_)) => std::cmp::Ordering::Less,
                     (CellValue::Text(_), CellValue::Boolean(_)) => std::cmp::Ordering::Greater,
                 };
@@ -605,6 +679,56 @@ impl Grid {
         for (row, cell) in cells {
             self.cells.insert((*row, col), cell.clone());
         }
+    }
+
+    /// Convert column index to letter (0 -> A, 1 -> B, ..., 25 -> Z, 26 -> AA, ...)
+    pub fn column_index_to_letter(index: usize) -> String {
+        let mut result = String::new();
+        let mut n = index + 1;
+
+        while n > 0 {
+            let rem = (n - 1) % 26;
+            result.insert(0, (b'A' + rem as u8) as char);
+            n = (n - 1) / 26;
+        }
+
+        result
+    }
+
+    /// Set column configuration by index
+    pub fn set_column_config(&mut self, col: usize, config: ColumnConfig) {
+        if col < self.cols {
+            if col < self.column_configs.len() {
+                self.column_configs[col] = config;
+            } else {
+                // Extend configs if needed
+                while self.column_configs.len() < col {
+                    let default = ColumnConfig::new(
+                        Self::column_index_to_letter(self.column_configs.len()),
+                        format!("col_{}", self.column_configs.len()),
+                    );
+                    self.column_configs.push(default);
+                }
+                self.column_configs.push(config);
+            }
+
+            // Update column width if specified
+            if col < self.col_widths.len() {
+                self.col_widths[col] = self.column_configs[col].width;
+            }
+        }
+    }
+
+    /// Get column configuration by index
+    pub fn get_column_config(&self, col: usize) -> Option<&ColumnConfig> {
+        self.column_configs.get(col)
+    }
+
+    /// Get column index by internal name
+    pub fn get_column_by_name(&self, name: &str) -> Option<usize> {
+        self.column_configs
+            .iter()
+            .position(|c| c.internal_name == name)
     }
 }
 
