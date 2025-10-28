@@ -97,6 +97,9 @@ pub struct DataGrid {
     last_frame_time: f64,       // Timestamp of last frame
     frame_count: u32,           // Total frame count
     render_time_ms: f64,        // Last render time in ms
+    // Differential rendering
+    dirty_cells: HashSet<(usize, usize)>, // Cells that need re-rendering
+    needs_full_render: bool,    // Flag to force full re-render
 }
 
 #[wasm_bindgen]
@@ -174,6 +177,8 @@ impl DataGrid {
             last_frame_time: 0.0,
             frame_count: 0,
             render_time_ms: 0.0,
+            dirty_cells: HashSet::new(),
+            needs_full_render: true, // Start with full render
         })
     }
 
@@ -300,6 +305,9 @@ impl DataGrid {
                 cell.modified = true;
             }
 
+            // Mark cell as dirty for differential rendering
+            self.dirty_cells.insert((row, col));
+
             // Record action for undo
             let action = EditAction::SetValue {
                 row,
@@ -334,6 +342,65 @@ impl DataGrid {
             self.viewport.first_visible_col,
             self.viewport.last_visible_col
         )
+    }
+
+    /// Get visible cell range for lazy loading (returns [first_row, last_row, first_col, last_col])
+    pub fn get_visible_range(&self) -> Vec<usize> {
+        vec![
+            self.viewport.first_visible_row,
+            self.viewport.last_visible_row,
+            self.viewport.first_visible_col,
+            self.viewport.last_visible_col,
+        ]
+    }
+
+    /// Set multiple cell values at once (for lazy loading/batch updates)
+    /// Takes array of [row, col, value_type, value_data]
+    /// value_type: 0=empty, 1=text, 2=number, 3=boolean
+    pub fn set_cells_batch(&mut self, cells_data: Vec<Vec<String>>) {
+        for cell_data in cells_data {
+            if cell_data.len() < 4 {
+                continue;
+            }
+
+            let row = cell_data[0].parse::<usize>().unwrap_or(0);
+            let col = cell_data[1].parse::<usize>().unwrap_or(0);
+            let value_type = cell_data[2].parse::<u8>().unwrap_or(0);
+            let value_data = &cell_data[3];
+
+            if row >= self.grid.row_count() || col >= self.grid.col_count() {
+                continue;
+            }
+
+            let cell_value = match value_type {
+                1 => CellValue::Text(value_data.clone()),
+                2 => CellValue::Number(value_data.parse::<f64>().unwrap_or(0.0)),
+                3 => CellValue::Boolean(value_data == "true" || value_data == "1"),
+                _ => CellValue::Empty,
+            };
+
+            self.grid.set_value(row, col, cell_value);
+            self.dirty_cells.insert((row, col));
+        }
+    }
+
+    /// Load data for a specific range (for lazy loading)
+    /// Returns true if data is already loaded, false if needs loading
+    pub fn is_range_loaded(&self, start_row: usize, end_row: usize, start_col: usize, end_col: usize) -> bool {
+        // Check if any cells in the range have data
+        let mut has_data = false;
+        for row in start_row..=end_row.min(self.grid.row_count().saturating_sub(1)) {
+            for col in start_col..=end_col.min(self.grid.col_count().saturating_sub(1)) {
+                if self.grid.get_cell(row, col).is_some() {
+                    has_data = true;
+                    break;
+                }
+            }
+            if has_data {
+                break;
+            }
+        }
+        has_data
     }
 
     /// Handle keyboard event
@@ -2097,6 +2164,111 @@ impl DataGrid {
 
         let total_time = self.benchmark_end(start);
         total_time / frame_count as f64
+    }
+
+    /// Mark a specific cell as dirty (needs re-rendering)
+    pub fn mark_cell_dirty(&mut self, row: usize, col: usize) {
+        if row < self.grid.row_count() && col < self.grid.col_count() {
+            self.dirty_cells.insert((row, col));
+        }
+    }
+
+    /// Mark all cells as dirty (force full re-render)
+    pub fn mark_all_dirty(&mut self) {
+        self.needs_full_render = true;
+        self.dirty_cells.clear();
+    }
+
+    /// Clear dirty cells (after rendering)
+    pub fn clear_dirty_cells(&mut self) {
+        self.dirty_cells.clear();
+        self.needs_full_render = false;
+    }
+
+    /// Get count of dirty cells
+    pub fn get_dirty_cell_count(&self) -> usize {
+        if self.needs_full_render {
+            self.grid.row_count() * self.grid.col_count()
+        } else {
+            self.dirty_cells.len()
+        }
+    }
+
+    /// Check if full render is needed
+    pub fn needs_full_render(&self) -> bool {
+        self.needs_full_render
+    }
+
+    /// Optimize memory by reserving capacity for expected data size
+    pub fn reserve_capacity(&mut self, expected_cells: usize) {
+        // Reserve capacity in undo/redo stacks
+        if self.undo_stack.capacity() < expected_cells {
+            self.undo_stack.reserve(expected_cells);
+        }
+        if self.redo_stack.capacity() < expected_cells {
+            self.redo_stack.reserve(expected_cells);
+        }
+
+        // Reserve capacity for dirty cells tracking
+        if self.dirty_cells.capacity() < expected_cells {
+            self.dirty_cells.reserve(expected_cells);
+        }
+
+        // Reserve capacity for selected cells
+        if self.selected_cells.capacity() < expected_cells / 10 {
+            self.selected_cells.reserve(expected_cells / 10);
+        }
+
+        // Reserve capacity for search results
+        if self.search_results.capacity() < expected_cells / 100 {
+            self.search_results.reserve(expected_cells / 100);
+        }
+    }
+
+    /// Clear all non-essential cached data to free memory
+    pub fn clear_caches(&mut self) {
+        self.search_results.clear();
+        self.search_results.shrink_to_fit();
+
+        self.dirty_cells.clear();
+        self.dirty_cells.shrink_to_fit();
+
+        self.fps_samples.clear();
+        self.fps_samples.shrink_to_fit();
+    }
+
+    /// Get estimated memory usage in bytes (approximate)
+    pub fn get_memory_usage(&self) -> usize {
+        let cell_count = self.grid.row_count() * self.grid.col_count();
+        let selected_cells_mem = self.selected_cells.len() * std::mem::size_of::<(usize, usize)>();
+        let search_results_mem = self.search_results.len() * std::mem::size_of::<(usize, usize)>();
+        let undo_stack_mem = self.undo_stack.capacity() * std::mem::size_of::<EditAction>();
+        let redo_stack_mem = self.redo_stack.capacity() * std::mem::size_of::<EditAction>();
+        let dirty_cells_mem = self.dirty_cells.len() * std::mem::size_of::<(usize, usize)>();
+
+        // Base structure + hash maps + vectors
+        let base_mem = std::mem::size_of::<Self>();
+        let grid_mem = cell_count * 100; // Approximate per-cell overhead
+
+        base_mem + grid_mem + selected_cells_mem + search_results_mem +
+        undo_stack_mem + redo_stack_mem + dirty_cells_mem
+    }
+
+    /// Compact memory by removing unused allocations
+    pub fn compact_memory(&mut self) {
+        // Shrink vectors to fit actual data
+        self.search_results.shrink_to_fit();
+        self.undo_stack.shrink_to_fit();
+        self.redo_stack.shrink_to_fit();
+        self.fps_samples.shrink_to_fit();
+
+        // Keep dirty_cells and selected_cells at reasonable capacity
+        if self.dirty_cells.capacity() > self.dirty_cells.len() * 2 {
+            self.dirty_cells.shrink_to_fit();
+        }
+        if self.selected_cells.capacity() > self.selected_cells.len() * 2 {
+            self.selected_cells.shrink_to_fit();
+        }
     }
 }
 
