@@ -854,6 +854,28 @@ impl Grid {
         }
         None
     }
+
+    // ========== Column Editable Control ==========
+
+    /// Set whether a column is editable
+    pub fn set_column_editable(&mut self, col: usize, editable: bool) {
+        if col < self.column_configs.len() {
+            self.column_configs[col].editable = editable;
+        }
+    }
+
+    /// Check if a column is editable
+    pub fn is_column_editable(&self, col: usize) -> bool {
+        if col < self.column_configs.len() {
+            return self.column_configs[col].editable;
+        }
+        true // Default to editable if column doesn't exist
+    }
+
+    /// Get editable status for all columns
+    pub fn get_all_column_editable_status(&self) -> Vec<bool> {
+        self.column_configs.iter().map(|c| c.editable).collect()
+    }
 }
 
 #[cfg(test)]

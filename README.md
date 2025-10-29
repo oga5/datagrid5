@@ -112,6 +112,7 @@ python3 -m http.server 8080
 Open your browser and navigate to:
 - Main demo: http://localhost:8080/www/
 - Examples: http://localhost:8080/examples/
+- Read-only columns: http://localhost:8080/examples/readonly-columns-example.html
 - Validation example: http://localhost:8080/examples/validation-example.html
 - Column grouping: http://localhost:8080/examples/column-grouping-example.html
 - Sales analysis (3-level): http://localhost:8080/examples/sales-analysis-example.html
@@ -299,6 +300,39 @@ grid.clear_column_validation(0);
 - Numbers only: `^[0-9]+$`
 - Japanese text: `^[\u4E00-\u9FFF\u3040-\u309F]+$`
 
+### Read-only Columns
+
+Control which columns can be edited on a per-column basis:
+
+```javascript
+// Set specific columns as read-only
+grid.set_column_editable(0, false);  // ID column - read-only
+grid.set_column_editable(5, false);  // Created date - read-only
+grid.set_column_editable(6, false);  // Updated date - read-only
+
+// Set columns as editable
+grid.set_column_editable(1, true);   // Name column - editable
+grid.set_column_editable(2, true);   // Email column - editable
+
+// Check if a column is editable
+const isEditable = grid.is_column_editable(0);
+console.log(`Column 0 is ${isEditable ? 'editable' : 'read-only'}`);
+
+// Get editable status for all columns
+const statusArray = JSON.parse(grid.get_all_column_editable_status());
+// Returns: [false, true, true, true, true, false, false, true]
+
+// Attempting to edit a read-only column will fail silently
+// You can check the column status before allowing user interaction
+```
+
+**Common Use Cases:**
+- Auto-generated IDs (read-only)
+- System timestamps (created_at, updated_at)
+- Calculated fields (totals, computed values)
+- Audit fields (created_by, modified_by)
+- Status fields managed by workflow
+
 ## 🎨 Advanced Configuration
 
 ### Column Definitions with Data Types
@@ -364,6 +398,7 @@ The `examples/` directory contains comprehensive examples:
 
 - **[simple-usage.html](./examples/simple-usage.html)** - Basic grid setup and data loading
 - **[advanced-config-example.html](./examples/advanced-config-example.html)** - Column configuration and data types
+- **[readonly-columns-example.html](./examples/readonly-columns-example.html)** - Read-only column configuration per column
 - **[validation-example.html](./examples/validation-example.html)** - Input validation with regex patterns and custom error messages
 - **[column-grouping-example.html](./examples/column-grouping-example.html)** - Multi-level hierarchical column headers with grouping
 - **[sales-analysis-example.html](./examples/sales-analysis-example.html)** - 3-level sales analysis dashboard (Quarter → Month → Metrics)

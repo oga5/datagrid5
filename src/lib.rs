@@ -1137,6 +1137,12 @@ impl DataGrid {
             return false;
         }
 
+        // Check if column is editable
+        if !self.grid.is_column_editable(col) {
+            web_sys::console::log_1(&format!("Column {} is read-only", col).into());
+            return false;
+        }
+
         // Check if cell is editable
         if let Some(cell) = self.grid.get_cell(row, col) {
             if !cell.editable {
@@ -1842,6 +1848,30 @@ impl DataGrid {
                          message.replace("\\", "\\\\").replace("\"", "\\\""));
         }
         String::new()
+    }
+
+    // ========== Column Editable Control API ==========
+
+    /// Set whether a column is editable
+    /// @param col - Column index (0-based)
+    /// @param editable - true: editable, false: read-only
+    pub fn set_column_editable(&mut self, col: usize, editable: bool) {
+        self.grid.set_column_editable(col, editable);
+    }
+
+    /// Check if a column is editable
+    pub fn is_column_editable(&self, col: usize) -> bool {
+        self.grid.is_column_editable(col)
+    }
+
+    /// Get editable status for all columns as JSON array
+    /// Returns: "[true, false, true, ...]"
+    pub fn get_all_column_editable_status(&self) -> String {
+        let status = self.grid.get_all_column_editable_status();
+        format!("[{}]", status.iter()
+            .map(|b| b.to_string())
+            .collect::<Vec<_>>()
+            .join(","))
     }
 
     /// Insert a row at the specified position
