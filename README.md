@@ -18,6 +18,7 @@ All 137 features from the original C++ GridControl have been successfully ported
 - **🚀 High Performance**: WebGL GPU rendering + WebAssembly for 60 FPS with 100k+ rows
 - **📊 Excel-like Interface**: Familiar spreadsheet UI with keyboard navigation
 - **✏️ Full Editing Support**: Double-click to edit, copy/paste, undo/redo
+- **✅ Input Validation**: Column-based regex validation with custom error messages
 - **🎨 Rich Styling**: Cell colors, fonts, borders, and custom styling API
 - **🔍 Advanced Search**: Text search, regex, find & replace, highlight matches
 - **📑 Sorting & Filtering**: Multi-column sort, custom filters, column-based filtering
@@ -111,6 +112,7 @@ python3 -m http.server 8080
 Open your browser and navigate to:
 - Main demo: http://localhost:8080/www/
 - Examples: http://localhost:8080/examples/
+- Validation example: http://localhost:8080/examples/validation-example.html
 - Column grouping: http://localhost:8080/examples/column-grouping-example.html
 - Sales analysis (3-level): http://localhost:8080/examples/sales-analysis-example.html
 - Editing example: http://localhost:8080/examples/editing-example.html
@@ -242,6 +244,61 @@ grid.clear_column_groups();
 
 The grid automatically calculates total header height based on the number of levels.
 
+### Input Validation (Column-based Rules)
+
+Set validation rules for each column using regular expressions:
+
+```javascript
+// Set validation for employee ID column
+grid.set_column_validation(
+    0,                              // Column index
+    "^EMP[0-9]{4}$",               // Regex pattern
+    '"EMP"の後に4桁の数字が必要です'  // Error message
+);
+
+// Email validation
+grid.set_column_validation(
+    2,
+    "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+    "正しいメールアドレス形式で入力してください"
+);
+
+// Phone number validation
+grid.set_column_validation(
+    3,
+    "^0\\d{1,4}-\\d{1,4}-\\d{4}$",
+    "電話番号はハイフン区切りで入力してください"
+);
+
+// Age validation (1-99)
+grid.set_column_validation(
+    4,
+    "^[1-9][0-9]?$",
+    "年齢は1〜99の数字で入力してください"
+);
+
+// Get validation rules for a column
+const validationJson = grid.get_column_validation(0);
+if (validationJson) {
+    const { pattern, message } = JSON.parse(validationJson);
+    const regex = new RegExp(pattern);
+    if (!regex.test(inputValue)) {
+        alert(message);
+    }
+}
+
+// Clear validation for a column
+grid.clear_column_validation(0);
+```
+
+**Common Patterns:**
+- Email: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+- Phone (JP): `^0\d{1,4}-\d{1,4}-\d{4}$`
+- Postal Code (JP): `^\d{3}-\d{4}$`
+- Date (YYYY/MM/DD): `^\d{4}/\d{2}/\d{2}$`
+- Numbers only: `^[0-9]+$`
+- Japanese text: `^[\u4E00-\u9FFF\u3040-\u309F]+$`
+
 ## 🎨 Advanced Configuration
 
 ### Column Definitions with Data Types
@@ -307,6 +364,7 @@ The `examples/` directory contains comprehensive examples:
 
 - **[simple-usage.html](./examples/simple-usage.html)** - Basic grid setup and data loading
 - **[advanced-config-example.html](./examples/advanced-config-example.html)** - Column configuration and data types
+- **[validation-example.html](./examples/validation-example.html)** - Input validation with regex patterns and custom error messages
 - **[column-grouping-example.html](./examples/column-grouping-example.html)** - Multi-level hierarchical column headers with grouping
 - **[sales-analysis-example.html](./examples/sales-analysis-example.html)** - 3-level sales analysis dashboard (Quarter → Month → Metrics)
 - **[editing-example.html](./examples/editing-example.html)** - Cell editing features with undo/redo and edit history

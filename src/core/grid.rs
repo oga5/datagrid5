@@ -33,14 +33,16 @@ impl ColumnGroup {
 /// Column configuration
 #[derive(Clone, Debug)]
 pub struct ColumnConfig {
-    pub display_name: String,    // Display name shown in header
-    pub internal_name: String,   // Internal unique identifier
-    pub width: f32,              // Column width in pixels
-    pub data_type: DataType,     // Data type (Text, Number, Date, Boolean)
-    pub editable: bool,          // Can cells in this column be edited
-    pub visible: bool,           // Is column visible
-    pub sortable: bool,          // Can column be sorted
-    pub filterable: bool,        // Can column be filtered
+    pub display_name: String,       // Display name shown in header
+    pub internal_name: String,      // Internal unique identifier
+    pub width: f32,                 // Column width in pixels
+    pub data_type: DataType,        // Data type (Text, Number, Date, Boolean)
+    pub editable: bool,             // Can cells in this column be edited
+    pub visible: bool,              // Is column visible
+    pub sortable: bool,             // Can column be sorted
+    pub filterable: bool,           // Can column be filtered
+    pub validation_pattern: Option<String>,  // Regex pattern for validation (JavaScript regex syntax)
+    pub validation_message: String, // Error message when validation fails
 }
 
 impl ColumnConfig {
@@ -54,6 +56,8 @@ impl ColumnConfig {
             visible: true,
             sortable: true,
             filterable: true,
+            validation_pattern: None,
+            validation_message: String::from("入力値が正しくありません"),
         }
     }
 
@@ -69,6 +73,12 @@ impl ColumnConfig {
 
     pub fn with_editable(mut self, editable: bool) -> Self {
         self.editable = editable;
+        self
+    }
+
+    pub fn with_validation(mut self, pattern: String, message: String) -> Self {
+        self.validation_pattern = Some(pattern);
+        self.validation_message = message;
         self
     }
 }
@@ -815,6 +825,34 @@ impl Grid {
     pub fn set_header_row_height(&mut self, height: f32) {
         self.header_row_height = height;
         self.col_header_height = self.header_row_height * self.header_levels as f32;
+    }
+
+    // ========== Column Validation ==========
+
+    /// Set validation pattern for a column
+    pub fn set_column_validation(&mut self, col: usize, pattern: String, message: String) {
+        if col < self.column_configs.len() {
+            self.column_configs[col].validation_pattern = Some(pattern);
+            self.column_configs[col].validation_message = message;
+        }
+    }
+
+    /// Clear validation pattern for a column
+    pub fn clear_column_validation(&mut self, col: usize) {
+        if col < self.column_configs.len() {
+            self.column_configs[col].validation_pattern = None;
+            self.column_configs[col].validation_message = String::from("入力値が正しくありません");
+        }
+    }
+
+    /// Get validation pattern for a column
+    pub fn get_column_validation(&self, col: usize) -> Option<(String, String)> {
+        if col < self.column_configs.len() {
+            if let Some(pattern) = &self.column_configs[col].validation_pattern {
+                return Some((pattern.clone(), self.column_configs[col].validation_message.clone()));
+            }
+        }
+        None
     }
 }
 

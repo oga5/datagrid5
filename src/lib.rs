@@ -1818,6 +1818,32 @@ impl DataGrid {
         self.grid.col_header_height
     }
 
+    // ========== Column Validation API ==========
+
+    /// Set validation pattern for a column
+    /// @param col - Column index (0-based)
+    /// @param pattern - JavaScript regex pattern (e.g., "^[0-9]+$" for numbers only)
+    /// @param message - Error message to display when validation fails
+    pub fn set_column_validation(&mut self, col: usize, pattern: String, message: String) {
+        self.grid.set_column_validation(col, pattern, message);
+    }
+
+    /// Clear validation pattern for a column
+    pub fn clear_column_validation(&mut self, col: usize) {
+        self.grid.clear_column_validation(col);
+    }
+
+    /// Get validation pattern and message for a column
+    /// Returns JSON string: {"pattern": "regex", "message": "error msg"} or empty string if no validation
+    pub fn get_column_validation(&self, col: usize) -> String {
+        if let Some((pattern, message)) = self.grid.get_column_validation(col) {
+            return format!(r#"{{"pattern":"{}","message":"{}"}}"#,
+                         pattern.replace("\\", "\\\\").replace("\"", "\\\""),
+                         message.replace("\\", "\\\\").replace("\"", "\\\""));
+        }
+        String::new()
+    }
+
     /// Insert a row at the specified position
     pub fn insert_row(&mut self, at_index: usize) {
         // Record action for undo (insert is opposite of delete, so we store as DeleteRow)
