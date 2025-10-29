@@ -110,6 +110,7 @@ python3 -m http.server 8080
 Open your browser and navigate to:
 - Main demo: http://localhost:8080/www/
 - Examples: http://localhost:8080/examples/
+- Editing example: http://localhost:8080/examples/editing-example.html
 - Full-screen example: http://localhost:8080/examples/full-screen-resize-example.html
 - Responsive example: http://localhost:8080/examples/responsive-resize-example.html
 
@@ -269,6 +270,9 @@ The `examples/` directory contains comprehensive examples:
 
 - **[simple-usage.html](./examples/simple-usage.html)** - Basic grid setup and data loading
 - **[advanced-config-example.html](./examples/advanced-config-example.html)** - Column configuration and data types
+- **[editing-example.html](./examples/editing-example.html)** - Cell editing features with undo/redo and edit history
+- **[full-screen-resize-example.html](./examples/full-screen-resize-example.html)** - Browser-responsive grid that auto-resizes
+- **[responsive-resize-example.html](./examples/responsive-resize-example.html)** - Responsive layout example
 - **[worker-example.html](./examples/worker-example.html)** - Background processing with Web Workers
 - **[context-menu-example.html](./examples/context-menu-example.html)** - Right-click context menus
 - **[index.html](./examples/index.html)** - Examples index page
