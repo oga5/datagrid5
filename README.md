@@ -117,6 +117,7 @@ Open your browser and navigate to:
 - Column grouping: http://localhost:8080/examples/column-grouping-example.html
 - Sales analysis (3-level): http://localhost:8080/examples/sales-analysis-example.html
 - Editing example: http://localhost:8080/examples/editing-example.html
+- Context menu editing: http://localhost:8080/examples/context-menu-editing-example.html
 - Full-screen example: http://localhost:8080/examples/full-screen-resize-example.html
 - Responsive example: http://localhost:8080/examples/responsive-resize-example.html
 
@@ -333,6 +334,121 @@ const statusArray = JSON.parse(grid.get_all_column_editable_status());
 - Audit fields (created_by, modified_by)
 - Status fields managed by workflow
 
+### Context Menu Editing
+
+DataGrid5 provides APIs for implementing context menu operations on rows, including insert, delete (single and bulk), and full undo/redo support:
+
+```javascript
+// Insert a new row below the current active cell
+const insertIndex = activeRow + 1;
+grid.insert_row(insertIndex);
+
+// Delete a specific row
+grid.delete_row(activeRow);
+
+// Get unique row indices from current selection
+const selectedRowsJson = grid.get_selected_row_indices();
+const selectedRows = JSON.parse(selectedRowsJson);
+console.log(`Selected rows: ${selectedRows.join(', ')}`);
+
+// Bulk delete multiple rows (with undo support)
+grid.delete_rows(selectedRowsJson);
+
+// Undo last operation
+const undoSuccess = grid.undo();
+if (undoSuccess) {
+    console.log('Undo successful');
+}
+
+// Redo last undone operation
+const redoSuccess = grid.redo();
+if (redoSuccess) {
+    console.log('Redo successful');
+}
+
+// Check if undo/redo operations are available
+const canUndo = grid.can_undo();
+const canRedo = grid.can_redo();
+```
+
+**Implementing a Context Menu:**
+
+```javascript
+// Show context menu on right-click
+canvas.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // Get active cell position
+    const activeCell = grid.get_active_cell();
+    if (activeCell) {
+        const { row, col } = JSON.parse(activeCell);
+        showContextMenu(event.clientX, event.clientY, row);
+    }
+});
+
+function showContextMenu(x, y, row) {
+    const menu = document.getElementById('context-menu');
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.style.display = 'block';
+
+    // Store row for later use
+    contextMenuRow = row;
+
+    // Update menu items based on selection
+    const selectedRowsJson = grid.get_selected_row_indices();
+    const selectedRows = JSON.parse(selectedRowsJson);
+
+    if (selectedRows.length > 1) {
+        // Show bulk delete option
+        document.getElementById('menu-delete-selected').style.display = 'block';
+        document.getElementById('selected-count').textContent = selectedRows.length;
+    }
+}
+
+// Handle menu item clicks
+document.getElementById('menu-insert-row').addEventListener('click', () => {
+    grid.insert_row(contextMenuRow + 1);
+    hideContextMenu();
+});
+
+document.getElementById('menu-delete-row').addEventListener('click', () => {
+    grid.delete_row(contextMenuRow);
+    hideContextMenu();
+});
+
+document.getElementById('menu-delete-selected').addEventListener('click', () => {
+    const selectedRowsJson = grid.get_selected_row_indices();
+    grid.delete_rows(selectedRowsJson);
+    hideContextMenu();
+});
+```
+
+**Keyboard Shortcuts for Undo/Redo:**
+
+```javascript
+document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key === 'z') {
+        event.preventDefault();
+        grid.undo();
+    } else if ((event.ctrlKey || event.metaKey) && (event.shiftKey && event.key === 'z' || event.key === 'y')) {
+        event.preventDefault();
+        grid.redo();
+    }
+});
+```
+
+**Features:**
+- Insert row at any position
+- Delete single row or multiple selected rows
+- Full undo/redo support for all row operations
+- Get unique row indices from cell selection
+- Operations are recorded in edit history
+
 ## 🎨 Advanced Configuration
 
 ### Column Definitions with Data Types
@@ -403,6 +519,7 @@ The `examples/` directory contains comprehensive examples:
 - **[column-grouping-example.html](./examples/column-grouping-example.html)** - Multi-level hierarchical column headers with grouping
 - **[sales-analysis-example.html](./examples/sales-analysis-example.html)** - 3-level sales analysis dashboard (Quarter → Month → Metrics)
 - **[editing-example.html](./examples/editing-example.html)** - Cell editing features with undo/redo and edit history
+- **[context-menu-editing-example.html](./examples/context-menu-editing-example.html)** - Context menu for row operations (insert, delete, undo/redo)
 - **[full-screen-resize-example.html](./examples/full-screen-resize-example.html)** - Browser-responsive grid that auto-resizes
 - **[responsive-resize-example.html](./examples/responsive-resize-example.html)** - Responsive layout example
 - **[worker-example.html](./examples/worker-example.html)** - Background processing with Web Workers

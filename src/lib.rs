@@ -49,6 +49,10 @@ enum EditAction {
         // Store all cells in the column for undo
         cells: Vec<(usize, Cell)>, // (row, cell)
     },
+    DeleteRows {
+        // Store multiple rows for bulk deletion undo
+        rows: Vec<(usize, Vec<(usize, Cell)>)>, // (row_index, cells)
+    },
     SetStyle {
         row: usize,
         col: usize,
@@ -1906,6 +1910,67 @@ impl DataGrid {
         self.viewport.update_visible_range(&self.grid);
     }
 
+    /// Delete multiple rows at once
+    /// @param indices - JSON array of row indices to delete, e.g., "[0, 2, 5]"
+    pub fn delete_rows(&mut self, indices_json: String) -> Result<(), JsValue> {
+        // Parse indices
+        let indices: Vec<usize> = serde_json::from_str(&indices_json)
+            .map_err(|e| JsValue::from_str(&format!("Failed to parse indices: {}", e)))?;
+
+        if indices.is_empty() {
+            return Ok(());
+        }
+
+        // Sort indices in descending order to delete from bottom to top
+        // This prevents index shifting issues
+        let mut sorted_indices = indices.clone();
+        sorted_indices.sort_unstable();
+        sorted_indices.reverse();
+
+        // Save all rows for undo
+        let mut deleted_rows = Vec::new();
+        for &index in &sorted_indices {
+            if index < self.grid.row_count() {
+                let cells = self.grid.get_row_cells(index);
+                deleted_rows.push((index, cells));
+            }
+        }
+
+        // Record undo action
+        let action = EditAction::DeleteRows {
+            rows: deleted_rows.clone(),
+        };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+
+        // Delete rows from bottom to top
+        for &index in &sorted_indices {
+            if index < self.grid.row_count() {
+                self.grid.delete_row(index);
+            }
+        }
+
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+
+        Ok(())
+    }
+
+    /// Get unique row indices from selected cells
+    /// Returns JSON array of row indices, e.g., "[0, 2, 5]"
+    pub fn get_selected_row_indices(&self) -> String {
+        let mut rows: Vec<usize> = self.selected_cells
+            .iter()
+            .map(|(row, _)| *row)
+            .collect();
+
+        // Remove duplicates and sort
+        rows.sort_unstable();
+        rows.dedup();
+
+        serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_string())
+    }
+
     /// Insert a column at the specified position
     pub fn insert_column(&mut self, at_index: usize) {
         // Record action for undo (insert is opposite of delete, so we store as DeleteColumn)
@@ -2423,6 +2488,14 @@ impl DataGrid {
                     self.grid.restore_column_cells(*index, cells);
                     self.viewport.update_visible_range(&self.grid);
                 }
+                EditAction::DeleteRows { rows } => {
+                    // Undo bulk delete by inserting rows back in reverse order
+                    for (index, cells) in rows.iter() {
+                        self.grid.insert_row(*index);
+                        self.grid.restore_row_cells(*index, cells);
+                    }
+                    self.viewport.update_visible_range(&self.grid);
+                }
                 EditAction::SetStyle { row, col, old_style, new_style: _ } => {
                     // Restore old style
                     if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
@@ -2470,6 +2543,16 @@ impl DataGrid {
                 EditAction::DeleteColumn { index, cells: _ } => {
                     // Redo delete
                     self.grid.delete_column(*index);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::DeleteRows { rows } => {
+                    // Redo bulk delete from bottom to top to avoid index shifting
+                    let mut sorted_indices: Vec<usize> = rows.iter().map(|(idx, _)| *idx).collect();
+                    sorted_indices.sort_unstable();
+                    sorted_indices.reverse();
+                    for index in sorted_indices {
+                        self.grid.delete_row(index);
+                    }
                     self.viewport.update_visible_range(&self.grid);
                 }
                 EditAction::SetStyle { row, col, old_style: _, new_style } => {
