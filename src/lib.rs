@@ -1787,6 +1787,37 @@ impl DataGrid {
         }
     }
 
+    // ========== Column Grouping API ==========
+
+    /// Add a column group for multi-level headers
+    /// @param label - Group label text
+    /// @param start_col - First column in group (0-indexed)
+    /// @param end_col - Last column in group (0-indexed, inclusive)
+    /// @param level - Header level (0 = top level, 1 = second level, etc.)
+    pub fn add_column_group(&mut self, label: String, start_col: usize, end_col: usize, level: usize) {
+        self.grid.add_column_group(label, start_col, end_col, level);
+    }
+
+    /// Clear all column groups (revert to single-level headers)
+    pub fn clear_column_groups(&mut self) {
+        self.grid.clear_column_groups();
+    }
+
+    /// Set the height of each header row (default: 30px)
+    pub fn set_header_row_height(&mut self, height: f32) {
+        self.grid.set_header_row_height(height);
+    }
+
+    /// Get the current number of header levels
+    pub fn get_header_levels(&self) -> usize {
+        self.grid.header_levels
+    }
+
+    /// Get total header height
+    pub fn get_header_height(&self) -> f32 {
+        self.grid.col_header_height
+    }
+
     /// Insert a row at the specified position
     pub fn insert_row(&mut self, at_index: usize) {
         // Record action for undo (insert is opposite of delete, so we store as DeleteRow)

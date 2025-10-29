@@ -1,6 +1,35 @@
 use super::cell::{Cell, CellValue, DataType};
 use std::collections::{HashMap, HashSet};
 
+/// Column group for multi-level headers
+#[derive(Clone, Debug)]
+pub struct ColumnGroup {
+    pub label: String,           // Group label text
+    pub start_col: usize,        // First column in group (inclusive)
+    pub end_col: usize,          // Last column in group (inclusive)
+    pub level: usize,            // Header level (0 = top, 1 = second, etc.)
+}
+
+impl ColumnGroup {
+    pub fn new(label: String, start_col: usize, end_col: usize, level: usize) -> Self {
+        Self {
+            label,
+            start_col,
+            end_col,
+            level,
+        }
+    }
+
+    /// Get the span (number of columns) of this group
+    pub fn span(&self) -> usize {
+        if self.end_col >= self.start_col {
+            self.end_col - self.start_col + 1
+        } else {
+            0
+        }
+    }
+}
+
 /// Column configuration
 #[derive(Clone, Debug)]
 pub struct ColumnConfig {
@@ -55,6 +84,11 @@ pub struct Grid {
     // Column configurations
     pub column_configs: Vec<ColumnConfig>,
 
+    // Column grouping for multi-level headers
+    pub column_groups: Vec<ColumnGroup>,
+    pub header_levels: usize,            // Number of header rows (1 = normal, 2+ = grouped)
+    pub header_row_height: f32,          // Height of each header row
+
     // Column widths (in pixels)
     col_widths: Vec<f32>,
 
@@ -67,7 +101,7 @@ pub struct Grid {
 
     // Header dimensions
     pub row_header_width: f32,
-    pub col_header_height: f32,
+    pub col_header_height: f32,          // Total header height (calculated from header_levels * header_row_height)
     pub show_headers: bool,
 
     // Sort state
@@ -110,6 +144,9 @@ impl Grid {
             cols,
             cells: HashMap::new(),
             column_configs,
+            column_groups: Vec::new(),
+            header_levels: 1,
+            header_row_height: 30.0,
             col_widths: vec![default_col_width; cols],
             row_heights: vec![default_row_height; rows],
             default_col_width,
@@ -742,6 +779,42 @@ impl Grid {
         self.column_configs
             .iter()
             .position(|c| c.internal_name == name)
+    }
+
+    // ========== Column Group Management ==========
+
+    /// Add a column group for multi-level headers
+    pub fn add_column_group(&mut self, label: String, start_col: usize, end_col: usize, level: usize) {
+        let group = ColumnGroup::new(label, start_col, end_col, level);
+        self.column_groups.push(group);
+
+        // Update header levels if this group introduces a new level
+        let max_level = self.column_groups.iter().map(|g| g.level).max().unwrap_or(0);
+        self.header_levels = max_level + 2; // +1 for the level itself (0-indexed), +1 for the column headers row
+
+        // Update total header height
+        self.col_header_height = self.header_row_height * self.header_levels as f32;
+    }
+
+    /// Clear all column groups
+    pub fn clear_column_groups(&mut self) {
+        self.column_groups.clear();
+        self.header_levels = 1;
+        self.col_header_height = self.header_row_height;
+    }
+
+    /// Get column groups at a specific level
+    pub fn get_column_groups_at_level(&self, level: usize) -> Vec<&ColumnGroup> {
+        self.column_groups
+            .iter()
+            .filter(|g| g.level == level)
+            .collect()
+    }
+
+    /// Set header row height (affects total header height)
+    pub fn set_header_row_height(&mut self, height: f32) {
+        self.header_row_height = height;
+        self.col_header_height = self.header_row_height * self.header_levels as f32;
     }
 }
 

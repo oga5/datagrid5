@@ -21,6 +21,7 @@ All 137 features from the original C++ GridControl have been successfully ported
 - **🎨 Rich Styling**: Cell colors, fonts, borders, and custom styling API
 - **🔍 Advanced Search**: Text search, regex, find & replace, highlight matches
 - **📑 Sorting & Filtering**: Multi-column sort, custom filters, column-based filtering
+- **📊 Column Grouping**: Multi-level hierarchical headers for organized data display
 - **❄️ Frozen Panes**: Freeze rows and columns like Excel
 - **📋 Context Menus**: Right-click operations on rows (insert, delete, move, copy, cut)
 - **⚡ Worker Thread Support**: Background data processing for large datasets
@@ -110,6 +111,7 @@ python3 -m http.server 8080
 Open your browser and navigate to:
 - Main demo: http://localhost:8080/www/
 - Examples: http://localhost:8080/examples/
+- Column grouping: http://localhost:8080/examples/column-grouping-example.html
 - Editing example: http://localhost:8080/examples/editing-example.html
 - Full-screen example: http://localhost:8080/examples/full-screen-resize-example.html
 - Responsive example: http://localhost:8080/examples/responsive-resize-example.html
@@ -205,6 +207,40 @@ for (let row = 1; row <= 100; row++) {
 }
 ```
 
+### Column Grouping (Multi-level Headers)
+
+DataGrid5 supports multi-level hierarchical column headers, allowing you to group columns visually:
+
+```javascript
+// 2-level example: Group columns by region
+grid.add_column_group("Tokyo", 0, 3, 0);     // Columns 0-3 in Tokyo group
+grid.add_column_group("Osaka", 4, 9, 0);     // Columns 4-9 in Osaka group
+grid.add_column_group("Others", 10, 19, 0);  // Columns 10-19 in Others group
+
+// 3-level example: Region > City > Store
+grid.add_column_group("Kanto Region", 0, 7, 0);     // Top level
+grid.add_column_group("Kansai Region", 8, 15, 0);
+
+grid.add_column_group("Tokyo", 0, 3, 1);            // Second level
+grid.add_column_group("Kanagawa", 4, 7, 1);
+grid.add_column_group("Osaka", 8, 11, 1);
+grid.add_column_group("Kyoto", 12, 15, 1);
+
+// Adjust header row height if needed
+grid.set_header_row_height(35);  // Default is 30px
+
+// Clear all groups to revert to simple headers
+grid.clear_column_groups();
+```
+
+**Parameters:**
+- `label`: Group label text
+- `start_col`: First column index (0-based)
+- `end_col`: Last column index (0-based, inclusive)
+- `level`: Header level (0 = top, 1 = second, etc.)
+
+The grid automatically calculates total header height based on the number of levels.
+
 ## 🎨 Advanced Configuration
 
 ### Column Definitions with Data Types
@@ -270,6 +306,7 @@ The `examples/` directory contains comprehensive examples:
 
 - **[simple-usage.html](./examples/simple-usage.html)** - Basic grid setup and data loading
 - **[advanced-config-example.html](./examples/advanced-config-example.html)** - Column configuration and data types
+- **[column-grouping-example.html](./examples/column-grouping-example.html)** - Multi-level hierarchical column headers with grouping
 - **[editing-example.html](./examples/editing-example.html)** - Cell editing features with undo/redo and edit history
 - **[full-screen-resize-example.html](./examples/full-screen-resize-example.html)** - Browser-responsive grid that auto-resizes
 - **[responsive-resize-example.html](./examples/responsive-resize-example.html)** - Responsive layout example
