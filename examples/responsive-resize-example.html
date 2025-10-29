@@ -80,28 +80,31 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: relative;
             min-height: 0;
-            display: flex;
-            flex-direction: column;
+            overflow: hidden;
         }
 
         /* Virtual scroll container with native scrollbars */
         #scroll-container {
-            flex: 1;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             overflow: auto;
-            position: relative;
-            background: white;
-            min-height: 0;
+            z-index: 0;
+            pointer-events: auto;
         }
 
         /* Virtual content area (defines scrollable size) */
         #scroll-content {
             position: relative;
+            pointer-events: none;
         }
 
-        /* Stack canvases */
+        /* Stack canvases - fixed position, don't scroll */
         #webgl-canvas,
         #text-canvas {
-            position: sticky;
+            position: absolute;
             top: 0;
             left: 0;
             pointer-events: none;
@@ -114,12 +117,26 @@
         #text-canvas {
             z-index: 2;
             cursor: cell;
-            pointer-events: all;
+            pointer-events: all !important;
         }
 
         #text-canvas:focus {
             outline: 3px solid #2196F3;
             outline-offset: -3px;
+        }
+
+        /* Corner header (top-left intersection of row and column headers) */
+        #corner-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 60px; /* row header width */
+            height: 30px; /* col header height */
+            background: #e0e0e0;
+            border-right: 1px solid #cccccc;
+            border-bottom: 1px solid #cccccc;
+            z-index: 1;
+            pointer-events: none;
         }
 
         /* Cell editor */
@@ -217,11 +234,11 @@
     <div class="container">
         <div class="main-panel">
             <div class="grid-container">
+                <canvas id="webgl-canvas"></canvas>
+                <canvas id="text-canvas" tabindex="0"></canvas>
+                <div id="corner-header"></div>
                 <div id="scroll-container">
-                    <div id="scroll-content">
-                        <canvas id="webgl-canvas"></canvas>
-                        <canvas id="text-canvas" tabindex="0"></canvas>
-                    </div>
+                    <div id="scroll-content"></div>
                 </div>
                 <input type="text" id="cell-editor" style="display: none;" />
             </div>
@@ -247,11 +264,9 @@
     </div>
 
     <div class="controls">
-        <button onclick="loadSampleData()">Load Sample Data</button>
         <button onclick="toggleSidePanel()">Toggle Side Panel</button>
-        <button onclick="fillMoreData()">Fill More Data</button>
         <div id="info" class="info">
-            Grid will automatically resize when browser window changes
+            Grid displays Row1-Row100 with Column 1-26 headers. Auto-resizes when browser window changes.
         </div>
     </div>
 
@@ -281,6 +296,38 @@
             // Create grid
             grid = new DataGrid('webgl-canvas', 'text-canvas', 100, 26);
             window.grid = grid;
+
+            // Set custom column headers (Column 1, Column 2, etc.)
+            for (let col = 0; col < 26; col++) {
+                grid.set_column_name(col, `Column ${col + 1}`);
+            }
+
+            // Fill sample data (Row 1 to Row 100)
+            // Each row displays "Row N" in the first column, then "Data N-C" for other columns
+            for (let row = 0; row < 100; row++) {
+                for (let col = 0; col < 26; col++) {
+                    if (col === 0) {
+                        // First column shows row number
+                        grid.set_cell_value(row, col, `Row ${row + 1}`);
+                    } else {
+                        // Other columns show data
+                        grid.set_cell_value(row, col, `Data ${row + 1}-${col + 1}`);
+                    }
+                }
+            }
+
+            console.log('Data loaded. Cell(0,0):', grid.get_cell_value(0, 0));
+            console.log('Data loaded. Cell(0,1):', grid.get_cell_value(0, 1));
+
+            // Test if methods exist
+            console.log('Methods available:');
+            console.log('  handle_mouse_down_at:', typeof grid.handle_mouse_down_at);
+            console.log('  handle_mouse_up_at:', typeof grid.handle_mouse_up_at);
+            console.log('  check_resize_handle:', typeof grid.check_resize_handle);
+            console.log('  start_resize:', typeof grid.start_resize);
+
+            // Resize grid to match container
+            grid.resize(rect.width, rect.height);
 
             // Update size display
             updateSizeDisplay(rect.width, rect.height);
@@ -427,41 +474,59 @@
 
             // Mouse events
             canvas.addEventListener('mousedown', (e) => {
-                if (!grid) return;
+                console.log('===== MOUSEDOWN EVENT FIRED =====');
+                console.log('Event target:', e.target);
+                console.log('Canvas element:', canvas);
 
-                const x = e.offsetX;
-                const y = e.offsetY;
+                if (!grid) {
+                    console.log('Grid not initialized');
+                    return;
+                }
+
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                console.log('Mouse down at:', x, y);
+                console.log('Canvas rect:', rect);
 
                 // Check if clicking on resize handle
                 const resizeType = grid.check_resize_handle(x, y);
+                console.log('Resize type:', resizeType);
+
                 if (resizeType !== 'none') {
                     isResizingLocal = true;
-                    grid.start_resize(x, y, resizeType);
+                    const started = grid.start_resize(x, y, resizeType);
+                    console.log('Resize started:', started);
                     e.preventDefault();
                 } else {
-                    const shift = e.shiftKey;
-                    const ctrl = e.ctrlKey || e.metaKey;
-                    grid.handle_mouse_down_with_modifiers(e, shift, ctrl);
+                    console.log('Calling handle_mouse_down_at with x:', x, 'y:', y);
+                    grid.handle_mouse_down_at(x, y);
                 }
             });
 
             canvas.addEventListener('mouseup', (e) => {
                 if (!grid) return;
 
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
                 if (isResizingLocal) {
                     grid.end_resize();
                     isResizingLocal = false;
                     updateVirtualScrollSize();
                 } else {
-                    grid.handle_mouse_up(e);
+                    grid.handle_mouse_up_at(x, y);
                 }
             });
 
             canvas.addEventListener('mousemove', (e) => {
                 if (!grid) return;
 
-                const x = e.offsetX;
-                const y = e.offsetY;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
 
                 if (isResizingLocal) {
                     grid.update_resize(x, y);
@@ -474,25 +539,45 @@
                     } else {
                         canvas.style.cursor = 'cell';
                     }
-
-                    grid.handle_mouse_move(e);
                 }
             });
 
             canvas.addEventListener('mouseleave', (e) => {
                 if (!grid) return;
 
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
                 if (isResizingLocal) {
                     grid.end_resize();
                     isResizingLocal = false;
                 }
-                grid.handle_mouse_up(e);
+                grid.handle_mouse_up_at(x, y);
                 canvas.style.cursor = 'cell';
             });
 
             // Keyboard events
             window.addEventListener('keydown', async (e) => {
                 if (!grid) return;
+
+                // F2 - Start editing current cell
+                if (e.key === 'F2' && !grid.is_editing()) {
+                    e.preventDefault();
+                    const selectionStr = grid.get_selected_cells();
+                    if (selectionStr) {
+                        try {
+                            const selection = JSON.parse(selectionStr);
+                            if (selection.length > 0) {
+                                const [row, col] = selection[0];
+                                startCellEdit(row, col);
+                            }
+                        } catch (err) {
+                            console.error('Failed to start edit:', err);
+                        }
+                    }
+                    return;
+                }
 
                 // Copy
                 if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
@@ -543,6 +628,20 @@
             canvas.addEventListener('click', () => {
                 canvas.focus();
             });
+
+            // Mouse wheel scrolling
+            canvas.addEventListener('wheel', (e) => {
+                if (!grid) return;
+
+                const scrollContainer = document.getElementById('scroll-container');
+
+                // Prevent default page scroll
+                e.preventDefault();
+
+                // Apply scroll to container
+                scrollContainer.scrollLeft += e.deltaX;
+                scrollContainer.scrollTop += e.deltaY;
+            }, { passive: false });
 
             // Double-click to edit
             canvas.addEventListener('dblclick', (e) => {
@@ -635,86 +734,6 @@
             });
         }
 
-        window.loadSampleData = function() {
-            if (!grid) return;
-
-            // Define column headers
-            const columnHeaders = [
-                "Employee ID", "Full Name", "Email Address", "Age", "City",
-                "Department", "Salary", "Performance Score", "Status", "Hire Date",
-                "Manager", "Team", "Phone", "Projects"
-            ];
-
-            // Set column headers with styling
-            for (let col = 0; col < columnHeaders.length; col++) {
-                grid.update_cell_value(0, col, columnHeaders[col]);
-
-                // Style header row
-                grid.set_cell_bg_color(0, col, 0x2196F3FF); // Blue background
-                grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White text
-                grid.set_cell_font_style(0, col, true, false); // Bold
-            }
-
-            // Fill sample data
-            const names = ["Alice Johnson", "Bob Williams", "Charlie Davis", "Diana Miller", "Emma Wilson", "Frank Brown", "Grace Taylor", "Henry Anderson"];
-            const cities = ["Tokyo", "New York", "London", "Paris", "Sydney", "Berlin", "Toronto", "Singapore"];
-            const departments = ["Engineering", "Sales", "Marketing", "HR", "Finance", "Operations"];
-            const statuses = ["Active", "On Leave", "Remote"];
-            const teams = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"];
-
-            // Data rows
-            for (let row = 1; row <= 30; row++) {
-                const nameIdx = (row - 1) % names.length;
-                const name = names[nameIdx];
-
-                grid.update_cell_value(row, 0, `EMP${1000 + row}`);
-                grid.update_cell_value(row, 1, name);
-                grid.update_cell_value(row, 2, `${name.toLowerCase().replace(' ', '.')}@company.com`);
-                grid.update_cell_value(row, 3, String(25 + (row % 35)));
-                grid.update_cell_value(row, 4, cities[row % cities.length]);
-                grid.update_cell_value(row, 5, departments[row % departments.length]);
-                grid.update_cell_value(row, 6, `$${50000 + row * 1000}`);
-                grid.update_cell_value(row, 7, String(Math.round(60 + Math.random() * 40)));
-                grid.update_cell_value(row, 8, statuses[row % statuses.length]);
-                grid.update_cell_value(row, 9, `202${row % 4}-0${1 + (row % 9)}-01`);
-                grid.update_cell_value(row, 10, names[(nameIdx + 2) % names.length]);
-                grid.update_cell_value(row, 11, teams[row % teams.length]);
-                grid.update_cell_value(row, 12, `+1-555-${1000 + row}`);
-                grid.update_cell_value(row, 13, String(row % 8));
-            }
-
-            document.getElementById('info').textContent = 'Loaded 30 rows of sample data with custom column headers';
-        };
-
-        window.fillMoreData = function() {
-            if (!grid) return;
-
-            // Define extended column headers
-            const columnHeaders = [
-                "ID", "Name", "Email", "Age", "City", "Department", "Salary", "Status",
-                "Country", "Phone", "Manager", "Team", "Projects", "Rating", "Experience",
-                "Education", "Skills", "Certifications", "Languages", "Availability"
-            ];
-
-            // Set column headers with styling
-            for (let col = 0; col < columnHeaders.length; col++) {
-                grid.update_cell_value(0, col, columnHeaders[col]);
-
-                // Style header row
-                grid.set_cell_bg_color(0, col, 0x2196F3FF); // Blue background
-                grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White text
-                grid.set_cell_font_style(0, col, true, false); // Bold
-            }
-
-            // Fill data rows
-            for (let row = 1; row < 50; row++) {
-                for (let col = 0; col < columnHeaders.length; col++) {
-                    grid.update_cell_value(row, col, `R${row}C${col}`);
-                }
-            }
-
-            document.getElementById('info').textContent = 'Filled 50 rows × 20 columns with custom headers';
-        };
 
         window.toggleSidePanel = function() {
             const sidePanel = document.querySelector('.side-panel');

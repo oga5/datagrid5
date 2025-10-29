@@ -219,21 +219,30 @@
             right: 0;
             bottom: 0;
             overflow: auto;
+            z-index: 3;
         }
 
         #scroll-content {
             position: relative;
+            pointer-events: none;
         }
 
         #webgl-canvas, #text-canvas {
-            position: sticky;
+            position: absolute;
             top: 0;
             left: 0;
             display: block;
+            pointer-events: none;
+        }
+
+        #webgl-canvas {
+            z-index: 1;
         }
 
         #text-canvas {
+            z-index: 2;
             cursor: cell;
+            pointer-events: all;
         }
 
         .status-bar {
@@ -365,11 +374,10 @@
     </div>
 
     <div class="grid-container">
+        <canvas id="webgl-canvas"></canvas>
+        <canvas id="text-canvas" tabindex="0"></canvas>
         <div id="scroll-container">
-            <div id="scroll-content">
-                <canvas id="webgl-canvas"></canvas>
-                <canvas id="text-canvas" tabindex="0"></canvas>
-            </div>
+            <div id="scroll-content"></div>
         </div>
     </div>
 
@@ -416,18 +424,28 @@
             const width = Math.floor(containerRect.width);
             const height = Math.floor(containerRect.height);
 
-            // Create grid: 11 rows (1 header + 10 stores) x 36 columns (12 months × 3 metrics)
-            grid = new DataGrid(webglCanvas, textCanvas, 11, 36, width, height);
-
+            // Set canvas dimensions before creating grid
             webglCanvas.width = width;
             webglCanvas.height = height;
             textCanvas.width = width;
             textCanvas.height = height;
 
+            // Create grid: 11 rows (1 header + 10 stores) x 36 columns (12 months × 3 metrics)
+            grid = new DataGrid('webgl-canvas', 'text-canvas', 11, 36);
+
             setupEventHandlers();
             setupVirtualScroll();
 
+            // Start render loop
+            renderLoop();
+
             console.log('Sales analysis grid initialized');
+        }
+
+        function renderLoop() {
+            if (!grid) return;
+            grid.render();
+            requestAnimationFrame(renderLoop);
         }
 
         function setupEventHandlers() {
@@ -600,10 +618,9 @@
             const data = generateSalesData(quarters);
             currentData = data;
 
-            // Set store names
-            stores.forEach((store, idx) => {
-                grid.update_cell_value(idx + 1, -1, store); // Row header (if visible)
-            });
+            // Note: Store names would be displayed in row headers
+            // But DataGrid5 handles row headers automatically (row numbers)
+            // Store names are in the data but not displayed in row headers
 
             // Fill data
             let totalSales = 0;

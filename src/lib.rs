@@ -309,7 +309,6 @@ impl DataGrid {
         let canvas_height = webgl_canvas.height() as f32;
 
         let mut grid = Grid::new(rows, cols);
-        grid.fill_sample_data();
 
         let mut viewport = Viewport::new(canvas_width, canvas_height);
         viewport.update_visible_range(&grid);
@@ -456,8 +455,48 @@ impl DataGrid {
         self.handle_mouse_down_with_modifiers(event, false, false);
     }
 
+    /// Handle mouse down at specific coordinates
+    pub fn handle_mouse_down_at(&mut self, x: f32, y: f32) {
+        web_sys::console::log_1(&format!("handle_mouse_down_at called: x={}, y={}", x, y).into());
+
+        // Check if clicked on column header (for sorting)
+        if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
+            web_sys::console::log_1(&format!("Clicked column header: {}", col).into());
+            self.toggle_column_sort(col);
+            return;
+        }
+
+        // Check if clicked on row header (already handled for row selection)
+        if let Some(row) = self.viewport.canvas_to_row_header(x, y, &self.grid) {
+            web_sys::console::log_1(&format!("Clicked row header: {}", row).into());
+            // Row header click - select entire row
+            self.select_row(row);
+            return;
+        }
+
+        // Check if clicked on a cell
+        if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
+            web_sys::console::log_1(&format!("Clicked cell: ({}, {})", row, col).into());
+            // Normal click: Single selection and start drag selection
+            self.select_single_cell(row, col);
+            self.mouse_handler.start_selection(x, y);
+            self.mouse_handler.select_cell(row, col);
+            web_sys::console::log_1(&format!("Selected {} cells", self.selected_cells.len()).into());
+        } else {
+            web_sys::console::log_1(&"No cell found at coordinates".into());
+            // Clicked outside grid, clear selection
+            self.clear_selection();
+            self.mouse_handler.selected_cell = None;
+        }
+    }
+
     /// Handle mouse up event
     pub fn handle_mouse_up(&mut self, _event: MouseEvent) {
+        self.mouse_handler.mouse_up();
+    }
+
+    /// Handle mouse up at specific coordinates
+    pub fn handle_mouse_up_at(&mut self, _x: f32, _y: f32) {
         self.mouse_handler.mouse_up();
     }
 
@@ -1183,8 +1222,9 @@ impl DataGrid {
 
     /// Get cell position for editing (returns canvas coordinates)
     pub fn get_cell_edit_rect(&self, row: usize, col: usize) -> Vec<f32> {
-        let x = self.grid.col_x_position(col) - self.viewport.scroll_x;
-        let y = self.grid.row_y_position(row) - self.viewport.scroll_y;
+        // Account for header offsets
+        let x = self.grid.row_header_width + self.grid.col_x_position(col) - self.viewport.scroll_x;
+        let y = self.grid.col_header_height + self.grid.row_y_position(row) - self.viewport.scroll_y;
         let width = self.grid.col_width(col);
         let height = self.grid.row_height(row);
 
@@ -1214,27 +1254,31 @@ impl DataGrid {
         let grid_x = x + self.viewport.scroll_x;
         let grid_y = y + self.viewport.scroll_y;
 
-        // Check column resize handles
-        let mut col_x = 0.0;
-        for col in 0..self.grid.col_count() {
-            let width = self.grid.col_width(col);
-            col_x += width;
+        // Column resize: only detect in column header area
+        if y < self.grid.col_header_height {
+            let mut col_x = self.grid.row_header_width;
+            for col in 0..self.grid.col_count() {
+                let width = self.grid.col_width(col);
+                col_x += width;
 
-            // Check if near right edge of column
-            if (grid_x - col_x).abs() < RESIZE_HANDLE_WIDTH {
-                return "col".to_string();
+                // Check if near right edge of column
+                if (x - col_x).abs() < RESIZE_HANDLE_WIDTH {
+                    return "col".to_string();
+                }
             }
         }
 
-        // Check row resize handles
-        let mut row_y = 0.0;
-        for row in 0..self.grid.row_count() {
-            let height = self.grid.row_height(row);
-            row_y += height;
+        // Row resize: only detect in row header area
+        if x < self.grid.row_header_width {
+            let mut row_y = self.grid.col_header_height;
+            for row in 0..self.grid.row_count() {
+                let height = self.grid.row_height(row);
+                row_y += height;
 
-            // Check if near bottom edge of row
-            if (grid_y - row_y).abs() < RESIZE_HANDLE_WIDTH {
-                return "row".to_string();
+                // Check if near bottom edge of row
+                if (y - row_y).abs() < RESIZE_HANDLE_WIDTH {
+                    return "row".to_string();
+                }
             }
         }
 
@@ -1245,17 +1289,14 @@ impl DataGrid {
     pub fn start_resize(&mut self, x: f32, y: f32, resize_type: &str) -> bool {
         const RESIZE_HANDLE_WIDTH: f32 = 5.0;
 
-        let grid_x = x + self.viewport.scroll_x;
-        let grid_y = y + self.viewport.scroll_y;
-
         if resize_type == "col" {
-            // Find which column to resize
-            let mut col_x = 0.0;
+            // Column resize: find which column in header area
+            let mut col_x = self.grid.row_header_width;
             for col in 0..self.grid.col_count() {
                 let width = self.grid.col_width(col);
                 col_x += width;
 
-                if (grid_x - col_x).abs() < RESIZE_HANDLE_WIDTH {
+                if (x - col_x).abs() < RESIZE_HANDLE_WIDTH {
                     self.is_resizing = true;
                     self.resizing_column = Some(col);
                     self.resize_start_pos = x;
@@ -1265,13 +1306,13 @@ impl DataGrid {
                 }
             }
         } else if resize_type == "row" {
-            // Find which row to resize
-            let mut row_y = 0.0;
+            // Row resize: find which row in header area
+            let mut row_y = self.grid.col_header_height;
             for row in 0..self.grid.row_count() {
                 let height = self.grid.row_height(row);
                 row_y += height;
 
-                if (grid_y - row_y).abs() < RESIZE_HANDLE_WIDTH {
+                if (y - row_y).abs() < RESIZE_HANDLE_WIDTH {
                     self.is_resizing = true;
                     self.resizing_row = Some(row);
                     self.resize_start_pos = y;
@@ -1878,6 +1919,15 @@ impl DataGrid {
             .join(","))
     }
 
+    /// Set column header name
+    /// @param col - Column index (0-based)
+    /// @param name - Header name to display
+    pub fn set_column_name(&mut self, col: usize, name: &str) {
+        if col < self.grid.column_configs.len() {
+            self.grid.column_configs[col].display_name = name.to_string();
+        }
+    }
+
     /// Insert a row at the specified position
     pub fn insert_row(&mut self, at_index: usize) {
         // Record action for undo (insert is opposite of delete, so we store as DeleteRow)
@@ -2453,9 +2503,19 @@ impl DataGrid {
         self.grid.frozen_rows
     }
 
+    /// Set frozen row count
+    pub fn set_frozen_rows(&mut self, count: usize) {
+        self.grid.frozen_rows = count;
+    }
+
     /// Get frozen column count
     pub fn get_frozen_cols(&self) -> usize {
         self.grid.frozen_cols
+    }
+
+    /// Set frozen column count
+    pub fn set_frozen_cols(&mut self, count: usize) {
+        self.grid.frozen_cols = count;
     }
 
     /// Undo last edit action

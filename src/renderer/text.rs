@@ -295,11 +295,35 @@ impl TextRenderer {
         // Save canvas state and set up clipping region
         self.context.save();
         self.context.begin_path();
-        self.context.rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
-        self.context.clip();
 
-        // Draw text within clipping region
-        let _ = self.context.fill_text(&text, text_x as f64, text_y as f64);
+        // Calculate clipping region, avoiding header areas
+        // For non-frozen columns, ensure text doesn't render over the row header area
+        let clip_x = if !is_frozen_col {
+            canvas_x.max(header_offset_x)
+        } else {
+            canvas_x
+        };
+
+        // For non-frozen rows, ensure text doesn't render over the column header area
+        let clip_y = if !is_frozen_row {
+            canvas_y.max(header_offset_y)
+        } else {
+            canvas_y
+        };
+
+        let clip_right = (canvas_x + width).min(viewport.canvas_width);
+        let clip_bottom = (canvas_y + height).min(viewport.canvas_height);
+        let clip_width = clip_right - clip_x;
+        let clip_height = clip_bottom - clip_y;
+
+        // Only draw if there's visible area
+        if clip_width > 0.0 && clip_height > 0.0 {
+            self.context.rect(clip_x as f64, clip_y as f64, clip_width as f64, clip_height as f64);
+            self.context.clip();
+
+            // Draw text within clipping region
+            let _ = self.context.fill_text(&text, text_x as f64, text_y as f64);
+        }
 
         // Restore canvas state (removes clipping)
         self.context.restore();
@@ -467,18 +491,29 @@ impl TextRenderer {
         // Save context for clipping
         let _ = self.context.save();
 
-        // Set clipping region to cell bounds
-        self.context.begin_path();
-        self.context.rect(
-            canvas_x as f64,
-            canvas_y as f64,
-            width as f64,
-            height as f64,
-        );
-        self.context.clip();
+        // Calculate clipping region, avoiding header areas
+        let clip_x = canvas_x.max(header_offset_x);
+        let clip_y = canvas_y.max(header_offset_y);
+        let clip_right = (canvas_x + width).min(viewport.canvas_width);
+        let clip_bottom = (canvas_y + height).min(viewport.canvas_height);
+        let clip_width = clip_right - clip_x;
+        let clip_height = clip_bottom - clip_y;
 
-        // Draw text
-        let _ = self.context.fill_text(&text, text_x as f64, text_y as f64);
+        // Only draw if there's visible area
+        if clip_width > 0.0 && clip_height > 0.0 {
+            // Set clipping region to cell bounds (avoiding headers)
+            self.context.begin_path();
+            self.context.rect(
+                clip_x as f64,
+                clip_y as f64,
+                clip_width as f64,
+                clip_height as f64,
+            );
+            self.context.clip();
+
+            // Draw text
+            let _ = self.context.fill_text(&text, text_x as f64, text_y as f64);
+        }
 
         // Restore context (also restores font)
         let _ = self.context.restore();
@@ -629,8 +664,12 @@ impl TextRenderer {
                 col_header_height as f64,
             );
 
-            // Draw column name (A, B, C, ...)
-            let col_name = Grid::get_col_name(col);
+            // Draw column name from column config (custom name or default A, B, C, ...)
+            let col_name = if col < grid.column_configs.len() {
+                grid.column_configs[col].display_name.clone()
+            } else {
+                Grid::get_col_name(col)
+            };
 
             // Add sort indicator if this column is sorted
             let display_text = if grid.sort_column == Some(col) {

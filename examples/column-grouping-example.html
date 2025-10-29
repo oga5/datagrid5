@@ -131,21 +131,30 @@
             right: 0;
             bottom: 0;
             overflow: auto;
+            z-index: 3;
         }
 
         #scroll-content {
             position: relative;
+            pointer-events: none;
         }
 
         #webgl-canvas, #text-canvas {
-            position: sticky;
+            position: absolute;
             top: 0;
             left: 0;
             display: block;
+            pointer-events: none;
+        }
+
+        #webgl-canvas {
+            z-index: 1;
         }
 
         #text-canvas {
+            z-index: 2;
             cursor: cell;
+            pointer-events: all;
         }
 
         .status-bar {
@@ -217,11 +226,10 @@
     </div>
 
     <div class="grid-container">
+        <canvas id="webgl-canvas"></canvas>
+        <canvas id="text-canvas" tabindex="0"></canvas>
         <div id="scroll-container">
-            <div id="scroll-content">
-                <canvas id="webgl-canvas"></canvas>
-                <canvas id="text-canvas" tabindex="0"></canvas>
-            </div>
+            <div id="scroll-content"></div>
         </div>
     </div>
 
@@ -258,23 +266,32 @@
             const width = Math.floor(containerRect.width);
             const height = Math.floor(containerRect.height);
 
-            // Create grid (50 rows x 20 columns for grouping demo)
-            grid = new DataGrid(webglCanvas, textCanvas, 50, 20, width, height);
-
             // Setup canvases
             webglCanvas.width = width;
             webglCanvas.height = height;
             textCanvas.width = width;
             textCanvas.height = height;
 
+            // Create grid (50 rows x 20 columns for grouping demo)
+            grid = new DataGrid('webgl-canvas', 'text-canvas', 50, 20);
+
             // Setup event handlers
             setupEventHandlers();
             setupVirtualScroll();
+
+            // Start render loop
+            renderLoop();
 
             // Load initial data
             loadSimpleData();
 
             console.log('Grid initialized for column grouping demo');
+        }
+
+        function renderLoop() {
+            if (!grid) return;
+            grid.render();
+            requestAnimationFrame(renderLoop);
         }
 
         function setupEventHandlers() {
