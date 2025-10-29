@@ -623,16 +623,52 @@
             document.getElementById('fill-data-btn').addEventListener('click', () => {
                 if (!grid) return;
 
-                for (let row = 0; row < 30; row++) {
-                    for (let col = 0; col < 15; col++) {
-                        if (row === 0) {
-                            grid.update_cell_value(row, col, `Column ${col + 1}`);
-                        } else {
-                            grid.update_cell_value(row, col, `R${row}C${col}`);
-                        }
-                    }
+                // Define column headers
+                const columnHeaders = [
+                    "ID", "Employee Name", "Email Address", "Age", "Department",
+                    "City", "Country", "Salary", "Start Date", "Status",
+                    "Phone", "Manager", "Team", "Active Projects", "Performance Rating"
+                ];
+
+                // Set column headers with styling
+                for (let col = 0; col < columnHeaders.length; col++) {
+                    grid.update_cell_value(0, col, columnHeaders[col]);
+
+                    // Style header row
+                    grid.set_cell_bg_color(0, col, 0x667eeaFF); // Purple-blue background
+                    grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White text
+                    grid.set_cell_font_style(0, col, true, false); // Bold
                 }
-                console.log('Filled sample data');
+
+                // Fill sample data
+                const names = ["Alice Johnson", "Bob Smith", "Charlie Brown", "Diana Prince", "Emma Watson"];
+                const departments = ["Engineering", "Sales", "Marketing", "HR", "Finance"];
+                const cities = ["Tokyo", "New York", "London", "Paris", "Sydney"];
+                const countries = ["Japan", "USA", "UK", "France", "Australia"];
+                const statuses = ["Active", "On Leave", "Remote", "In Office"];
+
+                for (let row = 1; row <= 25; row++) {
+                    const nameIdx = (row - 1) % names.length;
+                    const name = names[nameIdx];
+
+                    grid.update_cell_value(row, 0, String(1000 + row));
+                    grid.update_cell_value(row, 1, name);
+                    grid.update_cell_value(row, 2, `${name.toLowerCase().replace(' ', '.')}@company.com`);
+                    grid.update_cell_value(row, 3, String(25 + (row % 35)));
+                    grid.update_cell_value(row, 4, departments[row % departments.length]);
+                    grid.update_cell_value(row, 5, cities[row % cities.length]);
+                    grid.update_cell_value(row, 6, countries[row % countries.length]);
+                    grid.update_cell_value(row, 7, `$${45000 + row * 1500}`);
+                    grid.update_cell_value(row, 8, `202${row % 4}-0${1 + (row % 9)}-15`);
+                    grid.update_cell_value(row, 9, statuses[row % statuses.length]);
+                    grid.update_cell_value(row, 10, `+1-555-${1000 + row}`);
+                    grid.update_cell_value(row, 11, names[(nameIdx + 1) % names.length]);
+                    grid.update_cell_value(row, 12, `Team ${(row % 5) + 1}`);
+                    grid.update_cell_value(row, 13, String(row % 10));
+                    grid.update_cell_value(row, 14, `${3.5 + (row % 15) / 10}`);
+                }
+
+                console.log('Filled sample data with custom column headers');
             });
 
             // Fullscreen toggle

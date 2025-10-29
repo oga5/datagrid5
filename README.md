@@ -170,6 +170,40 @@ Open your browser and navigate to:
 </html>
 ```
 
+### Custom Column Headers
+
+You can customize column headers by setting values in row 0 and applying styling:
+
+```javascript
+// Define custom column headers
+const columnHeaders = [
+    "Employee ID", "Full Name", "Email Address", "Department",
+    "Salary", "Start Date", "Status", "Manager"
+];
+
+// Set headers with styling
+for (let col = 0; col < columnHeaders.length; col++) {
+    grid.update_cell_value(0, col, columnHeaders[col]);
+
+    // Style header row
+    grid.set_cell_bg_color(0, col, 0x667eeaFF);  // Blue background
+    grid.set_cell_fg_color(0, col, 0xFFFFFFFF);  // White text
+    grid.set_cell_font_style(0, col, true, false);  // Bold
+}
+
+// Fill data rows
+for (let row = 1; row <= 100; row++) {
+    grid.update_cell_value(row, 0, `EMP${1000 + row}`);
+    grid.update_cell_value(row, 1, `Employee ${row}`);
+    grid.update_cell_value(row, 2, `employee${row}@company.com`);
+    grid.update_cell_value(row, 3, "Engineering");
+    grid.update_cell_value(row, 4, `$${50000 + row * 1000}`);
+    grid.update_cell_value(row, 5, "2020-01-15");
+    grid.update_cell_value(row, 6, "Active");
+    grid.update_cell_value(row, 7, "Manager Name");
+}
+```
+
 ## 🎨 Advanced Configuration
 
 ### Column Definitions with Data Types

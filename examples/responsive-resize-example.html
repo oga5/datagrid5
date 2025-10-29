@@ -638,45 +638,82 @@
         window.loadSampleData = function() {
             if (!grid) return;
 
-            const data = [];
-            const names = ["Alice", "Bob", "Charlie", "David", "Emma", "Frank", "Grace", "Henry"];
-            const cities = ["Tokyo", "New York", "London", "Paris", "Sydney", "Berlin", "Toronto"];
+            // Define column headers
+            const columnHeaders = [
+                "Employee ID", "Full Name", "Email Address", "Age", "City",
+                "Department", "Salary", "Performance Score", "Status", "Hire Date",
+                "Manager", "Team", "Phone", "Projects"
+            ];
 
-            // Header row
-            const headers = ["ID", "Name", "Email", "Age", "City", "Score", "Status"];
-            for (let col = 0; col < headers.length; col++) {
-                grid.update_cell_value(0, col, headers[col]);
+            // Set column headers with styling
+            for (let col = 0; col < columnHeaders.length; col++) {
+                grid.update_cell_value(0, col, columnHeaders[col]);
+
+                // Style header row
+                grid.set_cell_bg_color(0, col, 0x2196F3FF); // Blue background
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White text
+                grid.set_cell_font_style(0, col, true, false); // Bold
             }
+
+            // Fill sample data
+            const names = ["Alice Johnson", "Bob Williams", "Charlie Davis", "Diana Miller", "Emma Wilson", "Frank Brown", "Grace Taylor", "Henry Anderson"];
+            const cities = ["Tokyo", "New York", "London", "Paris", "Sydney", "Berlin", "Toronto", "Singapore"];
+            const departments = ["Engineering", "Sales", "Marketing", "HR", "Finance", "Operations"];
+            const statuses = ["Active", "On Leave", "Remote"];
+            const teams = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon"];
 
             // Data rows
             for (let row = 1; row <= 30; row++) {
-                const name = names[row % names.length];
-                grid.update_cell_value(row, 0, String(1000 + row));
-                grid.update_cell_value(row, 1, `${name} ${row}`);
-                grid.update_cell_value(row, 2, `${name.toLowerCase()}${row}@example.com`);
-                grid.update_cell_value(row, 3, String(20 + (row % 50)));
+                const nameIdx = (row - 1) % names.length;
+                const name = names[nameIdx];
+
+                grid.update_cell_value(row, 0, `EMP${1000 + row}`);
+                grid.update_cell_value(row, 1, name);
+                grid.update_cell_value(row, 2, `${name.toLowerCase().replace(' ', '.')}@company.com`);
+                grid.update_cell_value(row, 3, String(25 + (row % 35)));
                 grid.update_cell_value(row, 4, cities[row % cities.length]);
-                grid.update_cell_value(row, 5, String(Math.round(50 + Math.random() * 50)));
-                grid.update_cell_value(row, 6, row % 3 === 0 ? "Active" : "Pending");
+                grid.update_cell_value(row, 5, departments[row % departments.length]);
+                grid.update_cell_value(row, 6, `$${50000 + row * 1000}`);
+                grid.update_cell_value(row, 7, String(Math.round(60 + Math.random() * 40)));
+                grid.update_cell_value(row, 8, statuses[row % statuses.length]);
+                grid.update_cell_value(row, 9, `202${row % 4}-0${1 + (row % 9)}-01`);
+                grid.update_cell_value(row, 10, names[(nameIdx + 2) % names.length]);
+                grid.update_cell_value(row, 11, teams[row % teams.length]);
+                grid.update_cell_value(row, 12, `+1-555-${1000 + row}`);
+                grid.update_cell_value(row, 13, String(row % 8));
             }
 
-            document.getElementById('info').textContent = 'Loaded 30 rows of sample data';
+            document.getElementById('info').textContent = 'Loaded 30 rows of sample data with custom column headers';
         };
 
         window.fillMoreData = function() {
             if (!grid) return;
 
-            for (let row = 0; row < 50; row++) {
-                for (let col = 0; col < 20; col++) {
-                    if (row === 0) {
-                        grid.update_cell_value(row, col, `Col ${col + 1}`);
-                    } else {
-                        grid.update_cell_value(row, col, `R${row}C${col}`);
-                    }
+            // Define extended column headers
+            const columnHeaders = [
+                "ID", "Name", "Email", "Age", "City", "Department", "Salary", "Status",
+                "Country", "Phone", "Manager", "Team", "Projects", "Rating", "Experience",
+                "Education", "Skills", "Certifications", "Languages", "Availability"
+            ];
+
+            // Set column headers with styling
+            for (let col = 0; col < columnHeaders.length; col++) {
+                grid.update_cell_value(0, col, columnHeaders[col]);
+
+                // Style header row
+                grid.set_cell_bg_color(0, col, 0x2196F3FF); // Blue background
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White text
+                grid.set_cell_font_style(0, col, true, false); // Bold
+            }
+
+            // Fill data rows
+            for (let row = 1; row < 50; row++) {
+                for (let col = 0; col < columnHeaders.length; col++) {
+                    grid.update_cell_value(row, col, `R${row}C${col}`);
                 }
             }
 
-            document.getElementById('info').textContent = 'Filled 50 rows × 20 columns with data';
+            document.getElementById('info').textContent = 'Filled 50 rows × 20 columns with custom headers';
         };
 
         window.toggleSidePanel = function() {

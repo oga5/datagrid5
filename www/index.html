@@ -597,7 +597,48 @@
 
             // Fill data button (placeholder for now)
             document.getElementById('fill-data-btn').addEventListener('click', () => {
-                console.log('Fill data functionality coming soon');
+                if (!grid) return;
+
+                // Define column headers
+                const columnHeaders = [
+                    "ID", "Name", "Email", "Age", "Department",
+                    "City", "Country", "Salary", "Start Date", "Status",
+                    "Phone", "Manager", "Team", "Projects", "Rating"
+                ];
+
+                // Set column headers (row 0)
+                for (let col = 0; col < Math.min(columnHeaders.length, 50); col++) {
+                    grid.update_cell_value(0, col, columnHeaders[col] || `Column ${col + 1}`);
+
+                    // Style header row
+                    grid.set_cell_bg_color(0, col, 0x667eeaFF); // Blue background
+                    grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White text
+                    grid.set_cell_font_style(0, col, true, false); // Bold
+                }
+
+                // Fill sample data
+                const sampleNames = ["Alice Johnson", "Bob Smith", "Charlie Brown", "Diana Prince", "Emma Wilson"];
+                const departments = ["Engineering", "Sales", "Marketing", "HR", "Finance"];
+                const cities = ["Tokyo", "New York", "London", "Paris", "Sydney"];
+                const countries = ["Japan", "USA", "UK", "France", "Australia"];
+                const statuses = ["Active", "On Leave", "Remote", "In Office"];
+
+                for (let row = 1; row <= 20; row++) {
+                    const nameIdx = (row - 1) % sampleNames.length;
+
+                    grid.update_cell_value(row, 0, String(1000 + row)); // ID
+                    grid.update_cell_value(row, 1, sampleNames[nameIdx]); // Name
+                    grid.update_cell_value(row, 2, `${sampleNames[nameIdx].toLowerCase().replace(' ', '.')}@company.com`); // Email
+                    grid.update_cell_value(row, 3, String(25 + (row % 30))); // Age
+                    grid.update_cell_value(row, 4, departments[row % departments.length]); // Department
+                    grid.update_cell_value(row, 5, cities[row % cities.length]); // City
+                    grid.update_cell_value(row, 6, countries[row % countries.length]); // Country
+                    grid.update_cell_value(row, 7, `$${50000 + row * 1000}`); // Salary
+                    grid.update_cell_value(row, 8, `2020-0${1 + (row % 9)}-15`); // Start Date
+                    grid.update_cell_value(row, 9, statuses[row % statuses.length]); // Status
+                }
+
+                console.log('Filled sample data with custom column headers');
             });
 
             // Test cell colors button
