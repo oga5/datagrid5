@@ -1,4 +1,5 @@
 mod core;
+mod features;
 mod input;
 mod renderer;
 
@@ -8,58 +9,12 @@ use wasm_bindgen::JsCast;
 use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
 
 use core::{cell::CellBorder, Cell, CellValue, ColumnConfig, DataType, Grid, Viewport};
+use features::{
+    clipboard::ClipboardOps, editing::EditingState, resize::ResizeState, search::SearchState,
+    selection::SelectionState, undo_redo::UndoRedoState, EditAction, CellStyle,
+};
 use input::{KeyboardHandler, MouseHandler, NavigationCommand};
 use renderer::{TextRenderer, WebGLRenderer};
-
-/// Cell style information for undo/redo
-#[derive(Clone, Debug)]
-struct CellStyle {
-    bg_color: Option<u32>,
-    fg_color: Option<u32>,
-    font_bold: bool,
-    font_italic: bool,
-}
-
-/// Action that can be undone/redone
-#[derive(Clone)]
-enum EditAction {
-    SetValue {
-        row: usize,
-        col: usize,
-        old_value: CellValue,
-        new_value: CellValue,
-    },
-    InsertRow {
-        index: usize,
-        // Store all cells in the row before deletion (for redo of delete)
-        cells: Vec<(usize, Cell)>, // (col, cell)
-    },
-    DeleteRow {
-        index: usize,
-        // Store all cells in the row for undo
-        cells: Vec<(usize, Cell)>, // (col, cell)
-    },
-    InsertColumn {
-        index: usize,
-        // Store all cells in the column before deletion (for redo of delete)
-        cells: Vec<(usize, Cell)>, // (row, cell)
-    },
-    DeleteColumn {
-        index: usize,
-        // Store all cells in the column for undo
-        cells: Vec<(usize, Cell)>, // (row, cell)
-    },
-    DeleteRows {
-        // Store multiple rows for bulk deletion undo
-        rows: Vec<(usize, Vec<(usize, Cell)>)>, // (row_index, cells)
-    },
-    SetStyle {
-        row: usize,
-        col: usize,
-        old_style: CellStyle,
-        new_style: CellStyle,
-    },
-}
 
 // Use wee_alloc as the global allocator for smaller WASM size
 #[global_allocator]
@@ -76,26 +31,12 @@ pub struct DataGrid {
     keyboard_handler: KeyboardHandler,
     webgl_canvas: HtmlCanvasElement,
     text_canvas: HtmlCanvasElement,
-    is_editing: bool,
-    editing_cell: Option<(usize, usize)>,
-    // Resize state
-    is_resizing: bool,
-    resizing_column: Option<usize>,
-    resizing_row: Option<usize>,
-    resize_start_pos: f32,
-    resize_start_size: f32,
-    // Multi-selection state
-    selected_cells: HashSet<(usize, usize)>,
-    selection_anchor: Option<(usize, usize)>,
-    // Search state
-    search_query: String,
-    search_results: Vec<(usize, usize)>,
-    current_search_index: Option<usize>,
-    search_case_sensitive: bool,
-    search_whole_word: bool,
-    // Undo/Redo state
-    undo_stack: Vec<EditAction>,
-    redo_stack: Vec<EditAction>,
+    // Feature modules
+    editing: EditingState,
+    selection: SelectionState,
+    resize: ResizeState,
+    search: SearchState,
+    undo_redo: UndoRedoState,
     // Performance monitoring
     fps_samples: Vec<f64>,      // Store last N frame times
     last_frame_time: f64,       // Timestamp of last frame
