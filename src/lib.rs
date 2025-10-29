@@ -49,6 +49,10 @@ enum EditAction {
         // Store all cells in the column for undo
         cells: Vec<(usize, Cell)>, // (row, cell)
     },
+    DeleteRows {
+        // Store multiple rows for bulk deletion undo
+        rows: Vec<(usize, Vec<(usize, Cell)>)>, // (row_index, cells)
+    },
     SetStyle {
         row: usize,
         col: usize,
@@ -1137,6 +1141,12 @@ impl DataGrid {
             return false;
         }
 
+        // Check if column is editable
+        if !self.grid.is_column_editable(col) {
+            web_sys::console::log_1(&format!("Column {} is read-only", col).into());
+            return false;
+        }
+
         // Check if cell is editable
         if let Some(cell) = self.grid.get_cell(row, col) {
             if !cell.editable {
@@ -1787,6 +1797,87 @@ impl DataGrid {
         }
     }
 
+    // ========== Column Grouping API ==========
+
+    /// Add a column group for multi-level headers
+    /// @param label - Group label text
+    /// @param start_col - First column in group (0-indexed)
+    /// @param end_col - Last column in group (0-indexed, inclusive)
+    /// @param level - Header level (0 = top level, 1 = second level, etc.)
+    pub fn add_column_group(&mut self, label: String, start_col: usize, end_col: usize, level: usize) {
+        self.grid.add_column_group(label, start_col, end_col, level);
+    }
+
+    /// Clear all column groups (revert to single-level headers)
+    pub fn clear_column_groups(&mut self) {
+        self.grid.clear_column_groups();
+    }
+
+    /// Set the height of each header row (default: 30px)
+    pub fn set_header_row_height(&mut self, height: f32) {
+        self.grid.set_header_row_height(height);
+    }
+
+    /// Get the current number of header levels
+    pub fn get_header_levels(&self) -> usize {
+        self.grid.header_levels
+    }
+
+    /// Get total header height
+    pub fn get_header_height(&self) -> f32 {
+        self.grid.col_header_height
+    }
+
+    // ========== Column Validation API ==========
+
+    /// Set validation pattern for a column
+    /// @param col - Column index (0-based)
+    /// @param pattern - JavaScript regex pattern (e.g., "^[0-9]+$" for numbers only)
+    /// @param message - Error message to display when validation fails
+    pub fn set_column_validation(&mut self, col: usize, pattern: String, message: String) {
+        self.grid.set_column_validation(col, pattern, message);
+    }
+
+    /// Clear validation pattern for a column
+    pub fn clear_column_validation(&mut self, col: usize) {
+        self.grid.clear_column_validation(col);
+    }
+
+    /// Get validation pattern and message for a column
+    /// Returns JSON string: {"pattern": "regex", "message": "error msg"} or empty string if no validation
+    pub fn get_column_validation(&self, col: usize) -> String {
+        if let Some((pattern, message)) = self.grid.get_column_validation(col) {
+            return format!(r#"{{"pattern":"{}","message":"{}"}}"#,
+                         pattern.replace("\\", "\\\\").replace("\"", "\\\""),
+                         message.replace("\\", "\\\\").replace("\"", "\\\""));
+        }
+        String::new()
+    }
+
+    // ========== Column Editable Control API ==========
+
+    /// Set whether a column is editable
+    /// @param col - Column index (0-based)
+    /// @param editable - true: editable, false: read-only
+    pub fn set_column_editable(&mut self, col: usize, editable: bool) {
+        self.grid.set_column_editable(col, editable);
+    }
+
+    /// Check if a column is editable
+    pub fn is_column_editable(&self, col: usize) -> bool {
+        self.grid.is_column_editable(col)
+    }
+
+    /// Get editable status for all columns as JSON array
+    /// Returns: "[true, false, true, ...]"
+    pub fn get_all_column_editable_status(&self) -> String {
+        let status = self.grid.get_all_column_editable_status();
+        format!("[{}]", status.iter()
+            .map(|b| b.to_string())
+            .collect::<Vec<_>>()
+            .join(","))
+    }
+
     /// Insert a row at the specified position
     pub fn insert_row(&mut self, at_index: usize) {
         // Record action for undo (insert is opposite of delete, so we store as DeleteRow)
@@ -1817,6 +1908,67 @@ impl DataGrid {
         self.grid.delete_row(index);
         self.clear_selection();
         self.viewport.update_visible_range(&self.grid);
+    }
+
+    /// Delete multiple rows at once
+    /// @param indices - JSON array of row indices to delete, e.g., "[0, 2, 5]"
+    pub fn delete_rows(&mut self, indices_json: String) -> Result<(), JsValue> {
+        // Parse indices
+        let indices: Vec<usize> = serde_json::from_str(&indices_json)
+            .map_err(|e| JsValue::from_str(&format!("Failed to parse indices: {}", e)))?;
+
+        if indices.is_empty() {
+            return Ok(());
+        }
+
+        // Sort indices in descending order to delete from bottom to top
+        // This prevents index shifting issues
+        let mut sorted_indices = indices.clone();
+        sorted_indices.sort_unstable();
+        sorted_indices.reverse();
+
+        // Save all rows for undo
+        let mut deleted_rows = Vec::new();
+        for &index in &sorted_indices {
+            if index < self.grid.row_count() {
+                let cells = self.grid.get_row_cells(index);
+                deleted_rows.push((index, cells));
+            }
+        }
+
+        // Record undo action
+        let action = EditAction::DeleteRows {
+            rows: deleted_rows.clone(),
+        };
+        self.undo_stack.push(action);
+        self.redo_stack.clear();
+
+        // Delete rows from bottom to top
+        for &index in &sorted_indices {
+            if index < self.grid.row_count() {
+                self.grid.delete_row(index);
+            }
+        }
+
+        self.clear_selection();
+        self.viewport.update_visible_range(&self.grid);
+
+        Ok(())
+    }
+
+    /// Get unique row indices from selected cells
+    /// Returns JSON array of row indices, e.g., "[0, 2, 5]"
+    pub fn get_selected_row_indices(&self) -> String {
+        let mut rows: Vec<usize> = self.selected_cells
+            .iter()
+            .map(|(row, _)| *row)
+            .collect();
+
+        // Remove duplicates and sort
+        rows.sort_unstable();
+        rows.dedup();
+
+        serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_string())
     }
 
     /// Insert a column at the specified position
@@ -2336,6 +2488,14 @@ impl DataGrid {
                     self.grid.restore_column_cells(*index, cells);
                     self.viewport.update_visible_range(&self.grid);
                 }
+                EditAction::DeleteRows { rows } => {
+                    // Undo bulk delete by inserting rows back in reverse order
+                    for (index, cells) in rows.iter() {
+                        self.grid.insert_row(*index);
+                        self.grid.restore_row_cells(*index, cells);
+                    }
+                    self.viewport.update_visible_range(&self.grid);
+                }
                 EditAction::SetStyle { row, col, old_style, new_style: _ } => {
                     // Restore old style
                     if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
@@ -2383,6 +2543,16 @@ impl DataGrid {
                 EditAction::DeleteColumn { index, cells: _ } => {
                     // Redo delete
                     self.grid.delete_column(*index);
+                    self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::DeleteRows { rows } => {
+                    // Redo bulk delete from bottom to top to avoid index shifting
+                    let mut sorted_indices: Vec<usize> = rows.iter().map(|(idx, _)| *idx).collect();
+                    sorted_indices.sort_unstable();
+                    sorted_indices.reverse();
+                    for index in sorted_indices {
+                        self.grid.delete_row(index);
+                    }
                     self.viewport.update_visible_range(&self.grid);
                 }
                 EditAction::SetStyle { row, col, old_style: _, new_style } => {

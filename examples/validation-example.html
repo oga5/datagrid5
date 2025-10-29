@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - 入力バリデーション</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .header {
+            padding: 20px 25px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        h1 {
+            font-size: 30px;
+            color: #1a202c;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #4a5568;
+            font-size: 15px;
+            margin-bottom: 8px;
+        }
+
+        .description {
+            color: #718096;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .controls {
+            padding: 18px 25px;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        button {
+            padding: 10px 18px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #48bb78;
+        }
+
+        .btn-secondary:hover {
+            background: #38a169;
+        }
+
+        .info-section {
+            padding: 20px 25px;
+            background: rgba(255, 255, 255, 0.92);
+            border-top: 1px solid #e2e8f0;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .info-title {
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+
+        .validation-rules {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .rule-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            transition: all 0.2s;
+        }
+
+        .rule-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        .rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .rule-column {
+            font-weight: 700;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        .rule-pattern {
+            background: #f7fafc;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #2d3748;
+        }
+
+        .rule-message {
+            color: #718096;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+
+        .rule-example {
+            background: #edf2f7;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #4a5568;
+            margin-top: 6px;
+        }
+
+        .rule-example strong {
+            color: #2d3748;
+        }
+
+        .grid-container {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+            background: white;
+            margin: 20px 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        #scroll-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: auto;
+        }
+
+        #scroll-content {
+            position: relative;
+        }
+
+        #webgl-canvas, #text-canvas {
+            position: sticky;
+            top: 0;
+            left: 0;
+            display: block;
+        }
+
+        #text-canvas {
+            cursor: cell;
+        }
+
+        #cell-editor {
+            position: absolute;
+            border: 2px solid #667eea;
+            outline: none;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            padding: 4px;
+            box-sizing: border-box;
+            z-index: 1000;
+            background: white;
+        }
+
+        #cell-editor.error {
+            border-color: #f56565;
+            background: #fff5f5;
+        }
+
+        .error-tooltip {
+            position: absolute;
+            background: #f56565;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 1001;
+            box-shadow: 0 4px 12px rgba(245, 101, 101, 0.4);
+            display: none;
+            max-width: 300px;
+            animation: shake 0.3s;
+        }
+
+        .error-tooltip::after {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 20px;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 6px solid #f56565;
+        }
+
+        .error-tooltip.show {
+            display: block;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .status-bar {
+            padding: 15px 25px;
+            background: rgba(255, 255, 255, 0.95);
+            border-top: 2px solid #e2e8f0;
+            display: flex;
+            gap: 30px;
+            font-size: 13px;
+            color: #4a5568;
+        }
+
+        .status-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .status-label {
+            font-weight: 700;
+            color: #2d3748;
+        }
+
+        .status-value {
+            background: #edf2f7;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .status-value.error {
+            background: #fff5f5;
+            color: #c53030;
+        }
+
+        .status-value.success {
+            background: #f0fff4;
+            color: #22543d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>✅ 入力バリデーション機能</h1>
+        <p class="subtitle">Column-based Input Validation with Custom Rules</p>
+        <p class="description">
+            各カラムに正規表現パターンとエラーメッセージを設定できます。
+            セルをダブルクリックして編集すると、入力内容が自動的にバリデーションされます。
+        </p>
+    </div>
+
+    <div class="controls">
+        <button id="load-data-btn" class="btn-secondary">📋 サンプルデータ読込</button>
+        <button id="clear-validation-btn">🔓 バリデーション解除</button>
+        <button id="apply-validation-btn">🔒 バリデーション再適用</button>
+    </div>
+
+    <div class="info-section">
+        <div class="info-title">📋 設定されているバリデーションルール</div>
+        <div class="validation-rules">
+            <div class="rule-card">
+                <div class="rule-header">
+                    <span class="rule-column">社員ID</span>
+                    <span class="rule-pattern">^EMP[0-9]{4}$</span>
+                </div>
+                <div class="rule-message">❌ "EMP"の後に4桁の数字が必要です</div>
+                <div class="rule-example"><strong>✓ OK:</strong> EMP0001, EMP1234 <strong>✗ NG:</strong> EMP123, emp0001</div>
+            </div>
+
+            <div class="rule-card">
+                <div class="rule-header">
+                    <span class="rule-column">氏名</span>
+                    <span class="rule-pattern">^[\u4E00-\u9FFF\u3040-\u309F]{2,10}$</span>
+                </div>
+                <div class="rule-message">❌ 漢字・ひらがなで2〜10文字で入力してください</div>
+                <div class="rule-example"><strong>✓ OK:</strong> 山田太郎, たなか <strong>✗ NG:</strong> Yamada, 田</div>
+            </div>
+
+            <div class="rule-card">
+                <div class="rule-header">
+                    <span class="rule-column">メールアドレス</span>
+                    <span class="rule-pattern">^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$</span>
+                </div>
+                <div class="rule-message">❌ 正しいメールアドレス形式で入力してください</div>
+                <div class="rule-example"><strong>✓ OK:</strong> user@example.com <strong>✗ NG:</strong> user@, @example.com</div>
+            </div>
+
+            <div class="rule-card">
+                <div class="rule-header">
+                    <span class="rule-column">電話番号</span>
+                    <span class="rule-pattern">^0\d{1,4}-\d{1,4}-\d{4}$</span>
+                </div>
+                <div class="rule-message">❌ 電話番号はハイフン区切りで入力してください (例: 03-1234-5678)</div>
+                <div class="rule-example"><strong>✓ OK:</strong> 03-1234-5678, 090-1234-5678 <strong>✗ NG:</strong> 0312345678</div>
+            </div>
+
+            <div class="rule-card">
+                <div class="rule-header">
+                    <span class="rule-column">年齢</span>
+                    <span class="rule-pattern">^[1-9][0-9]?$</span>
+                </div>
+                <div class="rule-message">❌ 年齢は1〜99の数字で入力してください</div>
+                <div class="rule-example"><strong>✓ OK:</strong> 25, 65, 8 <strong>✗ NG:</strong> 0, 100, 25歳</div>
+            </div>
+
+            <div class="rule-card">
+                <div class="rule-header">
+                    <span class="rule-column">郵便番号</span>
+                    <span class="rule-pattern">^\d{3}-\d{4}$</span>
+                </div>
+                <div class="rule-message">❌ 郵便番号は7桁をハイフン区切りで入力してください (例: 123-4567)</div>
+                <div class="rule-example"><strong>✓ OK:</strong> 100-0001, 530-0001 <strong>✗ NG:</strong> 1000001, 100-001</div>
+            </div>
+
+            <div class="rule-card">
+                <div class="rule-header">
+                    <span class="rule-column">入社日</span>
+                    <span class="rule-pattern">^\d{4}/\d{2}/\d{2}$</span>
+                </div>
+                <div class="rule-message">❌ 日付はYYYY/MM/DD形式で入力してください</div>
+                <div class="rule-example"><strong>✓ OK:</strong> 2024/01/15, 2023/12/31 <strong>✗ NG:</strong> 2024-01-15, 24/1/15</div>
+            </div>
+
+            <div class="rule-card">
+                <div class="rule-header">
+                    <span class="rule-column">部署コード</span>
+                    <span class="rule-pattern">^(DEV|SALES|HR|FIN|MKT)-[0-9]{2}$</span>
+                </div>
+                <div class="rule-message">❌ 部署コードは「部署-数字2桁」の形式です (DEV, SALES, HR, FIN, MKT)</div>
+                <div class="rule-example"><strong>✓ OK:</strong> DEV-01, SALES-10 <strong>✗ NG:</strong> DEV01, IT-01</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-container">
+        <div id="scroll-container">
+            <div id="scroll-content">
+                <canvas id="webgl-canvas"></canvas>
+                <canvas id="text-canvas" tabindex="0"></canvas>
+            </div>
+        </div>
+        <input type="text" id="cell-editor" style="display: none;" />
+        <div class="error-tooltip" id="error-tooltip"></div>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-label">検証状態:</span>
+            <span class="status-value" id="validation-status">有効</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">編集回数:</span>
+            <span class="status-value" id="edit-count">0</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">エラー回数:</span>
+            <span class="status-value error" id="error-count">0</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">成功回数:</span>
+            <span class="status-value success" id="success-count">0</span>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+
+        let grid = null;
+        let editingRow = null;
+        let editingCol = null;
+        let isInternalScroll = false;
+        let editCount = 0;
+        let errorCount = 0;
+        let successCount = 0;
+
+        // Validation rules
+        const validationRules = [
+            { pattern: "^EMP[0-9]{4}$", message: '"EMP"の後に4桁の数字が必要です (例: EMP0001)' },
+            { pattern: "^[\u4E00-\u9FFF\u3040-\u309F]{2,10}$", message: '漢字・ひらがなで2〜10文字で入力してください' },
+            { pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", message: '正しいメールアドレス形式で入力してください' },
+            { pattern: "^0\\d{1,4}-\\d{1,4}-\\d{4}$", message: '電話番号はハイフン区切りで入力してください (例: 03-1234-5678)' },
+            { pattern: "^[1-9][0-9]?$", message: '年齢は1〜99の数字で入力してください' },
+            { pattern: "^\\d{3}-\\d{4}$", message: '郵便番号は7桁をハイフン区切りで入力してください (例: 123-4567)' },
+            { pattern: "^\\d{4}/\\d{2}/\\d{2}$", message: '日付はYYYY/MM/DD形式で入力してください' },
+            { pattern: "^(DEV|SALES|HR|FIN|MKT)-[0-9]{2}$", message: '部署コードは「部署-数字2桁」の形式です (DEV, SALES, HR, FIN, MKT)' }
+        ];
+
+        async function initGrid() {
+            await init();
+
+            const webglCanvas = document.getElementById('webgl-canvas');
+            const textCanvas = document.getElementById('text-canvas');
+            const scrollContainer = document.getElementById('scroll-container');
+
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const width = Math.floor(containerRect.width);
+            const height = Math.floor(containerRect.height);
+
+            // Create grid: 20 rows × 8 columns
+            grid = new DataGrid(webglCanvas, textCanvas, 20, 8, width, height);
+
+            webglCanvas.width = width;
+            webglCanvas.height = height;
+            textCanvas.width = width;
+            textCanvas.height = height;
+
+            setupEventHandlers();
+            setupVirtualScroll();
+
+            // Apply validation rules
+            applyValidationRules();
+
+            console.log('Validation grid initialized');
+        }
+
+        function applyValidationRules() {
+            if (!grid) return;
+
+            validationRules.forEach((rule, index) => {
+                grid.set_column_validation(index, rule.pattern, rule.message);
+            });
+
+            document.getElementById('validation-status').textContent = '有効';
+            document.getElementById('validation-status').className = 'status-value success';
+        }
+
+        function clearValidationRules() {
+            if (!grid) return;
+
+            for (let i = 0; i < 8; i++) {
+                grid.clear_column_validation(i);
+            }
+
+            document.getElementById('validation-status').textContent = '無効';
+            document.getElementById('validation-status').className = 'status-value error';
+        }
+
+        function validateInput(col, value) {
+            const validationJson = grid.get_column_validation(col);
+            if (!validationJson) return { valid: true };
+
+            try {
+                const validation = JSON.parse(validationJson);
+                const regex = new RegExp(validation.pattern);
+                const valid = regex.test(value);
+
+                return {
+                    valid: valid,
+                    message: validation.message
+                };
+            } catch (e) {
+                console.error('Validation error:', e);
+                return { valid: true };
+            }
+        }
+
+        function showErrorTooltip(message) {
+            const tooltip = document.getElementById('error-tooltip');
+            const editor = document.getElementById('cell-editor');
+
+            tooltip.textContent = message;
+            tooltip.style.left = editor.offsetLeft + 'px';
+            tooltip.style.top = (editor.offsetTop + editor.offsetHeight + 8) + 'px';
+            tooltip.classList.add('show');
+
+            editor.classList.add('error');
+        }
+
+        function hideErrorTooltip() {
+            const tooltip = document.getElementById('error-tooltip');
+            const editor = document.getElementById('cell-editor');
+
+            tooltip.classList.remove('show');
+            editor.classList.remove('error');
+        }
+
+        function setupEventHandlers() {
+            const textCanvas = document.getElementById('text-canvas');
+
+            textCanvas.addEventListener('mousedown', (e) => {
+                const rect = textCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                grid.handle_mouse_down_with_modifiers(x, y, {
+                    shift: e.shiftKey,
+                    ctrl: e.ctrlKey || e.metaKey,
+                    alt: e.altKey
+                });
+            });
+
+            textCanvas.addEventListener('mousemove', (e) => {
+                const rect = textCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                grid.handle_mouse_move(x, y);
+            });
+
+            textCanvas.addEventListener('mouseup', (e) => {
+                const rect = textCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                grid.handle_mouse_up(x, y);
+            });
+
+            textCanvas.addEventListener('dblclick', (e) => {
+                const rect = textCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const cellInfo = grid.handle_double_click(x, y);
+                if (cellInfo) {
+                    const [row, col] = JSON.parse(cellInfo);
+                    startCellEdit(row, col);
+                }
+            });
+
+            textCanvas.addEventListener('keydown', (e) => {
+                const handled = grid.handle_keyboard_with_modifiers(e.key, {
+                    shift: e.shiftKey,
+                    ctrl: e.ctrlKey || e.metaKey,
+                    alt: e.altKey
+                });
+                if (handled) {
+                    e.preventDefault();
+                    syncScrollPosition();
+                }
+            });
+
+            textCanvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                grid.handle_wheel(e.deltaX, e.deltaY);
+            });
+        }
+
+        function setupVirtualScroll() {
+            const scrollContainer = document.getElementById('scroll-container');
+            updateVirtualScrollSize();
+
+            scrollContainer.addEventListener('scroll', () => {
+                if (!grid || isInternalScroll) {
+                    isInternalScroll = false;
+                    return;
+                }
+                grid.set_scroll(scrollContainer.scrollLeft, scrollContainer.scrollTop);
+            });
+        }
+
+        function updateVirtualScrollSize() {
+            if (!grid) return;
+            const scrollContent = document.getElementById('scroll-content');
+            const totalSize = JSON.parse(grid.get_total_size());
+            scrollContent.style.width = totalSize[0] + 'px';
+            scrollContent.style.height = totalSize[1] + 'px';
+        }
+
+        function syncScrollPosition() {
+            if (!grid) return;
+            const scrollContainer = document.getElementById('scroll-container');
+            const viewport = JSON.parse(grid.get_viewport_info_array());
+            isInternalScroll = true;
+            scrollContainer.scrollLeft = viewport[3];
+            scrollContainer.scrollTop = viewport[2];
+        }
+
+        function startCellEdit(row, col) {
+            if (!grid) return;
+
+            const editor = document.getElementById('cell-editor');
+            const scrollContainer = document.getElementById('scroll-container');
+            const gridContainer = document.querySelector('.grid-container');
+
+            const canEdit = grid.start_edit(row, col);
+            if (!canEdit) return;
+
+            const rect = grid.get_cell_edit_rect(row, col);
+            const [x, y, width, height] = rect;
+
+            const currentValue = grid.get_cell_value(row, col);
+
+            const scrollContainerRect = scrollContainer.getBoundingClientRect();
+            const gridContainerRect = gridContainer.getBoundingClientRect();
+            const offsetX = scrollContainerRect.left - gridContainerRect.left;
+            const offsetY = scrollContainerRect.top - gridContainerRect.top;
+
+            editor.style.left = `${x + offsetX - scrollContainer.scrollLeft}px`;
+            editor.style.top = `${y + offsetY - scrollContainer.scrollTop}px`;
+            editor.style.width = `${width}px`;
+            editor.style.height = `${height}px`;
+            editor.style.display = 'block';
+            editor.value = currentValue;
+
+            editingRow = row;
+            editingCol = col;
+
+            editor.focus();
+            editor.select();
+
+            setupEditorEvents(editor, row, col);
+        }
+
+        function endCellEdit(save = false) {
+            if (!grid || editingRow === null || editingCol === null) return;
+
+            const editor = document.getElementById('cell-editor');
+
+            if (save) {
+                const validation = validateInput(editingCol, editor.value);
+
+                if (!validation.valid) {
+                    showErrorTooltip(validation.message);
+                    errorCount++;
+                    document.getElementById('error-count').textContent = errorCount;
+                    return; // Don't close editor on validation error
+                }
+
+                grid.update_cell_value(editingRow, editingCol, editor.value);
+                editCount++;
+                successCount++;
+                document.getElementById('edit-count').textContent = editCount;
+                document.getElementById('success-count').textContent = successCount;
+            }
+
+            hideErrorTooltip();
+            editor.style.display = 'none';
+            editor.value = '';
+
+            grid.end_edit();
+
+            editingRow = null;
+            editingCol = null;
+
+            document.getElementById('text-canvas').focus();
+        }
+
+        function setupEditorEvents(editor, row, col) {
+            const newEditor = editor.cloneNode(true);
+            editor.parentNode.replaceChild(newEditor, editor);
+
+            // Validate on input
+            newEditor.addEventListener('input', () => {
+                const validation = validateInput(col, newEditor.value);
+                if (!validation.valid) {
+                    showErrorTooltip(validation.message);
+                } else {
+                    hideErrorTooltip();
+                }
+            });
+
+            newEditor.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    endCellEdit(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    hideErrorTooltip();
+                    endCellEdit(false);
+                }
+            });
+
+            newEditor.addEventListener('blur', () => {
+                setTimeout(() => endCellEdit(true), 100);
+            });
+        }
+
+        function loadSampleData() {
+            if (!grid) return;
+
+            const headers = ['社員ID', '氏名', 'メールアドレス', '電話番号', '年齢', '郵便番号', '入社日', '部署コード'];
+            headers.forEach((header, col) => {
+                grid.update_cell_value(0, col, header);
+                grid.set_cell_bg_color(0, col, 0x667eeaFF);
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
+                grid.set_cell_font_style(0, col, true, false);
+            });
+
+            const sampleData = [
+                ['EMP0001', '山田太郎', 'yamada@example.com', '03-1234-5678', '28', '100-0001', '2020/04/01', 'DEV-01'],
+                ['EMP0002', '佐藤花子', 'sato@example.com', '090-1234-5678', '32', '530-0001', '2019/10/15', 'SALES-10'],
+                ['EMP0003', '鈴木一郎', 'suzuki@example.com', '080-9876-5432', '45', '060-0001', '2015/06/20', 'HR-05'],
+                ['EMP0004', 'たなかみほ', 'tanaka@example.com', '06-5555-1234', '29', '541-0001', '2021/02/10', 'FIN-03'],
+                ['EMP0005', '高橋健', 'takahashi@example.com', '052-123-4567', '38', '460-0001', '2017/08/01', 'MKT-02'],
+            ];
+
+            sampleData.forEach((row, rowIdx) => {
+                row.forEach((value, colIdx) => {
+                    grid.update_cell_value(rowIdx + 1, colIdx, value);
+                });
+            });
+
+            updateVirtualScrollSize();
+        }
+
+        // Button handlers
+        document.getElementById('load-data-btn').addEventListener('click', loadSampleData);
+        document.getElementById('clear-validation-btn').addEventListener('click', clearValidationRules);
+        document.getElementById('apply-validation-btn').addEventListener('click', applyValidationRules);
+
+        // Resize handler
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                if (!grid) return;
+
+                const width = Math.floor(entry.contentRect.width);
+                const height = Math.floor(entry.contentRect.height);
+
+                const webglCanvas = document.getElementById('webgl-canvas');
+                const textCanvas = document.getElementById('text-canvas');
+
+                webglCanvas.width = width;
+                webglCanvas.height = height;
+                textCanvas.width = width;
+                textCanvas.height = height;
+
+                grid.resize(width, height);
+                updateVirtualScrollSize();
+            }
+        });
+
+        resizeObserver.observe(document.getElementById('scroll-container'));
+
+        // Initialize
+        initGrid();
+    </script>
+</body>
+</html>

@@ -566,7 +566,7 @@ impl TextRenderer {
         self.render_row_headers(grid, viewport, row_header_width, col_header_height, header_bg, header_border);
     }
 
-    /// Render column headers (A, B, C, ...)
+    /// Render column headers (A, B, C, ...) with optional multi-level grouping
     fn render_column_headers(
         &self,
         grid: &Grid,
@@ -579,6 +579,27 @@ impl TextRenderer {
         let first_col = viewport.first_visible_col;
         let last_col = viewport.last_visible_col.min(grid.col_count().saturating_sub(1));
 
+        // If we have column groups, render multi-level headers
+        if grid.header_levels > 1 && !grid.column_groups.is_empty() {
+            self.render_grouped_column_headers(grid, viewport, row_header_width, header_bg, header_border, first_col, last_col);
+        } else {
+            // Render simple single-level headers
+            self.render_simple_column_headers(grid, viewport, row_header_width, col_header_height, header_bg, header_border, first_col, last_col);
+        }
+    }
+
+    /// Render simple single-level column headers
+    fn render_simple_column_headers(
+        &self,
+        grid: &Grid,
+        viewport: &Viewport,
+        row_header_width: f32,
+        col_header_height: f32,
+        header_bg: &str,
+        header_border: &str,
+        first_col: usize,
+        last_col: usize,
+    ) {
         for col in first_col..=last_col {
             let grid_x = grid.col_x_position(col);
             let canvas_x = grid_x - viewport.scroll_x + row_header_width;
@@ -627,6 +648,146 @@ impl TextRenderer {
 
             let text_x = canvas_x + width / 2.0;
             let text_y = col_header_height / 2.0;
+
+            let _ = self.context.fill_text(&display_text, text_x as f64, text_y as f64);
+
+            // Reset text align
+            self.context.set_text_align("left");
+        }
+    }
+
+    /// Render multi-level grouped column headers
+    fn render_grouped_column_headers(
+        &self,
+        grid: &Grid,
+        viewport: &Viewport,
+        row_header_width: f32,
+        header_bg: &str,
+        header_border: &str,
+        first_col: usize,
+        last_col: usize,
+    ) {
+        let header_row_height = grid.header_row_height;
+
+        // Render group headers for each level (0 to header_levels - 2)
+        for level in 0..(grid.header_levels - 1) {
+            let groups_at_level = grid.get_column_groups_at_level(level);
+            let y_pos = (level as f32) * header_row_height;
+
+            for group in groups_at_level {
+                // Calculate group span width
+                let mut group_width = 0.0;
+                let mut group_start_x = 0.0;
+                let mut found_start = false;
+
+                for col in group.start_col..=group.end_col.min(grid.col_count().saturating_sub(1)) {
+                    let col_width = grid.col_width(col);
+                    group_width += col_width;
+
+                    if !found_start {
+                        group_start_x = grid.col_x_position(col);
+                        found_start = true;
+                    }
+                }
+
+                let canvas_x = group_start_x - viewport.scroll_x + row_header_width;
+
+                // Skip if not visible
+                if canvas_x + group_width < row_header_width || canvas_x > viewport.canvas_width {
+                    continue;
+                }
+
+                // Clip to visible area
+                let visible_x = canvas_x.max(row_header_width);
+                let visible_width = (canvas_x + group_width).min(viewport.canvas_width) - visible_x;
+
+                if visible_width <= 0.0 {
+                    continue;
+                }
+
+                // Draw group background
+                self.context.set_fill_style(&"#e8e8e8".into());
+                self.context.fill_rect(
+                    visible_x as f64,
+                    y_pos as f64,
+                    visible_width as f64,
+                    header_row_height as f64,
+                );
+
+                // Draw group border
+                self.context.set_stroke_style(&header_border.into());
+                self.context.set_line_width(1.0);
+                self.context.stroke_rect(
+                    visible_x as f64,
+                    y_pos as f64,
+                    visible_width as f64,
+                    header_row_height as f64,
+                );
+
+                // Draw group label (centered)
+                self.context.set_fill_style(&"#333333".into());
+                self.context.set_text_align("center");
+                self.context.set_font("bold 13px Arial");
+
+                let text_x = canvas_x + group_width / 2.0;
+                let text_y = y_pos + header_row_height / 2.0 + 4.0;
+
+                let _ = self.context.fill_text(&group.label, text_x as f64, text_y as f64);
+            }
+        }
+
+        // Render individual column headers at the last level
+        let col_header_y = ((grid.header_levels - 1) as f32) * header_row_height;
+
+        for col in first_col..=last_col {
+            let grid_x = grid.col_x_position(col);
+            let canvas_x = grid_x - viewport.scroll_x + row_header_width;
+            let width = grid.col_width(col);
+
+            // Skip if not visible
+            if canvas_x + width < row_header_width || canvas_x > viewport.canvas_width {
+                continue;
+            }
+
+            // Draw header background
+            self.context.set_fill_style(&header_bg.into());
+            self.context.fill_rect(
+                canvas_x as f64,
+                col_header_y as f64,
+                width as f64,
+                header_row_height as f64,
+            );
+
+            // Draw header border
+            self.context.set_stroke_style(&header_border.into());
+            self.context.set_line_width(1.0);
+            self.context.stroke_rect(
+                canvas_x as f64,
+                col_header_y as f64,
+                width as f64,
+                header_row_height as f64,
+            );
+
+            // Draw column name
+            let col_name = Grid::get_col_name(col);
+
+            // Add sort indicator if this column is sorted
+            let display_text = if grid.sort_column == Some(col) {
+                if grid.sort_ascending {
+                    format!("{} ▲", col_name)
+                } else {
+                    format!("{} ▼", col_name)
+                }
+            } else {
+                col_name
+            };
+
+            self.context.set_fill_style(&self.header_text_color.clone().into());
+            self.context.set_text_align("center");
+            self.context.set_font("13px Arial");
+
+            let text_x = canvas_x + width / 2.0;
+            let text_y = col_header_y + header_row_height / 2.0 + 4.0;
 
             let _ = self.context.fill_text(&display_text, text_x as f64, text_y as f64);
 
