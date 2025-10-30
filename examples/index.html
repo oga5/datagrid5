@@ -118,6 +118,26 @@
             background: #5568d3;
         }
 
+        .intro-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 40px;
+        }
+
+        .intro-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.8rem;
+        }
+
+        .intro-section p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
         .docs-section {
             background: white;
             border-radius: 12px;
@@ -178,116 +198,79 @@
     <div class="container">
         <header>
             <h1>DataGrid5 Examples</h1>
-            <p class="subtitle">Explore comprehensive examples of DataGrid5 features</p>
+            <p class="subtitle">Explore comprehensive examples of DataGrid5 features with DataGridWrapper</p>
         </header>
 
-        <div class="docs-section" style="margin-bottom: 40px;">
-            <h2>🚀 Simplified Examples (Using DataGridWrapper)</h2>
-            <p style="margin-bottom: 20px; color: #666;">
-                These examples use the new <strong>DataGridWrapper</strong> for cleaner, more maintainable code with ~50-80% less boilerplate!
+        <div class="intro-section">
+            <h2>🚀 DataGridWrapper - Simplified Development</h2>
+            <p>
+                All examples use the new <strong>DataGridWrapper</strong> - a high-level API that makes DataGrid5 development cleaner and more maintainable:
             </p>
-            <div class="docs-grid">
-                <a href="./simple-usage-v2.html" class="doc-link">
-                    <strong>📊 Simple Usage v2</strong>
-                    Basic grid with minimal code
-                </a>
-                <a href="./editing-example-simple.html" class="doc-link">
-                    <strong>✏️ Cell Editing v2</strong>
-                    Interactive editing simplified
-                </a>
-                <a href="./context-menu-example-v2.html" class="doc-link">
-                    <strong>🖱️ Context Menu v2</strong>
-                    Right-click menus made easy
-                </a>
-                <a href="./validation-example-v2.html" class="doc-link">
-                    <strong>✅ Validation v2</strong>
-                    Real-time validation
-                </a>
-                <a href="./column-grouping-example-v2.html" class="doc-link">
-                    <strong>🗂️ Column Grouping v2</strong>
-                    Multi-level headers
-                </a>
-                <a href="./readonly-columns-example-v2.html" class="doc-link">
-                    <strong>🔒 Read-Only Columns v2</strong>
-                    Column permissions
-                </a>
-                <a href="./advanced-config-example-v2.html" class="doc-link">
-                    <strong>⚙️ Advanced Config v2</strong>
-                    Advanced configuration
-                </a>
-                <a href="./sales-analysis-example-v2.html" class="doc-link">
-                    <strong>📊 Sales Dashboard v2</strong>
-                    Analytics dashboard
-                </a>
-                <a href="./responsive-resize-example-v2.html" class="doc-link">
-                    <strong>📐 Responsive v2</strong>
-                    Auto-resize support
-                </a>
-                <a href="./clipboard-example-v2.html" class="doc-link">
-                    <strong>📋 Clipboard v2</strong>
-                    Excel-like copy/paste
-                </a>
-            </div>
+            <ul class="card-features">
+                <li>50-80% less boilerplate code</li>
+                <li>Automatic setup and configuration</li>
+                <li>Built-in virtual scrolling and resize handling</li>
+                <li>Excel-like copy/paste functionality</li>
+                <li>Simplified event handling</li>
+            </ul>
         </div>
 
-        <h2 style="color: white; margin-bottom: 20px; text-align: center;">Original Examples (Full Implementation)</h2>
-
         <div class="examples-grid">
-            <a href="./simple-usage.html" class="example-card">
+            <a href="./simple-usage-v2.html" class="example-card">
                 <div class="card-icon">📊</div>
                 <div class="card-content">
                     <h3 class="card-title">Simple Usage</h3>
                     <p class="card-description">
-                        Learn the basics of DataGrid5 with a simple setup example.
+                        Learn the basics of DataGrid5 with minimal setup code.
                     </p>
                     <ul class="card-features">
                         <li>Basic grid initialization</li>
-                        <li>JSON data loading</li>
-                        <li>Simple configuration</li>
+                        <li>Data loading</li>
                         <li>Interactive demos</li>
+                        <li>Keyboard navigation</li>
                     </ul>
                     <span class="card-button">View Example →</span>
                 </div>
             </a>
 
-            <a href="./advanced-config-example.html" class="example-card">
-                <div class="card-icon">⚙️</div>
+            <a href="./responsive-resize-example-v2.html" class="example-card">
+                <div class="card-icon">📐</div>
                 <div class="card-content">
-                    <h3 class="card-title">Advanced Configuration<span class="badge">New</span></h3>
+                    <h3 class="card-title">Responsive Resize</h3>
                     <p class="card-description">
-                        Explore advanced grid configuration with column definitions and data types.
+                        Automatic grid resizing for responsive layouts.
                     </p>
                     <ul class="card-features">
-                        <li>Column configurations</li>
-                        <li>Data types (text, number, date, boolean)</li>
-                        <li>Frozen rows and columns</li>
-                        <li>Read-only mode</li>
+                        <li>Auto-resize with container</li>
+                        <li>ResizeObserver integration</li>
+                        <li>Fullscreen support</li>
+                        <li>Real-time size display</li>
                     </ul>
                     <span class="card-button">View Example →</span>
                 </div>
             </a>
 
-            <a href="./worker-example.html" class="example-card">
-                <div class="card-icon">⚡</div>
+            <a href="./clipboard-example-v2.html" class="example-card">
+                <div class="card-icon">📋</div>
                 <div class="card-content">
-                    <h3 class="card-title">Worker Threads<span class="badge">New</span></h3>
+                    <h3 class="card-title">Clipboard Operations</h3>
                     <p class="card-description">
-                        Process large datasets in background without blocking the UI.
+                        Excel-like copy, cut, and paste functionality.
                     </p>
                     <ul class="card-features">
-                        <li>Web Worker integration</li>
-                        <li>Background sorting</li>
-                        <li>Export/Import data</li>
-                        <li>10k+ rows performance</li>
+                        <li>Copy/Cut/Paste (Ctrl+C/X/V)</li>
+                        <li>TSV format support</li>
+                        <li>Multiple cell selection</li>
+                        <li>Range operations</li>
                     </ul>
                     <span class="card-button">View Example →</span>
                 </div>
             </a>
 
-            <a href="./context-menu-example.html" class="example-card">
+            <a href="./context-menu-example-v2.html" class="example-card">
                 <div class="card-icon">🖱️</div>
                 <div class="card-content">
-                    <h3 class="card-title">Context Menu<span class="badge">New</span></h3>
+                    <h3 class="card-title">Context Menu</h3>
                     <p class="card-description">
                         Right-click operations for intuitive row management.
                     </p>
@@ -301,78 +284,27 @@
                 </div>
             </a>
 
-            <a href="./responsive-resize-example.html" class="example-card">
-                <div class="card-icon">📐</div>
+            <a href="./validation-example-v2.html" class="example-card">
+                <div class="card-icon">✅</div>
                 <div class="card-content">
-                    <h3 class="card-title">Responsive Resize<span class="badge">New</span></h3>
+                    <h3 class="card-title">Input Validation</h3>
                     <p class="card-description">
-                        Automatic grid resizing with ResizeObserver for responsive layouts.
+                        Column-based input validation with real-time feedback.
                     </p>
                     <ul class="card-features">
-                        <li>Auto-resize with container</li>
-                        <li>ResizeObserver integration</li>
-                        <li>Preset size buttons</li>
-                        <li>Real-time size display</li>
+                        <li>Regex pattern validation</li>
+                        <li>Real-time feedback</li>
+                        <li>Custom error messages</li>
+                        <li>Data type constraints</li>
                     </ul>
                     <span class="card-button">View Example →</span>
                 </div>
             </a>
 
-            <a href="./full-screen-resize-example.html" class="example-card">
-                <div class="card-icon">🖥️</div>
+            <a href="./column-grouping-example-v2.html" class="example-card">
+                <div class="card-icon">🗂️</div>
                 <div class="card-content">
-                    <h3 class="card-title">Full Screen Resize<span class="badge">New</span></h3>
-                    <p class="card-description">
-                        Full-screen grid that adapts to browser window resizing.
-                    </p>
-                    <ul class="card-features">
-                        <li>Full-screen layout</li>
-                        <li>Window resize handling</li>
-                        <li>Automatic viewport adjustment</li>
-                        <li>Responsive design</li>
-                    </ul>
-                    <span class="card-button">View Example →</span>
-                </div>
-            </a>
-
-            <a href="./editing-example.html" class="example-card">
-                <div class="card-icon">✏️</div>
-                <div class="card-content">
-                    <h3 class="card-title">Cell Editing<span class="badge">New</span></h3>
-                    <p class="card-description">
-                        Interactive cell editing with validation and undo/redo support.
-                    </p>
-                    <ul class="card-features">
-                        <li>Double-click to edit cells</li>
-                        <li>Keyboard navigation</li>
-                        <li>Copy/paste support</li>
-                        <li>Undo/redo operations</li>
-                    </ul>
-                    <span class="card-button">View Example →</span>
-                </div>
-            </a>
-
-            <a href="./context-menu-editing-example.html" class="example-card">
-                <div class="card-icon">🎯</div>
-                <div class="card-content">
-                    <h3 class="card-title">Context Menu Editing<span class="badge">New</span></h3>
-                    <p class="card-description">
-                        Advanced context menu with bulk row operations and editing.
-                    </p>
-                    <ul class="card-features">
-                        <li>Bulk insert/delete operations</li>
-                        <li>Multi-row selection</li>
-                        <li>Copy/paste/cut operations</li>
-                        <li>Row sorting and filtering</li>
-                    </ul>
-                    <span class="card-button">View Example →</span>
-                </div>
-            </a>
-
-            <a href="./column-grouping-example.html" class="example-card">
-                <div class="card-icon">📊</div>
-                <div class="card-content">
-                    <h3 class="card-title">Column Grouping<span class="badge">New</span></h3>
+                    <h3 class="card-title">Column Grouping</h3>
                     <p class="card-description">
                         Multi-level column headers with hierarchical grouping.
                     </p>
@@ -386,44 +318,10 @@
                 </div>
             </a>
 
-            <a href="./sales-analysis-example.html" class="example-card">
-                <div class="card-icon">📈</div>
-                <div class="card-content">
-                    <h3 class="card-title">Sales Analysis<span class="badge">New</span></h3>
-                    <p class="card-description">
-                        Comprehensive sales data analysis with 3-level column grouping.
-                    </p>
-                    <ul class="card-features">
-                        <li>3-level column groups</li>
-                        <li>Quarterly/monthly data</li>
-                        <li>Performance metrics</li>
-                        <li>Regional analysis</li>
-                    </ul>
-                    <span class="card-button">View Example →</span>
-                </div>
-            </a>
-
-            <a href="./validation-example.html" class="example-card">
-                <div class="card-icon">✅</div>
-                <div class="card-content">
-                    <h3 class="card-title">Input Validation<span class="badge">New</span></h3>
-                    <p class="card-description">
-                        Column-based input validation with regex patterns.
-                    </p>
-                    <ul class="card-features">
-                        <li>Regex pattern validation</li>
-                        <li>Real-time feedback</li>
-                        <li>Custom error messages</li>
-                        <li>Data type constraints</li>
-                    </ul>
-                    <span class="card-button">View Example →</span>
-                </div>
-            </a>
-
-            <a href="./readonly-columns-example.html" class="example-card">
+            <a href="./readonly-columns-example-v2.html" class="example-card">
                 <div class="card-icon">🔒</div>
                 <div class="card-content">
-                    <h3 class="card-title">Read-Only Columns<span class="badge">New</span></h3>
+                    <h3 class="card-title">Read-Only Columns</h3>
                     <p class="card-description">
                         Configure specific columns as read-only while allowing others to be edited.
                     </p>
@@ -432,6 +330,40 @@
                         <li>Mixed editable/read-only</li>
                         <li>Visual indicators</li>
                         <li>Flexible configuration</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./advanced-config-example-v2.html" class="example-card">
+                <div class="card-icon">⚙️</div>
+                <div class="card-content">
+                    <h3 class="card-title">Advanced Configuration</h3>
+                    <p class="card-description">
+                        Explore advanced grid configuration with column definitions.
+                    </p>
+                    <ul class="card-features">
+                        <li>Column configurations</li>
+                        <li>Data types (text, number, date, boolean)</li>
+                        <li>Frozen rows and columns</li>
+                        <li>Styling and theming</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./sales-analysis-example-v2.html" class="example-card">
+                <div class="card-icon">📈</div>
+                <div class="card-content">
+                    <h3 class="card-title">Sales Dashboard</h3>
+                    <p class="card-description">
+                        Comprehensive sales data analysis with 3-level column grouping.
+                    </p>
+                    <ul class="card-features">
+                        <li>3-level column groups</li>
+                        <li>Quarterly/monthly data</li>
+                        <li>Performance metrics</li>
+                        <li>Regional analysis</li>
                     </ul>
                     <span class="card-button">View Example →</span>
                 </div>

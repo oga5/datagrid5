@@ -73,7 +73,7 @@ export class DataGridWrapper {
         this.scrollContainer.style.right = '0';
         this.scrollContainer.style.bottom = '0';
         this.scrollContainer.style.overflow = 'auto';
-        this.scrollContainer.style.zIndex = '3';
+        this.scrollContainer.style.zIndex = '1';
 
         this.scrollContent = document.createElement('div');
         this.scrollContent.id = 'scroll-content';
@@ -96,7 +96,7 @@ export class DataGridWrapper {
         this.webglCanvas.style.position = 'absolute';
         this.webglCanvas.style.top = '0';
         this.webglCanvas.style.left = '0';
-        this.webglCanvas.style.zIndex = '1';
+        this.webglCanvas.style.zIndex = '2';
         this.webglCanvas.style.pointerEvents = 'none';
         this.container.appendChild(this.webglCanvas);
 
@@ -109,7 +109,7 @@ export class DataGridWrapper {
         this.textCanvas.style.position = 'absolute';
         this.textCanvas.style.top = '0';
         this.textCanvas.style.left = '0';
-        this.textCanvas.style.zIndex = '2';
+        this.textCanvas.style.zIndex = '3';
         this.textCanvas.style.pointerEvents = 'all';
         this.textCanvas.style.cursor = 'cell';
         this.container.appendChild(this.textCanvas);
@@ -156,12 +156,15 @@ export class DataGridWrapper {
     setupEventHandlers() {
         // Mouse events
         this.textCanvas.addEventListener('mousedown', (e) => {
+            console.log('[DEBUG] mousedown event fired', e.clientX, e.clientY);
             const rect = this.textCanvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+            console.log('[DEBUG] canvas coords:', x, y);
 
             // Check for resize handle
             const resizeType = this.grid.check_resize_handle(x, y);
+            console.log('[DEBUG] resizeType:', resizeType);
             if (resizeType !== 'none') {
                 this.grid.start_resize(x, y, resizeType);
                 e.preventDefault();
@@ -169,11 +172,13 @@ export class DataGridWrapper {
             }
 
             // Handle cell selection with modifiers
+            console.log('[DEBUG] calling handle_mouse_down_at_with_modifiers');
             this.grid.handle_mouse_down_at_with_modifiers(
                 x, y,
                 e.shiftKey,
                 e.ctrlKey || e.metaKey
             );
+            console.log('[DEBUG] calling requestRender');
             this.requestRender();
         });
 
@@ -209,6 +214,7 @@ export class DataGridWrapper {
 
             if (this.grid.is_resizing()) {
                 this.grid.end_resize();
+                this.updateVirtualScrollSize();  // Update scroll size after resize
                 this.requestRender();
             } else {
                 this.grid.handle_mouse_up(x, y);
@@ -233,6 +239,11 @@ export class DataGridWrapper {
 
         // Keyboard events
         this.textCanvas.addEventListener('keydown', (e) => {
+            // Check if key is defined
+            if (!e.key) {
+                return;
+            }
+
             const isCtrl = e.ctrlKey || e.metaKey;
 
             // Handle clipboard operations
@@ -255,7 +266,7 @@ export class DataGridWrapper {
                 }
             }
 
-            const handled = this.grid.handle_keyboard_with_modifiers(
+            const handled = this.grid.handle_keyboard_with_modifiers_key(
                 e.key,
                 isCtrl,
                 e.shiftKey
@@ -272,6 +283,7 @@ export class DataGridWrapper {
         this.textCanvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             this.grid.handle_wheel(e.deltaX, e.deltaY);
+            this.syncScrollPosition();
             this.requestRender();
         });
 

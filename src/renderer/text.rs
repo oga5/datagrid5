@@ -229,9 +229,9 @@ impl TextRenderer {
             canvas_x
         };
         let bg_width = if canvas_x < header_offset_x {
-            (width - (header_offset_x - canvas_x)).max(0.0)
+            (width - (header_offset_x - canvas_x) - 1.0).max(0.0)
         } else {
-            width
+            (width - 1.0).max(0.0)
         };
 
         // Clip background to avoid drawing over column headers (vertical)
@@ -241,34 +241,34 @@ impl TextRenderer {
             canvas_y
         };
         let bg_height = if canvas_y < header_offset_y {
-            (height - (header_offset_y - canvas_y)).max(0.0)
+            (height - (header_offset_y - canvas_y) - 1.0).max(0.0)
         } else {
-            height
+            (height - 1.0).max(0.0)
         };
 
-        if let Some(cell) = cell {
-            if let Some(bg_color) = cell.bg_color {
-                let bg_str = u32_to_rgba_string(bg_color);
-                self.context.set_fill_style(&bg_str.into());
-                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
-            } else if is_current_match {
-                self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
-                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
-            } else if is_search_match {
-                self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
-                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
-            } else if is_selected {
-                self.context.set_fill_style(&self.selected_bg_color.clone().into());
-                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
-            }
+        // Priority order: selected > current_match > search_match > cell.bg_color > default white
+        if is_selected {
+            self.context.set_fill_style(&self.selected_bg_color.clone().into());
+            self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         } else if is_current_match {
             self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
             self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         } else if is_search_match {
             self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
             self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
-        } else if is_selected {
-            self.context.set_fill_style(&self.selected_bg_color.clone().into());
+        } else if let Some(cell) = cell {
+            if let Some(bg_color) = cell.bg_color {
+                let bg_str = u32_to_rgba_string(bg_color);
+                self.context.set_fill_style(&bg_str.into());
+                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
+            } else {
+                // Draw default white background for consistent grid line appearance
+                self.context.set_fill_style(&"#FFFFFF".into());
+                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
+            }
+        } else {
+            // Draw default white background for empty cells
+            self.context.set_fill_style(&"#FFFFFF".into());
             self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         }
 
@@ -399,71 +399,67 @@ impl TextRenderer {
             false
         };
 
-        // Draw cell background (priority: custom color > current search > search match > selection > default)
-        if let Some(cell) = cell {
+        // Draw cell background (priority: selected > current_match > search_match > cell.bg_color)
+        // Reduce width/height by 1px to show grid lines
+        let bg_width = (width - 1.0).max(0.0);
+        let bg_height = (height - 1.0).max(0.0);
+
+        if is_selected {
+            // Use selection background (highest priority)
+            self.context.set_fill_style(&self.selected_bg_color.clone().into());
+            self.context.fill_rect(
+                canvas_x as f64,
+                canvas_y as f64,
+                bg_width as f64,
+                bg_height as f64,
+            );
+        } else if is_current_match {
+            // Current (active) search result - bright orange
+            self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+            self.context.fill_rect(
+                canvas_x as f64,
+                canvas_y as f64,
+                bg_width as f64,
+                bg_height as f64,
+            );
+        } else if is_search_match {
+            // Other search results - light yellow
+            self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
+            self.context.fill_rect(
+                canvas_x as f64,
+                canvas_y as f64,
+                bg_width as f64,
+                bg_height as f64,
+            );
+        } else if let Some(cell) = cell {
             if let Some(bg_color) = cell.bg_color {
-                // Use custom background color (highest priority)
+                // Use custom background color
                 let bg_str = u32_to_rgba_string(bg_color);
                 self.context.set_fill_style(&bg_str.into());
                 self.context.fill_rect(
                     canvas_x as f64,
                     canvas_y as f64,
-                    width as f64,
-                    height as f64,
+                    bg_width as f64,
+                    bg_height as f64,
                 );
-            } else if is_current_match {
-                // Current (active) search result - bright orange
-                self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+            } else {
+                // Draw default white background for consistent grid line appearance
+                self.context.set_fill_style(&"#FFFFFF".into());
                 self.context.fill_rect(
                     canvas_x as f64,
                     canvas_y as f64,
-                    width as f64,
-                    height as f64,
-                );
-            } else if is_search_match {
-                // Other search results - light yellow
-                self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
-                self.context.fill_rect(
-                    canvas_x as f64,
-                    canvas_y as f64,
-                    width as f64,
-                    height as f64,
-                );
-            } else if is_selected {
-                // Use selection background
-                self.context.set_fill_style(&self.selected_bg_color.clone().into());
-                self.context.fill_rect(
-                    canvas_x as f64,
-                    canvas_y as f64,
-                    width as f64,
-                    height as f64,
+                    bg_width as f64,
+                    bg_height as f64,
                 );
             }
-        } else if is_current_match {
-            // Current search result
-            self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+        } else {
+            // Draw default white background for empty cells
+            self.context.set_fill_style(&"#FFFFFF".into());
             self.context.fill_rect(
                 canvas_x as f64,
                 canvas_y as f64,
-                width as f64,
-                height as f64,
-            );
-        } else if is_search_match {
-            // Other search results
-            self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
-            self.context.fill_rect(
-                canvas_x as f64,
-                canvas_y as f64,
-                width as f64,
-                height as f64,
-            );
-        } else if is_selected {
-            self.context.set_fill_style(&self.selected_bg_color.clone().into());
-            self.context.fill_rect(
-                canvas_x as f64,
-                canvas_y as f64,
-                width as f64,
-                height as f64,
+                bg_width as f64,
+                bg_height as f64,
             );
         }
 

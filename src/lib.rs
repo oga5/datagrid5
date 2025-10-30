@@ -372,6 +372,8 @@ impl DataGrid {
 
     /// Handle mouse down at coordinates with modifier keys (for JavaScript)
     pub fn handle_mouse_down_at_with_modifiers(&mut self, x: f32, y: f32, shift: bool, ctrl: bool) {
+        web_sys::console::log_1(&format!("[DEBUG RS] handle_mouse_down_at_with_modifiers: x={}, y={}", x, y).into());
+
         // If currently editing, commit the edit before processing the click
         if self.is_editing() {
             self.end_edit();
@@ -379,19 +381,21 @@ impl DataGrid {
 
         // Check if clicked on column header (for sorting)
         if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
-            web_sys::console::log_1(&format!("Clicked column header: {}", col).into());
+            web_sys::console::log_1(&format!("[DEBUG RS] Clicked column header: {}", col).into());
             self.toggle_column_sort(col);
             return;
         }
 
         // Check if clicked on row header (for row selection)
         if let Some(row) = self.viewport.canvas_to_row_header(x, y, &self.grid) {
+            web_sys::console::log_1(&format!("[DEBUG RS] Clicked row header: {}", row).into());
             self.select_row(row);
             return;
         }
 
         // Check if clicked on a cell
         if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
+            web_sys::console::log_1(&format!("[DEBUG RS] Clicked cell: ({}, {}), shift={}, ctrl={}", row, col, shift, ctrl).into());
             if shift {
                 // Shift+Click: Range selection
                 self.select_range(row, col);
@@ -402,13 +406,16 @@ impl DataGrid {
                 self.mouse_handler.mouse_down(x, y);
             } else {
                 // Normal click: Single selection and start drag selection
+                web_sys::console::log_1(&format!("[DEBUG RS] Calling select_single_cell({}, {})", row, col).into());
                 self.select_single_cell(row, col);
+                web_sys::console::log_1(&format!("[DEBUG RS] After select_single_cell, selected_cells.len={}", self.selection.selected_cells.len()).into());
                 self.mouse_handler.start_selection(x, y);
             }
 
             self.mouse_handler.select_cell(row, col);
-            web_sys::console::log_1(&format!("Selected {} cells", self.selection.selected_cells.len()).into());
+            web_sys::console::log_1(&format!("[DEBUG RS] Selected {} cells", self.selection.selected_cells.len()).into());
         } else {
+            web_sys::console::log_1(&format!("[DEBUG RS] Clicked outside grid area").into());
             // Clicked outside grid, clear selection
             if !ctrl {
                 self.clear_selection();
@@ -1141,6 +1148,130 @@ impl DataGrid {
         false
     }
 
+    /// Handle keyboard with key string and modifier flags (called from JavaScript)
+    pub fn handle_keyboard_with_modifiers_key(&mut self, key: &str, ctrl: bool, shift: bool) -> bool {
+        // Get navigation command with modifiers
+        if let Some(command) = self.keyboard_handler.handle_key_with_modifiers(key, ctrl, shift) {
+            let current = self.mouse_handler.selected_cell;
+
+            let new_selection = match command {
+                NavigationCommand::MoveUp => {
+                    current.and_then(|(row, col)| {
+                        if row > 0 {
+                            Some((row - 1, col))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveDown => {
+                    current.and_then(|(row, col)| {
+                        if row < self.grid.row_count() - 1 {
+                            Some((row + 1, col))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveLeft => {
+                    current.and_then(|(row, col)| {
+                        if col > 0 {
+                            Some((row, col - 1))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::MoveRight => {
+                    current.and_then(|(row, col)| {
+                        if col < self.grid.col_count() - 1 {
+                            Some((row, col + 1))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::PageUp => {
+                    current.map(|(row, col)| {
+                        let page_size = self.viewport.visible_row_count();
+                        let new_row = row.saturating_sub(page_size);
+                        (new_row, col)
+                    })
+                }
+                NavigationCommand::PageDown => {
+                    current.map(|(row, col)| {
+                        let page_size = self.viewport.visible_row_count();
+                        let new_row = (row + page_size).min(self.grid.row_count() - 1);
+                        (new_row, col)
+                    })
+                }
+                NavigationCommand::Home => {
+                    current.map(|(row, _)| (row, 0))
+                }
+                NavigationCommand::End => {
+                    current.map(|(row, _)| (row, self.grid.col_count() - 1))
+                }
+                NavigationCommand::DocumentStart => {
+                    Some((0, 0))
+                }
+                NavigationCommand::DocumentEnd => {
+                    Some((self.grid.row_count() - 1, self.grid.col_count() - 1))
+                }
+                NavigationCommand::Delete => {
+                    if let Some((row, col)) = current {
+                        self.grid.set_value(row, col, CellValue::Empty);
+                    }
+                    None
+                }
+                NavigationCommand::Undo => {
+                    if self.undo() {
+                        web_sys::console::log_1(&"Undo action".into());
+                    }
+                    None
+                }
+                NavigationCommand::Redo => {
+                    if self.redo() {
+                        web_sys::console::log_1(&"Redo action".into());
+                    }
+                    None
+                }
+                NavigationCommand::Enter | NavigationCommand::Escape | NavigationCommand::Tab => {
+                    None
+                }
+            };
+
+            if let Some((new_row, new_col)) = new_selection {
+                if shift {
+                    // Shift is pressed: extend selection (range selection)
+                    if self.selection.selection_anchor.is_none() {
+                        // No anchor yet, set current cell as anchor
+                        if let Some((row, col)) = current {
+                            self.selection.selection_anchor = Some((row, col));
+                        }
+                    }
+                    // Extend selection to new cell
+                    self.select_range(new_row, new_col);
+                } else {
+                    // No shift: move selection to new cell
+                    if let Some((prev_row, prev_col)) = current {
+                        if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
+                            cell.selected = false;
+                        }
+                    }
+
+                    self.select_single_cell(new_row, new_col);
+                }
+
+                self.mouse_handler.select_cell(new_row, new_col);
+                self.ensure_cell_visible(new_row, new_col);
+
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Ensure a cell is visible in the viewport
     fn ensure_cell_visible(&mut self, row: usize, col: usize) {
         let cell_x = self.grid.col_x_position(col);
@@ -1151,18 +1282,36 @@ impl DataGrid {
         let mut scroll_x = self.viewport.scroll_x;
         let mut scroll_y = self.viewport.scroll_y;
 
+        // Account for row and column headers
+        let row_header_width = self.grid.row_header_width;
+        let col_header_height = self.grid.col_header_height;
+
+        // Calculate visible area (excluding headers)
+        let visible_width = self.viewport.canvas_width - row_header_width;
+        let visible_height = self.viewport.canvas_height - col_header_height;
+
         // Check horizontal visibility
-        if cell_x < scroll_x {
+        // Cell position relative to visible area (after row header)
+        let cell_screen_x = cell_x - scroll_x;
+
+        if cell_screen_x < 0.0 {
+            // Cell is scrolled off to the left - align to left edge of visible area
             scroll_x = cell_x;
-        } else if cell_x + cell_width > scroll_x + self.viewport.canvas_width {
-            scroll_x = cell_x + cell_width - self.viewport.canvas_width;
+        } else if cell_screen_x + cell_width > visible_width {
+            // Cell is scrolled off to the right - align to right edge of visible area
+            scroll_x = cell_x + cell_width - visible_width;
         }
 
         // Check vertical visibility
-        if cell_y < scroll_y {
+        // Cell position relative to visible area (after column header)
+        let cell_screen_y = cell_y - scroll_y;
+
+        if cell_screen_y < 0.0 {
+            // Cell is scrolled off to the top - align to top edge of visible area
             scroll_y = cell_y;
-        } else if cell_y + cell_height > scroll_y + self.viewport.canvas_height {
-            scroll_y = cell_y + cell_height - self.viewport.canvas_height;
+        } else if cell_screen_y + cell_height > visible_height {
+            // Cell is scrolled off to the bottom - align to bottom edge of visible area
+            scroll_y = cell_y + cell_height - visible_height;
         }
 
         // Update scroll if changed
@@ -1220,40 +1369,8 @@ impl DataGrid {
     /// Check if mouse is over a resize handle
     /// Returns: "col" for column resize, "row" for row resize, "none" otherwise
     pub fn check_resize_handle(&self, x: f32, y: f32) -> String {
-        const RESIZE_HANDLE_WIDTH: f32 = 5.0;
-
-        let _grid_x = x + self.viewport.scroll_x;
-        let _grid_y = y + self.viewport.scroll_y;
-
-        // Column resize: only detect in column header area
-        if y < self.grid.col_header_height {
-            let mut col_x = self.grid.row_header_width;
-            for col in 0..self.grid.col_count() {
-                let width = self.grid.col_width(col);
-                col_x += width;
-
-                // Check if near right edge of column
-                if (x - col_x).abs() < RESIZE_HANDLE_WIDTH {
-                    return "col".to_string();
-                }
-            }
-        }
-
-        // Row resize: only detect in row header area
-        if x < self.grid.row_header_width {
-            let mut row_y = self.grid.col_header_height;
-            for row in 0..self.grid.row_count() {
-                let height = self.grid.row_height(row);
-                row_y += height;
-
-                // Check if near bottom edge of row
-                if (y - row_y).abs() < RESIZE_HANDLE_WIDTH {
-                    return "row".to_string();
-                }
-            }
-        }
-
-        "none".to_string()
+        // Use ResizeState's check_resize_handle method
+        self.resize.check_resize_handle(x, y, &self.grid, &self.viewport)
     }
 
     /// Start column or row resize
@@ -1264,31 +1381,14 @@ impl DataGrid {
 
     /// Update resize during drag
     pub fn update_resize(&mut self, x: f32, y: f32) {
-        if !self.resize.is_resizing {
-            return;
-        }
-
-        if let Some(col) = self.resize.resizing_column {
-            let delta = x - self.resize.resize_start_pos;
-            let new_width = (self.resize.resize_start_size + delta).max(30.0); // Minimum 30px
-            self.grid.set_col_width(col, new_width);
-        } else if let Some(row) = self.resize.resizing_row {
-            let delta = y - self.resize.resize_start_pos;
-            let new_height = (self.resize.resize_start_size + delta).max(20.0); // Minimum 20px
-            self.grid.set_row_height(row, new_height);
-        }
+        // Use ResizeState's update_resize method
+        self.resize.update_resize(x, y, &mut self.grid);
     }
 
     /// End resize
     pub fn end_resize(&mut self) {
-        if self.resize.is_resizing {
-            web_sys::console::log_1(&"Ended resizing".into());
-        }
-        self.resize.is_resizing = false;
-        self.resize.resizing_column = None;
-        self.resize.resizing_row = None;
-        self.resize.resize_start_pos = 0.0;
-        self.resize.resize_start_size = 0.0;
+        // Use ResizeState's end_resize method
+        self.resize.end_resize();
     }
 
     /// Check if currently resizing
