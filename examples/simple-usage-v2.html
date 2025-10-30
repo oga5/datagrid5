@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Simple Usage Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin-right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button.secondary {
+            background-color: #2196F3;
+        }
+
+        button.secondary:hover {
+            background-color: #0b7dda;
+        }
+
+        .grid-wrapper {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+
+        .info h3 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+
+        .info ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .info li {
+            margin: 5px 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>DataGrid5 - Simple Usage Example</h1>
+    <div class="description">
+        This example demonstrates the basic usage of DataGrid5 with the DataGridWrapper.
+        The wrapper handles all setup automatically - canvases, events, rendering, scrolling, etc.
+    </div>
+
+    <div class="controls">
+        <button id="fill-data-btn">Fill Sample Data</button>
+        <button id="clear-btn" class="secondary">Clear Grid</button>
+        <button id="highlight-btn" class="secondary">Highlight Headers</button>
+    </div>
+
+    <div class="grid-wrapper" id="grid-container"></div>
+
+    <div class="info">
+        <h3>🎮 Features Demonstrated:</h3>
+        <ul>
+            <li><strong>Simple Initialization:</strong> Just 3 lines of code to create a fully functional grid</li>
+            <li><strong>Click Cells:</strong> Click any cell to select it</li>
+            <li><strong>Keyboard Navigation:</strong> Use arrow keys to move between cells</li>
+            <li><strong>Mouse Wheel:</strong> Scroll with mouse wheel or trackpad</li>
+            <li><strong>Drag Selection:</strong> Click and drag to select multiple cells</li>
+            <li><strong>Column/Row Resize:</strong> Drag column or row borders to resize</li>
+        </ul>
+    </div>
+
+    <script type="module">
+        import init from '../pkg/datagrid5.js';
+        import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
+
+        let gridWrapper = null;
+
+        async function initGrid() {
+            // Initialize WASM module
+            const wasmModule = await init();
+
+            // Create grid - that's it! All setup is automatic.
+            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+                rows: 100,
+                cols: 26,
+                enableEditing: false,  // Disable editing for this simple example
+                enableVirtualScroll: true,
+                enableResize: true
+            });
+
+            console.log('Grid initialized successfully!');
+        }
+
+        // Example: Fill grid with sample data
+        function fillSampleData() {
+            const grid = gridWrapper.getGrid();
+
+            // Fill headers (A, B, C, ...)
+            for (let col = 0; col < 26; col++) {
+                const colName = String.fromCharCode(65 + col); // A-Z
+                grid.update_cell_value(0, col, colName);
+                grid.set_cell_bg_color(0, col, 0x4CAF50FF); // Green
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White
+                grid.set_cell_font_style(0, col, true, false); // Bold
+            }
+
+            // Fill data cells
+            for (let row = 1; row < 100; row++) {
+                for (let col = 0; col < 26; col++) {
+                    const value = `${String.fromCharCode(65 + col)}${row}`;
+                    grid.update_cell_value(row, col, value);
+                }
+            }
+
+            console.log('Sample data filled!');
+        }
+
+        // Example: Clear all data
+        function clearGrid() {
+            const grid = gridWrapper.getGrid();
+
+            for (let row = 0; row < 100; row++) {
+                for (let col = 0; col < 26; col++) {
+                    grid.update_cell_value(row, col, '');
+
+                    // Reset colors if not header
+                    if (row > 0) {
+                        grid.set_cell_bg_color(row, col, 0xFFFFFFFF);
+                        grid.set_cell_fg_color(row, col, 0x000000FF);
+                    }
+                }
+            }
+
+            console.log('Grid cleared!');
+        }
+
+        // Example: Highlight headers with different colors
+        function highlightHeaders() {
+            const grid = gridWrapper.getGrid();
+
+            const colors = [
+                0xFF5722FF, // Deep Orange
+                0xE91E63FF, // Pink
+                0x9C27B0FF, // Purple
+                0x673AB7FF, // Deep Purple
+                0x3F51B5FF, // Indigo
+                0x2196F3FF, // Blue
+                0x00BCD4FF, // Cyan
+                0x009688FF, // Teal
+            ];
+
+            for (let col = 0; col < 26; col++) {
+                const colorIndex = col % colors.length;
+                grid.set_cell_bg_color(0, col, colors[colorIndex]);
+            }
+
+            console.log('Headers highlighted!');
+        }
+
+        // Button event handlers
+        document.getElementById('fill-data-btn').addEventListener('click', fillSampleData);
+        document.getElementById('clear-btn').addEventListener('click', clearGrid);
+        document.getElementById('highlight-btn').addEventListener('click', highlightHeaders);
+
+        // Initialize grid
+        initGrid();
+    </script>
+</body>
+</html>

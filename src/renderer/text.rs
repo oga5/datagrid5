@@ -651,22 +651,35 @@ impl TextRenderer {
                 continue;
             }
 
-            // Draw header background
+            // Clip header if it overlaps with top-left corner
+            let draw_x = canvas_x.max(row_header_width);
+            let draw_width = if canvas_x < row_header_width {
+                // Part of header is under top-left corner, clip it
+                (canvas_x + width - row_header_width).max(0.0)
+            } else {
+                width
+            };
+
+            if draw_width <= 0.0 {
+                continue;
+            }
+
+            // Draw header background (clipped to not overlap top-left corner)
             self.context.set_fill_style(&header_bg.into());
             self.context.fill_rect(
-                canvas_x as f64,
+                draw_x as f64,
                 0.0,
-                width as f64,
+                draw_width as f64,
                 col_header_height as f64,
             );
 
-            // Draw header border
+            // Draw header border (clipped to not overlap top-left corner)
             self.context.set_stroke_style(&header_border.into());
             self.context.set_line_width(1.0);
             self.context.stroke_rect(
-                canvas_x as f64,
+                draw_x as f64,
                 0.0,
-                width as f64,
+                draw_width as f64,
                 col_header_height as f64,
             );
 
@@ -688,16 +701,19 @@ impl TextRenderer {
                 col_name
             };
 
-            self.context.set_fill_style(&self.header_text_color.clone().into());
-            self.context.set_text_align("center");
+            // Only draw text if the header is visible (not hidden behind top-left corner)
+            if draw_x >= row_header_width {
+                self.context.set_fill_style(&self.header_text_color.clone().into());
+                self.context.set_text_align("center");
 
-            let text_x = canvas_x + width / 2.0;
-            let text_y = col_header_height / 2.0;
+                let text_x = draw_x + draw_width / 2.0;
+                let text_y = col_header_height / 2.0;
 
-            let _ = self.context.fill_text(&display_text, text_x as f64, text_y as f64);
+                let _ = self.context.fill_text(&display_text, text_x as f64, text_y as f64);
 
-            // Reset text align
-            self.context.set_text_align("left");
+                // Reset text align
+                self.context.set_text_align("left");
+            }
         }
     }
 

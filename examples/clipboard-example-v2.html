@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Excel-like Clipboard Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .description {
+            color: rgba(255,255,255,0.95);
+            margin-bottom: 20px;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        button.secondary {
+            background: #48bb78;
+        }
+
+        button.secondary:hover {
+            background: #38a169;
+        }
+
+        .grid-wrapper {
+            height: 500px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .status-bar {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .status-success {
+            color: #48bb78;
+            font-weight: bold;
+        }
+
+        .status-info {
+            color: #4299e1;
+            font-weight: bold;
+        }
+
+        .info-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+        }
+
+        .info-panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .info-panel ul {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+
+        .info-panel li {
+            margin: 8px 0;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .shortcut-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .shortcut-item {
+            padding: 12px;
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+
+        .shortcut-item kbd {
+            background: #4a5568;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .clipboard-log {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 6px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .log-entry {
+            margin: 4px 0;
+            padding: 4px;
+        }
+
+        .log-copy {
+            color: #4299e1;
+        }
+
+        .log-cut {
+            color: #ed8936;
+        }
+
+        .log-paste {
+            color: #48bb78;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 DataGrid5 - Excel-like Clipboard Example</h1>
+        <div class="description">
+            This example demonstrates Excel-compatible copy/paste functionality.
+            Select multiple cells, copy with Ctrl+C, and paste with Ctrl+V just like in Excel!
+        </div>
+
+        <div class="controls">
+            <button id="load-data-btn">Load Sample Data</button>
+            <button id="copy-btn" class="secondary">Copy Selection (Ctrl+C)</button>
+            <button id="cut-btn" class="secondary">Cut Selection (Ctrl+X)</button>
+            <button id="paste-btn" class="secondary">Paste (Ctrl+V)</button>
+        </div>
+
+        <div class="grid-wrapper" id="grid-container"></div>
+
+        <div class="status-bar" id="status-bar">
+            <strong>Status:</strong> Ready - Select cells and try Ctrl+C / Ctrl+V
+        </div>
+
+        <div class="info-panel">
+            <h3>⌨️ Keyboard Shortcuts:</h3>
+            <div class="shortcut-grid">
+                <div class="shortcut-item">
+                    <kbd>Ctrl+C</kbd> - Copy selected cells to clipboard
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Ctrl+X</kbd> - Cut selected cells to clipboard
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Ctrl+V</kbd> - Paste from clipboard
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Click+Drag</kbd> - Select multiple cells
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Shift+Click</kbd> - Extend selection
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Ctrl+Click</kbd> - Add to selection
+                </div>
+            </div>
+
+            <h3 style="margin-top: 20px;">💡 How to Use:</h3>
+            <ul>
+                <li><strong>Select cells:</strong> Click and drag to select a range, or Shift+Click to extend selection</li>
+                <li><strong>Copy (Ctrl+C):</strong> Selected cells are copied to system clipboard in TSV format</li>
+                <li><strong>Cut (Ctrl+X):</strong> Selected cells are copied and cleared</li>
+                <li><strong>Paste (Ctrl+V):</strong> Paste at the active cell position</li>
+                <li><strong>Excel Compatible:</strong> Copy from Excel and paste here, or vice versa!</li>
+                <li><strong>Multi-cell paste:</strong> Paste expands to match the copied range size</li>
+            </ul>
+
+            <h3 style="margin-top: 20px;">📝 Clipboard Activity Log:</h3>
+            <div class="clipboard-log" id="clipboard-log">
+                <div class="log-entry">No clipboard activity yet...</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init from '../pkg/datagrid5.js';
+        import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
+
+        let gridWrapper = null;
+        const logContainer = document.getElementById('clipboard-log');
+
+        async function initGrid() {
+            const wasmModule = await init();
+
+            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+                rows: 30,
+                cols: 10,
+                enableEditing: true,
+                enableVirtualScroll: true,
+                enableResize: true
+            });
+
+            setupClipboardListeners();
+            setupHeaders();
+
+            console.log('Grid initialized with clipboard support!');
+        }
+
+        function setupClipboardListeners() {
+            const container = document.getElementById('grid-container');
+
+            // Listen to clipboard events
+            container.addEventListener('gridcopy', (e) => {
+                const { data } = e.detail;
+                const lineCount = data.split('\n').filter(l => l.trim()).length;
+                updateStatus(`✅ Copied ${lineCount} row(s) to clipboard`, 'success');
+                addLogEntry('COPY', `${lineCount} row(s)`, data);
+            });
+
+            container.addEventListener('gridcut', (e) => {
+                const { data } = e.detail;
+                const lineCount = data.split('\n').filter(l => l.trim()).length;
+                updateStatus(`✂️ Cut ${lineCount} row(s) to clipboard`, 'success');
+                addLogEntry('CUT', `${lineCount} row(s)`, data);
+            });
+
+            container.addEventListener('gridpaste', (e) => {
+                const { data } = e.detail;
+                const lineCount = data.split('\n').filter(l => l.trim()).length;
+                updateStatus(`📋 Pasted ${lineCount} row(s) from clipboard`, 'success');
+                addLogEntry('PASTE', `${lineCount} row(s)`, data);
+            });
+        }
+
+        function setupHeaders() {
+            const grid = gridWrapper.getGrid();
+
+            // Set column headers
+            const headers = ['Product', 'SKU', 'Category', 'Price', 'Stock', 'Sales', 'Revenue', 'Status', 'Region', 'Notes'];
+            for (let col = 0; col < headers.length; col++) {
+                grid.update_cell_value(0, col, headers[col]);
+                grid.set_cell_bg_color(0, col, 0x667eeaFF);
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
+                grid.set_cell_font_style(0, col, true, false);
+            }
+        }
+
+        function loadSampleData() {
+            const grid = gridWrapper.getGrid();
+
+            const products = [
+                ['Laptop Pro 15"', 'LPT-001', 'Electronics', '$1,299', '45', '234', '$303,966', 'In Stock', 'North', 'Bestseller'],
+                ['Wireless Mouse', 'MSE-002', 'Accessories', '$29', '150', '567', '$16,443', 'In Stock', 'South', 'Popular'],
+                ['USB-C Hub', 'HUB-003', 'Accessories', '$49', '89', '123', '$6,027', 'Low Stock', 'East', ''],
+                ['Monitor 27" 4K', 'MON-004', 'Electronics', '$599', '67', '189', '$113,211', 'In Stock', 'West', 'Premium'],
+                ['Mechanical Keyboard', 'KBD-005', 'Accessories', '$159', '120', '345', '$54,855', 'In Stock', 'North', 'Gaming'],
+                ['Webcam HD', 'CAM-006', 'Electronics', '$89', '200', '456', '$40,584', 'In Stock', 'South', 'WFH Essential'],
+                ['External SSD 1TB', 'SSD-007', 'Storage', '$149', '78', '234', '$34,866', 'In Stock', 'East', 'Fast'],
+                ['Desk Lamp LED', 'LMP-008', 'Office', '$39', '134', '178', '$6,942', 'In Stock', 'West', 'Ergonomic'],
+                ['Notebook A5', 'NTB-009', 'Stationery', '$12', '500', '890', '$10,680', 'In Stock', 'North', 'Eco-friendly'],
+                ['Pen Set', 'PEN-010', 'Stationery', '$24', '300', '445', '$10,680', 'In Stock', 'South', 'Premium ink'],
+                ['Tablet 10"', 'TAB-011', 'Electronics', '$399', '56', '167', '$66,633', 'Low Stock', 'East', 'Portable'],
+                ['Headphones Pro', 'HDP-012', 'Audio', '$279', '89', '234', '$65,286', 'In Stock', 'West', 'Noise cancelling'],
+                ['Standing Desk', 'DSK-013', 'Furniture', '$599', '34', '89', '$53,311', 'In Stock', 'North', 'Adjustable height'],
+                ['Office Chair', 'CHR-014', 'Furniture', '$449', '45', '123', '$55,227', 'In Stock', 'South', 'Ergonomic'],
+                ['Cable Organizer', 'ORG-015', 'Accessories', '$15', '400', '678', '$10,170', 'In Stock', 'East', 'Minimalist'],
+            ];
+
+            for (let i = 0; i < products.length; i++) {
+                for (let col = 0; col < products[i].length; col++) {
+                    grid.update_cell_value(i + 1, col, products[i][col]);
+                }
+
+                // Color coding for status
+                if (products[i][7] === 'Low Stock') {
+                    grid.set_cell_bg_color(i + 1, 7, 0xFFE0B2FF); // Light orange
+                } else if (products[i][7] === 'In Stock') {
+                    grid.set_cell_bg_color(i + 1, 7, 0xC8E6C9FF); // Light green
+                }
+            }
+
+            updateStatus('Sample data loaded - Try selecting and copying cells!', 'info');
+        }
+
+        function addLogEntry(operation, summary, data) {
+            if (logContainer.children.length === 1 && logContainer.textContent.includes('No clipboard activity')) {
+                logContainer.innerHTML = '';
+            }
+
+            const timestamp = new Date().toLocaleTimeString();
+            const preview = data.split('\n')[0].substring(0, 50) + (data.length > 50 ? '...' : '');
+
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${operation.toLowerCase()}`;
+            entry.textContent = `[${timestamp}] ${operation}: ${summary} - "${preview}"`;
+
+            logContainer.insertBefore(entry, logContainer.firstChild);
+
+            // Keep only last 10 entries
+            while (logContainer.children.length > 10) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        function updateStatus(message, type = 'normal') {
+            const statusBar = document.getElementById('status-bar');
+            const className = type === 'success' ? 'status-success' : type === 'info' ? 'status-info' : '';
+            statusBar.innerHTML = `<strong>Status:</strong> <span class="${className}">${message}</span>`;
+        }
+
+        // Button handlers
+        document.getElementById('load-data-btn').addEventListener('click', loadSampleData);
+
+        document.getElementById('copy-btn').addEventListener('click', () => {
+            gridWrapper.copy();
+        });
+
+        document.getElementById('cut-btn').addEventListener('click', () => {
+            gridWrapper.cut();
+        });
+
+        document.getElementById('paste-btn').addEventListener('click', () => {
+            gridWrapper.paste();
+        });
+
+        // Initialize
+        initGrid().then(() => {
+            loadSampleData();
+        });
+    </script>
+</body>
+</html>

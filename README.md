@@ -1,6 +1,6 @@
 # DataGrid5
 
-[![License: BSD-2-Clause](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-2021-orange.svg)](https://www.rust-lang.org/)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-WASM-blueviolet.svg)](https://webassembly.org/)
 
@@ -8,7 +8,7 @@
 
 DataGrid5 is a high-performance, feature-rich data grid component built with Rust and WebAssembly. It provides Excel-like functionality with GPU-accelerated rendering using WebGL.
 
-[日本語版 README](./README.ja.md) | [Documentation](./docs/) | [Examples](./examples/)
+[日本語版 README](./README.ja.md) | [Documentation](./docs/) | [Examples](./examples/) | [DataGridWrapper Guide](./www/README.md)
 
 ## ✨ Features
 
@@ -18,6 +18,7 @@ All 137 features from the original C++ GridControl have been successfully ported
 - **🚀 High Performance**: WebGL GPU rendering + WebAssembly for 60 FPS with 100k+ rows
 - **📊 Excel-like Interface**: Familiar spreadsheet UI with keyboard navigation
 - **✏️ Full Editing Support**: Double-click to edit, copy/paste, undo/redo
+- **📋 Excel-Compatible Clipboard**: Copy/cut/paste with Ctrl+C/X/V, TSV format for Excel compatibility
 - **✅ Input Validation**: Column-based regex validation with custom error messages
 - **🎨 Rich Styling**: Cell colors, fonts, borders, and custom styling API
 - **🔍 Advanced Search**: Text search, regex, find & replace, highlight matches
@@ -30,6 +31,7 @@ All 137 features from the original C++ GridControl have been successfully ported
 - **🔒 Read-only Mode**: Grid-wide or per-column edit control
 - **🎯 Differential Rendering**: Only re-render changed cells for better performance
 - **💾 Lazy Loading**: Progressive data loading for massive datasets
+- **🎁 DataGridWrapper**: High-level JavaScript wrapper that reduces boilerplate by ~50-80%
 
 ## 🎯 Key Advantages
 
@@ -138,6 +140,63 @@ Open your browser and navigate to:
 ```
 
 ### Basic Usage
+
+#### Option 1: Using DataGridWrapper (Recommended) ⭐
+
+The easiest way to get started with ~80% less code:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DataGrid5 Example</title>
+</head>
+<body>
+    <div id="grid-container" style="width: 100%; height: 600px;"></div>
+
+    <script type="module">
+        import init from './pkg/datagrid5.js';
+        import { DataGridWrapper } from './www/datagrid5-wrapper.js';
+
+        // Initialize WebAssembly
+        const wasmModule = await init();
+
+        // Create grid with wrapper - automatically handles everything!
+        const gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            rows: 100,
+            cols: 10,
+            enableEditing: true,
+            enableVirtualScroll: true
+        });
+
+        // Access the grid for data operations
+        const grid = gridWrapper.getGrid();
+        grid.update_cell_value(0, 0, "Product");
+        grid.update_cell_value(0, 1, "Price");
+        grid.update_cell_value(1, 0, "Laptop");
+        grid.update_cell_value(1, 1, "$999.99");
+
+        // Listen to edit events (optional)
+        document.getElementById('grid-container').addEventListener('celleditend', (e) => {
+            console.log(`Cell (${e.detail.row}, ${e.detail.col}) changed to: ${e.detail.newValue}`);
+        });
+    </script>
+</body>
+</html>
+```
+
+**What DataGridWrapper provides:**
+- ✅ Automatic canvas setup and event handling
+- ✅ Built-in cell editor with keyboard navigation
+- ✅ Clipboard support (Ctrl+C/X/V)
+- ✅ Render loop management
+- ✅ Virtual scrolling setup
+- ✅ Resize handling
+- ✅ Custom events for integration
+
+See [DataGridWrapper Guide](./www/README.md) for details.
+
+#### Option 2: Direct API Usage (Full Control)
 
 ```html
 <!DOCTYPE html>
@@ -449,6 +508,74 @@ document.addEventListener('keydown', (event) => {
 - Get unique row indices from cell selection
 - Operations are recorded in edit history
 
+### Excel-Compatible Clipboard Operations
+
+DataGrid5 provides full clipboard support with Excel compatibility using TSV (Tab-Separated Values) format:
+
+```javascript
+// Copy selected cells (Ctrl+C)
+const tsvData = grid.copy_selected_cells();
+if (tsvData) {
+    navigator.clipboard.writeText(tsvData);
+    console.log('Copied to clipboard');
+}
+
+// Cut selected cells (Ctrl+X)
+const cutData = grid.cut_selected_cells();
+if (cutData) {
+    navigator.clipboard.writeText(cutData);
+    console.log('Cut to clipboard - cells cleared');
+}
+
+// Paste from clipboard (Ctrl+V)
+navigator.clipboard.readText().then(tsvData => {
+    const success = grid.paste_cells(tsvData);
+    if (success) {
+        console.log('Pasted from clipboard');
+    }
+});
+```
+
+**When using DataGridWrapper:**
+
+Clipboard operations are automatically handled with Ctrl+C/X/V keyboard shortcuts:
+
+```javascript
+const gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+    rows: 100,
+    cols: 26,
+    enableEditing: true
+});
+
+// Listen to clipboard events
+const container = document.getElementById('grid-container');
+
+container.addEventListener('gridcopy', (e) => {
+    console.log('Copied:', e.detail.data);
+});
+
+container.addEventListener('gridcut', (e) => {
+    console.log('Cut:', e.detail.data);
+});
+
+container.addEventListener('gridpaste', (e) => {
+    console.log('Pasted:', e.detail.data);
+});
+
+// Or trigger programmatically
+gridWrapper.copy();  // Same as Ctrl+C
+gridWrapper.cut();   // Same as Ctrl+X
+gridWrapper.paste(); // Same as Ctrl+V
+```
+
+**Features:**
+- TSV format compatible with Excel and Google Sheets
+- System clipboard integration
+- Multi-cell range support
+- Automatic expansion on paste
+- Copy between DataGrid5 and other applications
+- Fallback to internal clipboard if system clipboard unavailable
+
 ## 🎨 Advanced Configuration
 
 ### Column Definitions with Data Types
@@ -512,6 +639,25 @@ const grid = DataGrid.from_container('my-grid', JSON.stringify(options));
 
 The `examples/` directory contains comprehensive examples:
 
+### 🚀 Simplified Examples (Using DataGridWrapper)
+
+These examples use DataGridWrapper for ~50-80% less code:
+
+- **[simple-usage-v2.html](./examples/simple-usage-v2.html)** - Basic grid with minimal code (~180 lines, 64% reduction)
+- **[editing-example-simple.html](./examples/editing-example-simple.html)** - Interactive editing simplified (~150 lines, 79% reduction)
+- **[clipboard-example-v2.html](./examples/clipboard-example-v2.html)** - Excel-like copy/paste demonstration
+- **[context-menu-example-v2.html](./examples/context-menu-example-v2.html)** - Right-click menus made easy
+- **[validation-example-v2.html](./examples/validation-example-v2.html)** - Real-time validation
+- **[column-grouping-example-v2.html](./examples/column-grouping-example-v2.html)** - Multi-level headers
+- **[readonly-columns-example-v2.html](./examples/readonly-columns-example-v2.html)** - Column permissions
+- **[advanced-config-example-v2.html](./examples/advanced-config-example-v2.html)** - Advanced configuration
+- **[sales-analysis-example-v2.html](./examples/sales-analysis-example-v2.html)** - Analytics dashboard
+- **[responsive-resize-example-v2.html](./examples/responsive-resize-example-v2.html)** - Auto-resize support
+
+### 📚 Full Examples (Direct API Usage)
+
+Complete examples showing full control:
+
 - **[simple-usage.html](./examples/simple-usage.html)** - Basic grid setup and data loading
 - **[advanced-config-example.html](./examples/advanced-config-example.html)** - Column configuration and data types
 - **[readonly-columns-example.html](./examples/readonly-columns-example.html)** - Read-only column configuration per column
@@ -524,7 +670,8 @@ The `examples/` directory contains comprehensive examples:
 - **[responsive-resize-example.html](./examples/responsive-resize-example.html)** - Responsive layout example
 - **[worker-example.html](./examples/worker-example.html)** - Background processing with Web Workers
 - **[context-menu-example.html](./examples/context-menu-example.html)** - Right-click context menus
-- **[index.html](./examples/index.html)** - Examples index page
+
+Visit **[index.html](./examples/index.html)** for a complete examples showcase.
 
 ## 📊 Performance
 
@@ -592,7 +739,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-BSD 2-Clause License - see [LICENSE](./LICENSE) for details
+MIT License - see [LICENSE](./LICENSE) for details
+
+All dependencies are MIT-compatible, ensuring hassle-free integration into your projects.
 
 ## 🙏 Acknowledgments
 
