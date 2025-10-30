@@ -112,17 +112,17 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
 
         async function initGrid() {
             // Initialize WASM module
-            const wasmModule = await init();
+            await init();
 
             // Create grid - that's it! All setup is automatic.
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
                 rows: 100,
                 cols: 26,
                 enableEditing: false,  // Disable editing for this simple example
@@ -140,7 +140,7 @@
             // Fill headers (A, B, C, ...)
             for (let col = 0; col < 26; col++) {
                 const colName = String.fromCharCode(65 + col); // A-Z
-                grid.update_cell_value(0, col, colName);
+                grid.set_cell_value(0, col, colName);
                 grid.set_cell_bg_color(0, col, 0x4CAF50FF); // Green
                 grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White
                 grid.set_cell_font_style(0, col, true, false); // Bold
@@ -150,11 +150,12 @@
             for (let row = 1; row < 100; row++) {
                 for (let col = 0; col < 26; col++) {
                     const value = `${String.fromCharCode(65 + col)}${row}`;
-                    grid.update_cell_value(row, col, value);
+                    grid.set_cell_value(row, col, value);
                 }
             }
 
             console.log('Sample data filled!');
+            gridWrapper.render();
         }
 
         // Example: Clear all data
@@ -163,7 +164,7 @@
 
             for (let row = 0; row < 100; row++) {
                 for (let col = 0; col < 26; col++) {
-                    grid.update_cell_value(row, col, '');
+                    grid.set_cell_value(row, col, '');
 
                     // Reset colors if not header
                     if (row > 0) {
@@ -174,6 +175,7 @@
             }
 
             console.log('Grid cleared!');
+            gridWrapper.render();
         }
 
         // Example: Highlight headers with different colors
@@ -197,6 +199,7 @@
             }
 
             console.log('Headers highlighted!');
+            gridWrapper.render();
         }
 
         // Button event handlers

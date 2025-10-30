@@ -100,8 +100,6 @@ impl TextRenderer {
         search_results: &[(usize, usize)],
         current_search_index: Option<usize>
     ) {
-        web_sys::console::log_1(&"TextRenderer::render_with_search() called".into());
-
         // Clear canvas first
         self.clear(viewport.canvas_width, viewport.canvas_height);
 
@@ -156,15 +154,12 @@ impl TextRenderer {
         }
 
         // Region 4: Scrollable rows × Scrollable cols (bottom-right)
-        let mut rendered_count = 0;
         for row in first_row.max(frozen_rows)..=last_row {
             if grid.is_row_filtered(row) { continue; }
             for col in first_col.max(frozen_cols)..=last_col {
                 self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, false, false);
-                rendered_count += 1;
             }
         }
-        web_sys::console::log_1(&format!("TextRenderer: Attempted to render {} cells", rendered_count).into());
     }
 
     /// Render a single cell's text
@@ -227,30 +222,54 @@ impl TextRenderer {
         };
 
         // Draw cell background
+        // Clip background to avoid drawing over row headers (horizontal)
+        let bg_x = if canvas_x < header_offset_x {
+            header_offset_x
+        } else {
+            canvas_x
+        };
+        let bg_width = if canvas_x < header_offset_x {
+            (width - (header_offset_x - canvas_x)).max(0.0)
+        } else {
+            width
+        };
+
+        // Clip background to avoid drawing over column headers (vertical)
+        let bg_y = if canvas_y < header_offset_y {
+            header_offset_y
+        } else {
+            canvas_y
+        };
+        let bg_height = if canvas_y < header_offset_y {
+            (height - (header_offset_y - canvas_y)).max(0.0)
+        } else {
+            height
+        };
+
         if let Some(cell) = cell {
             if let Some(bg_color) = cell.bg_color {
                 let bg_str = u32_to_rgba_string(bg_color);
                 self.context.set_fill_style(&bg_str.into());
-                self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
             } else if is_current_match {
                 self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
-                self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
             } else if is_search_match {
                 self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
-                self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
             } else if is_selected {
                 self.context.set_fill_style(&self.selected_bg_color.clone().into());
-                self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+                self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
             }
         } else if is_current_match {
             self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
-            self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+            self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         } else if is_search_match {
             self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
-            self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+            self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         } else if is_selected {
             self.context.set_fill_style(&self.selected_bg_color.clone().into());
-            self.context.fill_rect(canvas_x as f64, canvas_y as f64, width as f64, height as f64);
+            self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         }
 
         // Set text color
@@ -576,8 +595,6 @@ impl TextRenderer {
 
     /// Render row and column headers
     fn render_headers(&self, grid: &Grid, viewport: &Viewport) {
-        web_sys::console::log_1(&"TextRenderer::render_headers() called".into());
-
         let row_header_width = grid.row_header_width;
         let col_header_height = grid.col_header_height;
 
@@ -586,19 +603,17 @@ impl TextRenderer {
         let header_border = "#cccccc";
 
         // Draw top-left corner cell (all-select button area)
-        // Adjust size to account for selection border width (2.0px)
-        let selection_border_width = 2.0;
         self.context.set_fill_style(&header_bg.into());
         self.context.fill_rect(0.0, 0.0,
-            (row_header_width as f64) - selection_border_width,
-            (col_header_height as f64) - selection_border_width);
+            row_header_width as f64,
+            col_header_height as f64);
 
         // Border for corner
         self.context.set_stroke_style(&header_border.into());
         self.context.set_line_width(1.0);
         self.context.stroke_rect(0.0, 0.0,
-            (row_header_width as f64) - selection_border_width,
-            (col_header_height as f64) - selection_border_width);
+            row_header_width as f64,
+            col_header_height as f64);
 
         // Render column headers
         self.render_column_headers(grid, viewport, row_header_width, col_header_height, header_bg, header_border);
@@ -701,19 +716,35 @@ impl TextRenderer {
                 col_name
             };
 
-            // Only draw text if the header is visible (not hidden behind top-left corner)
-            if draw_x >= row_header_width {
-                self.context.set_fill_style(&self.header_text_color.clone().into());
-                self.context.set_text_align("center");
+            // Draw text - always centered in the original cell position, not the clipped area
+            self.context.set_fill_style(&self.header_text_color.clone().into());
+            self.context.set_text_align("center");
+            self.context.set_font(&self.font_string);
 
-                let text_x = draw_x + draw_width / 2.0;
-                let text_y = col_header_height / 2.0;
+            // Text should be centered in the original cell, not the clipped visible area
+            let text_x = canvas_x + width / 2.0;
+            let text_y = col_header_height / 2.0;
+
+            // Draw text as long as any part of the cell is visible
+            if canvas_x + width > row_header_width {
+                // Use canvas clipping to prevent text from drawing over row headers
+                self.context.save();
+                self.context.begin_path();
+                self.context.rect(
+                    row_header_width as f64,
+                    0.0,
+                    (viewport.canvas_width - row_header_width) as f64,
+                    col_header_height as f64,
+                );
+                self.context.clip();
 
                 let _ = self.context.fill_text(&display_text, text_x as f64, text_y as f64);
 
-                // Reset text align
-                self.context.set_text_align("left");
+                self.context.restore();
             }
+
+            // Reset text align
+            self.context.set_text_align("left");
         }
     }
 
@@ -785,7 +816,7 @@ impl TextRenderer {
                     header_row_height as f64,
                 );
 
-                // Draw group label (centered)
+                // Draw group label (centered, with clipping)
                 self.context.set_fill_style(&"#333333".into());
                 self.context.set_text_align("center");
                 self.context.set_font("bold 13px Arial");
@@ -793,7 +824,23 @@ impl TextRenderer {
                 let text_x = canvas_x + group_width / 2.0;
                 let text_y = y_pos + header_row_height / 2.0 + 4.0;
 
+                // Use clipping to prevent text from drawing over row headers
+                self.context.save();
+                self.context.begin_path();
+                self.context.rect(
+                    row_header_width as f64,
+                    y_pos as f64,
+                    (viewport.canvas_width - row_header_width) as f64,
+                    header_row_height as f64,
+                );
+                self.context.clip();
+
                 let _ = self.context.fill_text(&group.label, text_x as f64, text_y as f64);
+
+                self.context.restore();
+
+                // Reset font to normal (not bold)
+                self.context.set_font(&self.font_string);
             }
         }
 
@@ -810,22 +857,34 @@ impl TextRenderer {
                 continue;
             }
 
-            // Draw header background
+            // Clip header if it overlaps with row headers
+            let draw_x = canvas_x.max(row_header_width);
+            let draw_width = if canvas_x < row_header_width {
+                (canvas_x + width - row_header_width).max(0.0)
+            } else {
+                width
+            };
+
+            if draw_width <= 0.0 {
+                continue;
+            }
+
+            // Draw header background (clipped)
             self.context.set_fill_style(&header_bg.into());
             self.context.fill_rect(
-                canvas_x as f64,
+                draw_x as f64,
                 col_header_y as f64,
-                width as f64,
+                draw_width as f64,
                 header_row_height as f64,
             );
 
-            // Draw header border
+            // Draw header border (clipped)
             self.context.set_stroke_style(&header_border.into());
             self.context.set_line_width(1.0);
             self.context.stroke_rect(
-                canvas_x as f64,
+                draw_x as f64,
                 col_header_y as f64,
-                width as f64,
+                draw_width as f64,
                 header_row_height as f64,
             );
 
@@ -845,12 +904,29 @@ impl TextRenderer {
 
             self.context.set_fill_style(&self.header_text_color.clone().into());
             self.context.set_text_align("center");
-            self.context.set_font("13px Arial");
+            self.context.set_font(&self.font_string);
 
+            // Text should be centered in the original cell, not the clipped area
             let text_x = canvas_x + width / 2.0;
             let text_y = col_header_y + header_row_height / 2.0 + 4.0;
 
-            let _ = self.context.fill_text(&display_text, text_x as f64, text_y as f64);
+            // Draw text as long as any part of the cell is visible
+            if canvas_x + width > row_header_width {
+                // Use clipping to prevent text from drawing over row headers
+                self.context.save();
+                self.context.begin_path();
+                self.context.rect(
+                    row_header_width as f64,
+                    col_header_y as f64,
+                    (viewport.canvas_width - row_header_width) as f64,
+                    header_row_height as f64,
+                );
+                self.context.clip();
+
+                let _ = self.context.fill_text(&display_text, text_x as f64, text_y as f64);
+
+                self.context.restore();
+            }
 
             // Reset text align
             self.context.set_text_align("left");
@@ -880,34 +956,67 @@ impl TextRenderer {
                 continue;
             }
 
-            // Draw header background
+            // Clip row header to avoid drawing over column headers (top corner)
+            let draw_y = if canvas_y < col_header_height {
+                col_header_height
+            } else {
+                canvas_y
+            };
+            let draw_height = if canvas_y < col_header_height {
+                (height - (col_header_height - canvas_y)).max(0.0)
+            } else {
+                height
+            };
+
+            if draw_height <= 0.0 {
+                continue;
+            }
+
+            // Draw header background (clipped)
             self.context.set_fill_style(&header_bg.into());
             self.context.fill_rect(
                 0.0,
-                canvas_y as f64,
+                draw_y as f64,
                 row_header_width as f64,
-                height as f64,
+                draw_height as f64,
             );
 
-            // Draw header border
+            // Draw header border (clipped)
             self.context.set_stroke_style(&header_border.into());
             self.context.set_line_width(1.0);
             self.context.stroke_rect(
                 0.0,
-                canvas_y as f64,
+                draw_y as f64,
                 row_header_width as f64,
-                height as f64,
+                draw_height as f64,
             );
 
-            // Draw row number (1, 2, 3, ...)
+            // Draw row number (1, 2, 3, ...) with clipping
             let row_number = format!("{}", row + 1);
             self.context.set_fill_style(&self.header_text_color.clone().into());
             self.context.set_text_align("center");
+            self.context.set_font(&self.font_string);
 
             let text_x = row_header_width / 2.0;
             let text_y = canvas_y + height / 2.0;
 
-            let _ = self.context.fill_text(&row_number, text_x as f64, text_y as f64);
+            // Draw text as long as any part of the row header is visible
+            if canvas_y + height > col_header_height {
+                // Use clipping to prevent text from drawing over column headers
+                self.context.save();
+                self.context.begin_path();
+                self.context.rect(
+                    0.0,
+                    col_header_height as f64,
+                    row_header_width as f64,
+                    (viewport.canvas_height - col_header_height) as f64,
+                );
+                self.context.clip();
+
+                let _ = self.context.fill_text(&row_number, text_x as f64, text_y as f64);
+
+                self.context.restore();
+            }
 
             // Reset text align
             self.context.set_text_align("left");

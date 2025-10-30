@@ -21,6 +21,7 @@
             display: flex;
             flex-direction: column;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 0 20px 20px 20px;
         }
 
         .header {
@@ -78,7 +79,7 @@
             position: relative;
             min-height: 0;
             background: white;
-            margin: 20px;
+            margin: 20px 0;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             overflow: hidden;
@@ -193,25 +194,22 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
         let resizeCount = 0;
 
         async function initGrid() {
-            const wasmModule = await init();
+            await init();
 
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
-                rows: 100,
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
+                rows: 10000,
                 cols: 26,
                 enableEditing: false,
                 enableVirtualScroll: true,
                 enableResize: true
             });
-
-            // DataGridWrapper automatically handles resize via ResizeObserver
-            // No manual resize event handling needed!
 
             updateMetrics();
             console.log('Grid initialized with automatic responsive resize!');
@@ -220,19 +218,16 @@
         function loadSampleData() {
             const grid = gridWrapper.getGrid();
 
-            // Headers
+            // Set column headers (not as data, but as column names)
             for (let col = 0; col < 26; col++) {
                 const colName = String.fromCharCode(65 + col);
-                grid.update_cell_value(0, col, `Column ${colName}`);
-                grid.set_cell_bg_color(0, col, 0x667eeaFF);
-                grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
-                grid.set_cell_font_style(0, col, true, false);
+                grid.set_column_name(col, `Column ${colName}`);
             }
 
-            // Data
-            for (let row = 1; row < 100; row++) {
+            // Data (starting from row 0)
+            for (let row = 0; row < 10000; row++) {
                 for (let col = 0; col < 26; col++) {
-                    grid.update_cell_value(row, col, `R${row}C${col}`);
+                    grid.set_cell_value(row, col, `R${row + 1}C${col + 1}`);
 
                     // Zebra striping
                     if (row % 2 === 0) {
@@ -242,6 +237,7 @@
             }
 
             console.log('Sample data loaded');
+            gridWrapper.render();
         }
 
         function updateMetrics() {
@@ -304,7 +300,7 @@
 
         function simulateDesktop() {
             const container = document.querySelector('.grid-container');
-            container.style.margin = '20px';
+            container.style.margin = '20px 0';
             container.style.maxWidth = 'none';
             container.style.height = '';
 
@@ -343,8 +339,11 @@
 
         // Initialize
         initGrid().then(() => {
-            loadSampleData();
-            updateMetrics();
+            // Wait a bit for ResizeObserver to set correct canvas size
+            setTimeout(() => {
+                loadSampleData();
+                updateMetrics();
+            }, 100);
         });
 
         // Update metrics periodically

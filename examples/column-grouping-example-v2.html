@@ -155,16 +155,16 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
 
         async function initGrid() {
-            const wasmModule = await init();
+            await init();
 
             // Start with basic grid
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
                 rows: 50,
                 cols: 15,
                 enableEditing: false,
@@ -219,6 +219,7 @@ Level 1 (Columns):
   Customer ID | Name | Email | Phone | Order ID | Product | Quantity | Date | Status | Price | Tax | Total | Notes | Region | Priority
             `);
 
+            gridWrapper.render();
             console.log('Simple grouping applied');
         }
 
@@ -269,6 +270,7 @@ Level 2 (Columns):
   ID | Full Name | Contact | Location | Trans ID | Item | Qty | Amount | Method | Created | Modified | Status | Extra1 | Extra2 | Extra3
             `);
 
+            gridWrapper.render();
             console.log('Complex grouping applied');
         }
 
@@ -294,30 +296,31 @@ Level 2 (Columns):
 
                 // Customer info
                 for (let i = 0; i < customer.length; i++) {
-                    grid.update_cell_value(row, i, customer[i]);
+                    grid.set_cell_value(row, i, customer[i]);
                 }
 
                 // Order details
-                grid.update_cell_value(row, 4, `ORD${1000 + row}`);
-                grid.update_cell_value(row, 5, products[row % products.length]);
-                grid.update_cell_value(row, 6, `${(row % 5) + 1}`);
-                grid.update_cell_value(row, 7, `2024-10-${String(row % 28 + 1).padStart(2, '0')}`);
-                grid.update_cell_value(row, 8, statuses[row % statuses.length]);
+                grid.set_cell_value(row, 4, `ORD${1000 + row}`);
+                grid.set_cell_value(row, 5, products[row % products.length]);
+                grid.set_cell_value(row, 6, `${(row % 5) + 1}`);
+                grid.set_cell_value(row, 7, `2024-10-${String(row % 28 + 1).padStart(2, '0')}`);
+                grid.set_cell_value(row, 8, statuses[row % statuses.length]);
 
                 // Financial
                 const price = (50 + (row * 13) % 500).toFixed(2);
                 const tax = (parseFloat(price) * 0.08).toFixed(2);
                 const total = (parseFloat(price) + parseFloat(tax)).toFixed(2);
-                grid.update_cell_value(row, 9, `$${price}`);
-                grid.update_cell_value(row, 10, `$${tax}`);
-                grid.update_cell_value(row, 11, `$${total}`);
+                grid.set_cell_value(row, 9, `$${price}`);
+                grid.set_cell_value(row, 10, `$${tax}`);
+                grid.set_cell_value(row, 11, `$${total}`);
 
                 // Other columns
-                grid.update_cell_value(row, 12, row % 3 === 0 ? 'Important' : '');
-                grid.update_cell_value(row, 13, regions[row % regions.length]);
-                grid.update_cell_value(row, 14, row % 2 === 0 ? 'High' : 'Normal');
+                grid.set_cell_value(row, 12, row % 3 === 0 ? 'Important' : '');
+                grid.set_cell_value(row, 13, regions[row % regions.length]);
+                grid.set_cell_value(row, 14, row % 2 === 0 ? 'High' : 'Normal');
             }
 
+            gridWrapper.render();
             console.log('Sample data filled');
         }
 

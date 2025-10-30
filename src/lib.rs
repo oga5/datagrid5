@@ -277,8 +277,6 @@ impl DataGrid {
 
     /// Render the grid
     pub fn render(&self) {
-        web_sys::console::log_1(&"DataGrid::render() called".into());
-
         // Render WebGL layer (grid lines and backgrounds)
         self.webgl_renderer.render(&self.grid, &self.viewport);
 
@@ -289,13 +287,6 @@ impl DataGrid {
             &self.search.search_results,
             self.search.current_search_index
         );
-
-        web_sys::console::log_1(&format!("DataGrid::render() completed. Viewport: first_row={}, last_row={}, first_col={}, last_col={}",
-            self.viewport.first_visible_row,
-            self.viewport.last_visible_row,
-            self.viewport.first_visible_col,
-            self.viewport.last_visible_col
-        ).into());
     }
 
     /// Resize the grid

@@ -202,7 +202,7 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
@@ -235,9 +235,9 @@
         }
 
         async function initGrid() {
-            const wasmModule = await init();
+            await init();
 
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
                 rows: 20,
                 cols: 6,
                 enableEditing: true,
@@ -270,10 +270,12 @@
                     if (isValid) {
                         // Valid: Green background
                         grid.set_cell_bg_color(row, col, 0xC8E6C9FF); // Light green
+                        gridWrapper.render();
                         updateStatus(`✅ Valid ${rule.name}: "${newValue}"`, 'success');
                     } else {
                         // Invalid: Red background
                         grid.set_cell_bg_color(row, col, 0xFFCDD2FF); // Light red
+                        gridWrapper.render();
                         updateStatus(`❌ Invalid ${rule.name}: "${newValue}"`, 'error');
                     }
                 }
@@ -286,12 +288,13 @@
             // Setup headers
             const headers = ['Name', 'Email', 'Age', 'Phone', 'Postal Code', 'Notes'];
             for (let col = 0; col < headers.length; col++) {
-                grid.update_cell_value(0, col, headers[col]);
+                grid.set_cell_value(0, col, headers[col]);
                 grid.set_cell_bg_color(0, col, 0x667eeaFF);
                 grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
                 grid.set_cell_font_style(0, col, true, false);
             }
 
+            gridWrapper.render();
             updateStatus('Validation rules applied!', 'success');
         }
 
@@ -309,7 +312,7 @@
             for (let i = 0; i < validData.length; i++) {
                 for (let col = 0; col < validData[i].length; col++) {
                     const value = validData[i][col];
-                    grid.update_cell_value(i + 1, col, value);
+                    grid.set_cell_value(i + 1, col, value);
 
                     // Apply green background to validated columns
                     if (validationRules[col]) {
@@ -318,6 +321,7 @@
                 }
             }
 
+            gridWrapper.render();
             updateStatus('Filled with valid data', 'success');
         }
 
@@ -333,7 +337,7 @@
             for (let i = 0; i < invalidData.length; i++) {
                 for (let col = 0; col < invalidData[i].length; col++) {
                     const value = invalidData[i][col];
-                    grid.update_cell_value(i + 1, col, value);
+                    grid.set_cell_value(i + 1, col, value);
 
                     // Apply red background to validated columns with invalid data
                     if (validationRules[col]) {
@@ -342,6 +346,7 @@
                 }
             }
 
+            gridWrapper.render();
             updateStatus('Filled with invalid data - see red cells', 'error');
         }
 
@@ -350,11 +355,12 @@
 
             for (let row = 1; row < 20; row++) {
                 for (let col = 0; col < 6; col++) {
-                    grid.update_cell_value(row, col, '');
+                    grid.set_cell_value(row, col, '');
                     grid.set_cell_bg_color(row, col, 0xFFFFFFFF);
                 }
             }
 
+            gridWrapper.render();
             updateStatus('Grid cleared', 'success');
         }
 

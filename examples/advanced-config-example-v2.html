@@ -213,15 +213,15 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
 
         async function initGrid() {
-            const wasmModule = await init();
+            await init();
 
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
                 rows: 50,
                 cols: 12,
                 enableEditing: false,
@@ -244,7 +244,7 @@
             // Set column headers with custom styling
             for (let col = 0; col < columns.length; col++) {
                 grid.set_column_display_name(col, columns[col]);
-                grid.update_cell_value(0, col, columns[col]);
+                grid.set_cell_value(0, col, columns[col]);
                 grid.set_cell_bg_color(0, col, 0x673AB7FF); // Purple
                 grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White
                 grid.set_cell_font_style(0, col, true, false); // Bold
@@ -274,7 +274,7 @@
                 const isEven = i % 2 === 0;
 
                 for (let col = 0; col < employees[i].length; col++) {
-                    grid.update_cell_value(row, col, employees[i][col]);
+                    grid.set_cell_value(row, col, employees[i][col]);
 
                     // Alternating row background
                     if (isEven) {
@@ -299,6 +299,7 @@
             }
 
             console.log('Employee data loaded with styling');
+            gridWrapper.render();
         }
 
         function loadSalesData() {
@@ -312,7 +313,7 @@
 
             for (let col = 0; col < columns.length; col++) {
                 grid.set_column_display_name(col, columns[col]);
-                grid.update_cell_value(0, col, columns[col]);
+                grid.set_cell_value(0, col, columns[col]);
                 grid.set_cell_bg_color(0, col, 0x2196F3FF); // Blue
                 grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
                 grid.set_cell_font_style(0, col, true, false);
@@ -348,7 +349,7 @@
                 ];
 
                 for (let col = 0; col < data.length; col++) {
-                    grid.update_cell_value(row, col, String(data[col]));
+                    grid.set_cell_value(row, col, String(data[col]));
 
                     // Color code by status
                     if (col === 10) {
@@ -370,18 +371,21 @@
             }
 
             console.log('Sales data loaded');
+            gridWrapper.render();
         }
 
         function freezeFirstRowAndColumn() {
             const grid = gridWrapper.getGrid();
             grid.set_freeze(1, 1); // Freeze first row and first column
             console.log('Frozen first row and column');
+            gridWrapper.render();
         }
 
         function unfreeze() {
             const grid = gridWrapper.getGrid();
             grid.set_freeze(0, 0); // Unfreeze
             console.log('Unfrozen all');
+            gridWrapper.render();
         }
 
         function applyRainbowColors() {
@@ -406,6 +410,7 @@
             }
 
             console.log('Rainbow colors applied');
+            gridWrapper.render();
         }
 
         // Button handlers

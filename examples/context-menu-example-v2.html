@@ -154,7 +154,7 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
@@ -162,9 +162,9 @@
         let currentContext = null;
 
         async function initGrid() {
-            const wasmModule = await init();
+            await init();
 
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
                 rows: 50,
                 cols: 20,
                 enableEditing: false,
@@ -308,6 +308,7 @@
                 case 'delete':
                     message = `Deleted cell (${row}, ${col})`;
                     gridWrapper.setCellValue(row, col, '');
+                    gridWrapper.render();
                     break;
                 case 'format':
                     message = `Opening format dialog for cell (${row}, ${col})`;
@@ -327,10 +328,12 @@
                 case 'sort-asc':
                     message = `Sort column ${col} ascending`;
                     gridWrapper.getGrid().toggle_column_sort(col);
+                    gridWrapper.render();
                     break;
                 case 'sort-desc':
                     message = `Sort column ${col} descending`;
                     gridWrapper.getGrid().toggle_column_sort(col);
+                    gridWrapper.render();
                     break;
                 case 'filter':
                     message = `Open filter for column ${col}`;
@@ -359,7 +362,7 @@
             // Headers
             for (let col = 0; col < 20; col++) {
                 const colName = String.fromCharCode(65 + col);
-                grid.update_cell_value(0, col, `Column ${colName}`);
+                grid.set_cell_value(0, col, `Column ${colName}`);
                 grid.set_cell_bg_color(0, col, 0x667eeaFF);
                 grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
                 grid.set_cell_font_style(0, col, true, false);
@@ -368,9 +371,11 @@
             // Sample data
             for (let row = 1; row < 50; row++) {
                 for (let col = 0; col < 20; col++) {
-                    grid.update_cell_value(row, col, `R${row}C${col}`);
+                    grid.set_cell_value(row, col, `R${row}C${col}`);
                 }
             }
+
+            gridWrapper.render();
         }
 
         initGrid();

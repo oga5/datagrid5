@@ -247,7 +247,7 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
@@ -264,9 +264,9 @@
         };
 
         async function initGrid() {
-            const wasmModule = await init();
+            await init();
 
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
                 rows: 20,
                 cols: 6,
                 enableEditing: true,
@@ -316,7 +316,7 @@
             // Set headers
             const headers = ['Employee ID', 'Name', 'Email', 'Department', 'Position', 'Hire Date'];
             for (let col = 0; col < headers.length; col++) {
-                grid.update_cell_value(0, col, headers[col]);
+                grid.set_cell_value(0, col, headers[col]);
                 grid.set_cell_bg_color(0, col, 0x667eeaFF);
                 grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
                 grid.set_cell_font_style(0, col, true, false);
@@ -339,6 +339,8 @@
             for (let col = 0; col < 6; col++) {
                 grid.set_column_editable(col, columnPermissions[col]);
             }
+
+            gridWrapper.render();
         }
 
         function loadEmployeeData() {
@@ -357,10 +359,11 @@
 
             for (let i = 0; i < employees.length; i++) {
                 for (let col = 0; col < employees[i].length; col++) {
-                    grid.update_cell_value(i + 1, col, employees[i][col]);
+                    grid.set_cell_value(i + 1, col, employees[i][col]);
                 }
             }
 
+            gridWrapper.render();
             updateStatus('Employee data loaded', 'success');
         }
 
@@ -381,6 +384,7 @@
                 }
             }
 
+            gridWrapper.render();
             updateStatus(`Column B is now ${columnBEditable ? 'editable' : 'read-only'}`, 'success');
         }
 
@@ -389,10 +393,11 @@
 
             for (let row = 1; row < 20; row++) {
                 for (let col = 0; col < 6; col++) {
-                    grid.update_cell_value(row, col, '');
+                    grid.set_cell_value(row, col, '');
                 }
             }
 
+            gridWrapper.render();
             updateStatus('Data cleared', 'success');
         }
 

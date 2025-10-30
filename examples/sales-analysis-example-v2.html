@@ -243,16 +243,16 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
         let salesData = [];
 
         async function initGrid() {
-            const wasmModule = await init();
+            await init();
 
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
                 rows: 100,
                 cols: 10,
                 enableEditing: false,
@@ -312,7 +312,7 @@
             ];
 
             for (let col = 0; col < headers.length; col++) {
-                grid.update_cell_value(0, col, headers[col]);
+                grid.set_cell_value(0, col, headers[col]);
                 grid.set_cell_bg_color(0, col, 0x1E3C72FF);
                 grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
                 grid.set_cell_font_style(0, col, true, false);
@@ -325,19 +325,20 @@
                 const row = i + 1;
                 const item = data[i];
 
-                grid.update_cell_value(row, 0, item.orderId);
-                grid.update_cell_value(row, 1, item.date);
-                grid.update_cell_value(row, 2, item.customer);
-                grid.update_cell_value(row, 3, item.product);
-                grid.update_cell_value(row, 4, String(item.quantity));
-                grid.update_cell_value(row, 5, item.unitPrice);
-                grid.update_cell_value(row, 6, item.total);
-                grid.update_cell_value(row, 7, item.discount);
-                grid.update_cell_value(row, 8, item.netTotal);
-                grid.update_cell_value(row, 9, item.status);
-                grid.update_cell_value(row, 10, item.region);
+                grid.set_cell_value(row, 0, item.orderId);
+                grid.set_cell_value(row, 1, item.date);
+                grid.set_cell_value(row, 2, item.customer);
+                grid.set_cell_value(row, 3, item.product);
+                grid.set_cell_value(row, 4, String(item.quantity));
+                grid.set_cell_value(row, 5, item.unitPrice);
+                grid.set_cell_value(row, 6, item.total);
+                grid.set_cell_value(row, 7, item.discount);
+                grid.set_cell_value(row, 8, item.netTotal);
+                grid.set_cell_value(row, 9, item.status);
+                grid.set_cell_value(row, 10, item.region);
             }
 
+            gridWrapper.render();
             updateMetrics();
             console.log('Sales data loaded');
         }
@@ -383,6 +384,7 @@
                 }
             }
 
+            gridWrapper.render();
             console.log('High-value orders highlighted');
         }
 
@@ -404,6 +406,7 @@
                 }
             }
 
+            gridWrapper.render();
             console.log('Colored by region');
         }
 
@@ -434,6 +437,7 @@
                 }
             }
 
+            gridWrapper.render();
             console.log('Colored by status');
         }
 
@@ -448,6 +452,7 @@
                 }
             }
 
+            gridWrapper.render();
             console.log('Colors reset');
         }
 
@@ -479,6 +484,7 @@
                 }
             }
 
+            gridWrapper.render();
             console.log(`Filtered by region: ${selectedRegion || 'All'}`);
         });
 

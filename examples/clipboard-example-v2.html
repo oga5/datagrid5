@@ -233,16 +233,16 @@
     </div>
 
     <script type="module">
-        import init from '../pkg/datagrid5.js';
+        import init, { DataGrid } from '../pkg/datagrid5.js';
         import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
 
         let gridWrapper = null;
         const logContainer = document.getElementById('clipboard-log');
 
         async function initGrid() {
-            const wasmModule = await init();
+            await init();
 
-            gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
                 rows: 30,
                 cols: 10,
                 enableEditing: true,
@@ -288,11 +288,12 @@
             // Set column headers
             const headers = ['Product', 'SKU', 'Category', 'Price', 'Stock', 'Sales', 'Revenue', 'Status', 'Region', 'Notes'];
             for (let col = 0; col < headers.length; col++) {
-                grid.update_cell_value(0, col, headers[col]);
+                grid.set_cell_value(0, col, headers[col]);
                 grid.set_cell_bg_color(0, col, 0x667eeaFF);
                 grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
                 grid.set_cell_font_style(0, col, true, false);
             }
+            gridWrapper.render();
         }
 
         function loadSampleData() {
@@ -318,7 +319,7 @@
 
             for (let i = 0; i < products.length; i++) {
                 for (let col = 0; col < products[i].length; col++) {
-                    grid.update_cell_value(i + 1, col, products[i][col]);
+                    grid.set_cell_value(i + 1, col, products[i][col]);
                 }
 
                 // Color coding for status
@@ -329,6 +330,7 @@
                 }
             }
 
+            gridWrapper.render();
             updateStatus('Sample data loaded - Try selecting and copying cells!', 'info');
         }
 

@@ -28,6 +28,8 @@ export class DataGridWrapper {
         this.editingCol = null;
         this.renderLoopId = null;
         this.clipboardData = ''; // Fallback clipboard storage
+        this.isDirty = false; // Track if render is needed
+        this.renderScheduled = false; // Track if render is already scheduled
 
         this.init();
     }
@@ -50,7 +52,8 @@ export class DataGridWrapper {
             this.setupCellEditor();
         }
 
-        this.startRenderLoop();
+        // Initial render is not needed - user should call render() after loading data
+        // this.requestRender();
     }
 
     setupDOM() {
@@ -119,6 +122,11 @@ export class DataGridWrapper {
                 const width = Math.floor(entry.contentRect.width);
                 const height = Math.floor(entry.contentRect.height);
 
+                // Only resize if dimensions actually changed
+                if (this.webglCanvas.width === width && this.webglCanvas.height === height) {
+                    return;
+                }
+
                 this.webglCanvas.width = width;
                 this.webglCanvas.height = height;
                 this.textCanvas.width = width;
@@ -126,6 +134,7 @@ export class DataGridWrapper {
 
                 this.grid.resize(width, height);
                 this.updateVirtualScrollSize();
+                this.requestRender();
             }
         });
 
@@ -133,6 +142,9 @@ export class DataGridWrapper {
     }
 
     createGrid() {
+        if (!this.DataGrid) {
+            throw new Error('DataGrid class is not defined. Make sure to pass { DataGrid } to DataGridWrapper constructor.');
+        }
         this.grid = new this.DataGrid(
             'webgl-canvas',
             'text-canvas',
@@ -162,6 +174,7 @@ export class DataGridWrapper {
                 e.shiftKey,
                 e.ctrlKey || e.metaKey
             );
+            this.requestRender();
         });
 
         this.textCanvas.addEventListener('mousemove', (e) => {
@@ -182,8 +195,10 @@ export class DataGridWrapper {
             // Handle mouse move
             if (this.grid.is_resizing()) {
                 this.grid.update_resize(x, y);
+                this.requestRender();
             } else {
                 this.grid.handle_mouse_move(e);
+                // Don't render on every mouse move unless needed
             }
         });
 
@@ -194,8 +209,10 @@ export class DataGridWrapper {
 
             if (this.grid.is_resizing()) {
                 this.grid.end_resize();
+                this.requestRender();
             } else {
                 this.grid.handle_mouse_up(x, y);
+                this.requestRender();
             }
         });
 
@@ -247,6 +264,7 @@ export class DataGridWrapper {
             if (handled) {
                 e.preventDefault();
                 this.syncScrollPosition();
+                this.requestRender();
             }
         });
 
@@ -254,6 +272,7 @@ export class DataGridWrapper {
         this.textCanvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             this.grid.handle_wheel(e.deltaX, e.deltaY);
+            this.requestRender();
         });
 
         // Context menu
@@ -282,6 +301,7 @@ export class DataGridWrapper {
             const scrollX = this.scrollContainer.scrollLeft;
             const scrollY = this.scrollContainer.scrollTop;
             this.grid.set_scroll(scrollX, scrollY);
+            this.requestRender();
         });
     }
 
@@ -378,6 +398,7 @@ export class DataGridWrapper {
             // Save value
             this.grid.update_cell_value(this.editingRow, this.editingCol, this.cellEditor.value);
             changed = true;
+            this.requestRender();
         }
 
         // Hide editor
@@ -444,25 +465,20 @@ export class DataGridWrapper {
         });
     }
 
-    startRenderLoop() {
-        const renderFrame = () => {
+    // Request a render on the next animation frame (event-driven rendering)
+    requestRender() {
+        if (this.renderScheduled) return;
+
+        this.renderScheduled = true;
+        requestAnimationFrame(() => {
+            this.renderScheduled = false;
             if (this.grid) {
                 this.grid.render();
             }
-            this.renderLoopId = requestAnimationFrame(renderFrame);
-        };
-        renderFrame();
-    }
-
-    stopRenderLoop() {
-        if (this.renderLoopId) {
-            cancelAnimationFrame(this.renderLoopId);
-            this.renderLoopId = null;
-        }
+        });
     }
 
     destroy() {
-        this.stopRenderLoop();
         if (this.container) {
             this.container.innerHTML = '';
         }
@@ -474,12 +490,25 @@ export class DataGridWrapper {
         return this.grid;
     }
 
+    // Public method to request a render (async via requestAnimationFrame)
+    render() {
+        this.requestRender();
+    }
+
+    // Public method to force immediate synchronous render
+    renderNow() {
+        if (this.grid) {
+            this.grid.render();
+        }
+    }
+
     getCellValue(row, col) {
         return this.grid.get_cell_value(row, col);
     }
 
     setCellValue(row, col, value) {
-        this.grid.update_cell_value(row, col, value);
+        this.grid.set_cell_value(row, col, value);
+        this.requestRender();
     }
 
     getSelectedCell() {
@@ -494,6 +523,7 @@ export class DataGridWrapper {
 
     setScroll(x, y) {
         this.grid.set_scroll(x, y);
+        this.requestRender();
     }
 
     getViewportInfo() {
@@ -535,6 +565,8 @@ export class DataGridWrapper {
             const tsvData = this.grid.cut_selected_cells();
 
             if (tsvData) {
+                this.requestRender();
+
                 // Copy to system clipboard
                 navigator.clipboard.writeText(tsvData).then(() => {
                     console.log('Cut to clipboard');
@@ -580,6 +612,8 @@ export class DataGridWrapper {
                 this.container.dispatchEvent(new CustomEvent('gridpaste', {
                     detail: { data: tsvData }
                 }));
+
+                this.requestRender();
             }
         } catch (err) {
             console.error('Paste error:', err);
@@ -598,6 +632,7 @@ export class DataGridWrapper {
     paste(tsvData) {
         if (tsvData) {
             this.grid.paste_cells(tsvData);
+            this.requestRender();
         } else {
             this.handlePaste();
         }
