@@ -12,9 +12,6 @@ DataGrid5 is a high-performance, feature-rich data grid component built with Rus
 
 ## ✨ Features
 
-### 🎯 100% Feature Complete
-All 137 features from the original C++ GridControl have been successfully ported!
-
 - **🚀 High Performance**: WebGL GPU rendering + WebAssembly for 60 FPS with 100k+ rows
 - **📊 Excel-like Interface**: Familiar spreadsheet UI with keyboard navigation
 - **✏️ Full Editing Support**: Double-click to edit, copy/paste, undo/redo
