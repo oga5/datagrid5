@@ -31,18 +31,25 @@ impl ResizeState {
     /// Check if mouse is over a resize handle
     /// Returns: "col" for column resize, "row" for row resize, "none" otherwise
     pub fn check_resize_handle(&self, x: f32, y: f32, grid: &Grid, viewport: &Viewport) -> String {
-        let _grid_x = x + viewport.scroll_x;
-        let _grid_y = y + viewport.scroll_y;
-
         // Column resize: only detect in column header area
         if y < grid.col_header_height {
-            let mut col_x = grid.row_header_width;
-            for col in 0..grid.col_count() {
-                let width = grid.col_width(col);
-                col_x += width;
+            // Convert canvas x to grid x, considering scroll offset
+            let grid_x = x - grid.row_header_width + viewport.scroll_x;
 
-                // Check if near right edge of column
-                if (x - col_x).abs() < RESIZE_HANDLE_WIDTH {
+            // Check visible columns only
+            let first_col = viewport.first_visible_col;
+            let last_col = viewport.last_visible_col.min(grid.col_count().saturating_sub(1));
+
+            for col in first_col..=last_col {
+                let col_grid_x = grid.col_x_position(col);
+                let col_width = grid.col_width(col);
+                let col_right_edge = col_grid_x + col_width;
+
+                // Calculate canvas position of the right edge
+                let canvas_edge_x = col_right_edge - viewport.scroll_x + grid.row_header_width;
+
+                // Check if mouse is near the right edge on canvas
+                if (x - canvas_edge_x).abs() < RESIZE_HANDLE_WIDTH && canvas_edge_x > grid.row_header_width {
                     return "col".to_string();
                 }
             }
@@ -50,13 +57,23 @@ impl ResizeState {
 
         // Row resize: only detect in row header area
         if x < grid.row_header_width {
-            let mut row_y = grid.col_header_height;
-            for row in 0..grid.row_count() {
-                let height = grid.row_height(row);
-                row_y += height;
+            // Convert canvas y to grid y, considering scroll offset
+            let grid_y = y - grid.col_header_height + viewport.scroll_y;
 
-                // Check if near bottom edge of row
-                if (y - row_y).abs() < RESIZE_HANDLE_WIDTH {
+            // Check visible rows only
+            let first_row = viewport.first_visible_row;
+            let last_row = viewport.last_visible_row.min(grid.row_count().saturating_sub(1));
+
+            for row in first_row..=last_row {
+                let row_grid_y = grid.row_y_position(row);
+                let row_height = grid.row_height(row);
+                let row_bottom_edge = row_grid_y + row_height;
+
+                // Calculate canvas position of the bottom edge
+                let canvas_edge_y = row_bottom_edge - viewport.scroll_y + grid.col_header_height;
+
+                // Check if mouse is near the bottom edge on canvas
+                if (y - canvas_edge_y).abs() < RESIZE_HANDLE_WIDTH && canvas_edge_y > grid.col_header_height {
                     return "row".to_string();
                 }
             }
@@ -66,35 +83,47 @@ impl ResizeState {
     }
 
     /// Start column or row resize
-    pub fn start_resize(&mut self, x: f32, y: f32, resize_type: &str, grid: &Grid) -> bool {
+    pub fn start_resize(&mut self, x: f32, y: f32, resize_type: &str, grid: &Grid, viewport: &Viewport) -> bool {
         if resize_type == "col" {
             // Column resize: find which column in header area
-            let mut col_x = grid.row_header_width;
-            for col in 0..grid.col_count() {
-                let width = grid.col_width(col);
-                col_x += width;
+            let first_col = viewport.first_visible_col;
+            let last_col = viewport.last_visible_col.min(grid.col_count().saturating_sub(1));
 
-                if (x - col_x).abs() < RESIZE_HANDLE_WIDTH {
+            for col in first_col..=last_col {
+                let col_grid_x = grid.col_x_position(col);
+                let col_width = grid.col_width(col);
+                let col_right_edge = col_grid_x + col_width;
+
+                // Calculate canvas position of the right edge
+                let canvas_edge_x = col_right_edge - viewport.scroll_x + grid.row_header_width;
+
+                if (x - canvas_edge_x).abs() < RESIZE_HANDLE_WIDTH && canvas_edge_x > grid.row_header_width {
                     self.is_resizing = true;
                     self.resizing_column = Some(col);
                     self.resize_start_pos = x;
-                    self.resize_start_size = width;
+                    self.resize_start_size = col_width;
                     web_sys::console::log_1(&format!("Started resizing column {}", col).into());
                     return true;
                 }
             }
         } else if resize_type == "row" {
             // Row resize: find which row in header area
-            let mut row_y = grid.col_header_height;
-            for row in 0..grid.row_count() {
-                let height = grid.row_height(row);
-                row_y += height;
+            let first_row = viewport.first_visible_row;
+            let last_row = viewport.last_visible_row.min(grid.row_count().saturating_sub(1));
 
-                if (y - row_y).abs() < RESIZE_HANDLE_WIDTH {
+            for row in first_row..=last_row {
+                let row_grid_y = grid.row_y_position(row);
+                let row_height = grid.row_height(row);
+                let row_bottom_edge = row_grid_y + row_height;
+
+                // Calculate canvas position of the bottom edge
+                let canvas_edge_y = row_bottom_edge - viewport.scroll_y + grid.col_header_height;
+
+                if (y - canvas_edge_y).abs() < RESIZE_HANDLE_WIDTH && canvas_edge_y > grid.col_header_height {
                     self.is_resizing = true;
                     self.resizing_row = Some(row);
                     self.resize_start_pos = y;
-                    self.resize_start_size = height;
+                    self.resize_start_size = row_height;
                     web_sys::console::log_1(&format!("Started resizing row {}", row).into());
                     return true;
                 }

@@ -379,6 +379,54 @@ impl DataGrid {
         self.handle_mouse_down_with_modifiers(event, false, false);
     }
 
+    /// Handle mouse down at coordinates with modifier keys (for JavaScript)
+    pub fn handle_mouse_down_at_with_modifiers(&mut self, x: f32, y: f32, shift: bool, ctrl: bool) {
+        // If currently editing, commit the edit before processing the click
+        if self.is_editing() {
+            self.end_edit();
+        }
+
+        // Check if clicked on column header (for sorting)
+        if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
+            web_sys::console::log_1(&format!("Clicked column header: {}", col).into());
+            self.toggle_column_sort(col);
+            return;
+        }
+
+        // Check if clicked on row header (for row selection)
+        if let Some(row) = self.viewport.canvas_to_row_header(x, y, &self.grid) {
+            self.select_row(row);
+            return;
+        }
+
+        // Check if clicked on a cell
+        if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
+            if shift {
+                // Shift+Click: Range selection
+                self.select_range(row, col);
+                self.mouse_handler.start_selection(x, y);
+            } else if ctrl {
+                // Ctrl+Click: Toggle selection
+                self.toggle_cell_selection(row, col);
+                self.mouse_handler.mouse_down(x, y);
+            } else {
+                // Normal click: Single selection and start drag selection
+                self.select_single_cell(row, col);
+                self.mouse_handler.start_selection(x, y);
+            }
+
+            self.mouse_handler.select_cell(row, col);
+            web_sys::console::log_1(&format!("Selected {} cells", self.selection.selected_cells.len()).into());
+        } else {
+            // Clicked outside grid, clear selection
+            if !ctrl {
+                self.clear_selection();
+            }
+            self.mouse_handler.selected_cell = None;
+            self.mouse_handler.mouse_down(x, y);
+        }
+    }
+
     /// Handle mouse down at specific coordinates
     pub fn handle_mouse_down_at(&mut self, x: f32, y: f32) {
         web_sys::console::log_1(&format!("handle_mouse_down_at called: x={}, y={}", x, y).into());
@@ -1219,43 +1267,8 @@ impl DataGrid {
 
     /// Start column or row resize
     pub fn start_resize(&mut self, x: f32, y: f32, resize_type: &str) -> bool {
-        const RESIZE_HANDLE_WIDTH: f32 = 5.0;
-
-        if resize_type == "col" {
-            // Column resize: find which column in header area
-            let mut col_x = self.grid.row_header_width;
-            for col in 0..self.grid.col_count() {
-                let width = self.grid.col_width(col);
-                col_x += width;
-
-                if (x - col_x).abs() < RESIZE_HANDLE_WIDTH {
-                    self.resize.is_resizing = true;
-                    self.resize.resizing_column = Some(col);
-                    self.resize.resize_start_pos = x;
-                    self.resize.resize_start_size = width;
-                    web_sys::console::log_1(&format!("Started resizing column {}", col).into());
-                    return true;
-                }
-            }
-        } else if resize_type == "row" {
-            // Row resize: find which row in header area
-            let mut row_y = self.grid.col_header_height;
-            for row in 0..self.grid.row_count() {
-                let height = self.grid.row_height(row);
-                row_y += height;
-
-                if (y - row_y).abs() < RESIZE_HANDLE_WIDTH {
-                    self.resize.is_resizing = true;
-                    self.resize.resizing_row = Some(row);
-                    self.resize.resize_start_pos = y;
-                    self.resize.resize_start_size = height;
-                    web_sys::console::log_1(&format!("Started resizing row {}", row).into());
-                    return true;
-                }
-            }
-        }
-
-        false
+        // Use ResizeState's start_resize method with viewport information
+        self.resize.start_resize(x, y, resize_type, &self.grid, &self.viewport)
     }
 
     /// Update resize during drag
