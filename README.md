@@ -35,7 +35,7 @@ All 137 features from the original C++ GridControl have been successfully ported
 
 | Feature | DataGrid5 | Traditional JS Grids |
 |---------|-----------|---------------------|
-| Performance | **10x faster** (WebGL + WASM) | JavaScript + DOM |
+| Performance | **High performance** (WebGL + WASM) | JavaScript + DOM |
 | Memory Usage | **Sparse storage** (HashMap) | Dense arrays |
 | Large Datasets | ✅ 1M+ rows | ❌ Limited to ~50k |
 | Virtual Scrolling | ✅ GPU-accelerated | ✅ CPU-bound |

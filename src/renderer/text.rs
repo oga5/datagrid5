@@ -586,13 +586,19 @@ impl TextRenderer {
         let header_border = "#cccccc";
 
         // Draw top-left corner cell (all-select button area)
+        // Adjust size to account for selection border width (2.0px)
+        let selection_border_width = 2.0;
         self.context.set_fill_style(&header_bg.into());
-        self.context.fill_rect(0.0, 0.0, row_header_width as f64, col_header_height as f64);
+        self.context.fill_rect(0.0, 0.0,
+            (row_header_width as f64) - selection_border_width,
+            (col_header_height as f64) - selection_border_width);
 
         // Border for corner
         self.context.set_stroke_style(&header_border.into());
         self.context.set_line_width(1.0);
-        self.context.stroke_rect(0.0, 0.0, row_header_width as f64, col_header_height as f64);
+        self.context.stroke_rect(0.0, 0.0,
+            (row_header_width as f64) - selection_border_width,
+            (col_header_height as f64) - selection_border_width);
 
         // Render column headers
         self.render_column_headers(grid, viewport, row_header_width, col_header_height, header_bg, header_border);

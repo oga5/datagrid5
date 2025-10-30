@@ -327,6 +327,11 @@ impl DataGrid {
         let x = event.offset_x() as f32;
         let y = event.offset_y() as f32;
 
+        // If currently editing, commit the edit before processing the click
+        if self.is_editing() {
+            self.end_edit();
+        }
+
         // Check if clicked on column header (for sorting)
         if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
             web_sys::console::log_1(&format!("Clicked column header: {}", col).into());
@@ -377,6 +382,11 @@ impl DataGrid {
     /// Handle mouse down at specific coordinates
     pub fn handle_mouse_down_at(&mut self, x: f32, y: f32) {
         web_sys::console::log_1(&format!("handle_mouse_down_at called: x={}, y={}", x, y).into());
+
+        // If currently editing, commit the edit before processing the click
+        if self.is_editing() {
+            self.end_edit();
+        }
 
         // Check if clicked on column header (for sorting)
         if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
@@ -895,9 +905,40 @@ impl DataGrid {
                     }
                     None
                 }
-                NavigationCommand::Enter | NavigationCommand::Escape | NavigationCommand::Tab => {
-                    // Future: handle edit mode, etc.
+                NavigationCommand::Enter => {
+                    // If editing, end edit mode first
+                    if self.is_editing() {
+                        self.end_edit();
+                    }
+                    // Move down to next row
+                    current.and_then(|(row, col)| {
+                        if row < self.grid.row_count() - 1 {
+                            Some((row + 1, col))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                NavigationCommand::Escape => {
+                    // If editing, cancel edit mode without moving
+                    if self.is_editing() {
+                        self.end_edit();
+                    }
                     None
+                }
+                NavigationCommand::Tab => {
+                    // If editing, end edit mode first
+                    if self.is_editing() {
+                        self.end_edit();
+                    }
+                    // Move right to next column
+                    current.and_then(|(row, col)| {
+                        if col < self.grid.col_count() - 1 {
+                            Some((row, col + 1))
+                        } else {
+                            None
+                        }
+                    })
                 }
             };
 
@@ -1094,60 +1135,32 @@ impl DataGrid {
 
     /// Start editing a cell (called from JavaScript)
     pub fn start_edit(&mut self, row: usize, col: usize) -> bool {
-        // Check if cell is valid
-        if row >= self.grid.row_count() || col >= self.grid.col_count() {
-            return false;
-        }
-
-        // Check if column is editable
-        if !self.grid.is_column_editable(col) {
-            web_sys::console::log_1(&format!("Column {} is read-only", col).into());
-            return false;
-        }
-
-        // Check if cell is editable
-        if let Some(cell) = self.grid.get_cell(row, col) {
-            if !cell.editable {
-                return false;
-            }
-        }
-
-        self.editing.is_editing = true;
-        self.editing.editing_cell = Some((row, col));
-
-        web_sys::console::log_1(&format!("Started editing cell: ({}, {})", row, col).into());
-        true
+        // Use the EditingState's start_edit method
+        self.editing.start_edit(row, col, &self.grid)
     }
 
     /// End editing mode
     pub fn end_edit(&mut self) {
-        self.editing.is_editing = false;
-        self.editing.editing_cell = None;
-        web_sys::console::log_1(&"Ended editing".into());
+        // Use the EditingState's end_edit method
+        self.editing.end_edit();
     }
 
     /// Check if currently editing
     pub fn is_editing(&self) -> bool {
-        self.editing.is_editing
+        // Use the EditingState's is_editing method
+        self.editing.is_editing()
     }
 
     /// Update cell value during editing
     pub fn update_cell_value(&mut self, row: usize, col: usize, value: String) {
-        if self.editing.is_editing && self.editing.editing_cell == Some((row, col)) {
-            self.set_cell_value(row, col, &value);
-            web_sys::console::log_1(&format!("Updated cell ({}, {}) to: {}", row, col, value).into());
-        }
+        // Use the EditingState's update_cell_value method
+        self.editing.update_cell_value(row, col, value, &mut self.grid);
     }
 
     /// Get cell position for editing (returns canvas coordinates)
     pub fn get_cell_edit_rect(&self, row: usize, col: usize) -> Vec<f32> {
-        // Account for header offsets
-        let x = self.grid.row_header_width + self.grid.col_x_position(col) - self.viewport.scroll_x;
-        let y = self.grid.col_header_height + self.grid.row_y_position(row) - self.viewport.scroll_y;
-        let width = self.grid.col_width(col);
-        let height = self.grid.row_height(row);
-
-        vec![x, y, width, height]
+        // Use the EditingState's get_cell_edit_rect method
+        self.editing.get_cell_edit_rect(row, col, &self.grid, &self.viewport)
     }
 
     /// Handle double-click for editing

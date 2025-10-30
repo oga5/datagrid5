@@ -127,19 +127,7 @@
             clip-path: polygon(60px 0, 100% 0, 100% 100%, 0 100%, 0 30px, 60px 30px);
         }
 
-        /* Corner header (top-left intersection of row and column headers) */
-        #corner-header {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 60px; /* row header width */
-            height: 30px; /* col header height */
-            background: #f0f0f0;
-            border-right: 1px solid #cccccc;
-            border-bottom: 1px solid #cccccc;
-            z-index: 3;
-            pointer-events: none;
-        }
+        /* Corner header is now drawn on canvas in Rust (text.rs) - no DIV needed */
 
         /* Cell editor */
         #cell-editor {
@@ -238,7 +226,6 @@
             <div class="grid-container">
                 <canvas id="webgl-canvas"></canvas>
                 <canvas id="text-canvas" tabindex="0"></canvas>
-                <div id="corner-header"></div>
                 <div id="scroll-container">
                     <div id="scroll-content"></div>
                 </div>
