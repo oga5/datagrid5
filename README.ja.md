@@ -111,14 +111,6 @@ python3 -m http.server 8080
 ブラウザを開いて以下にアクセス：
 - メインデモ: http://localhost:8080/www/
 - サンプル: http://localhost:8080/examples/
-- 読み取り専用列: http://localhost:8080/examples/readonly-columns-example.html
-- 検証サンプル: http://localhost:8080/examples/validation-example.html
-- 列のグループ化: http://localhost:8080/examples/column-grouping-example.html
-- 売上分析（3レベル）: http://localhost:8080/examples/sales-analysis-example.html
-- 編集サンプル: http://localhost:8080/examples/editing-example.html
-- コンテキストメニュー編集: http://localhost:8080/examples/context-menu-editing-example.html
-- フルスクリーンサンプル: http://localhost:8080/examples/full-screen-resize-example.html
-- レスポンシブサンプル: http://localhost:8080/examples/responsive-resize-example.html
 
 ### ビルドスクリプトオプション
 
@@ -632,18 +624,22 @@ const grid = DataGrid.from_container('my-grid', JSON.stringify(options));
 - **[サンプルガイド（日本語）](./docs/EXAMPLES.ja.md)** - 使用例とチュートリアル
 - **[タスク進捗](./TASK.md)** - 開発ロードマップと機能追跡
 
+## 🌐 ライブデモ
+
+ブラウザでDataGrid5を試してみましょう：
+
+**🚀 [ライブデモサイト](https://oga5.github.io/datagrid5/)**
+
+- [サンプルギャラリー](https://oga5.github.io/datagrid5/examples/) - インタラクティブデモ
+- [メインデモ](https://oga5.github.io/datagrid5/www/) - フル機能グリッド
+
 ## 📦 サンプル
 
-`examples/`ディレクトリには包括的なサンプルが含まれています：
+`examples/`ディレクトリにはDataGridWrapperを使用した包括的なサンプルが含まれています：
 
-### 🚀 簡略化されたサンプル（DataGridWrapperを使用）
-
-これらのサンプルはDataGridWrapperを使用し、コードが約50-80%削減されています：
-
-- **[simple-usage-v2.html](./examples/simple-usage-v2.html)** - 最小限のコードでの基本グリッド（約180行、64%削減）
-- **[editing-example-simple.html](./examples/editing-example-simple.html)** - インタラクティブ編集を簡略化（約150行、79%削減）
-- **[clipboard-example-v2.html](./examples/clipboard-example-v2.html)** - Excelライクなコピー/ペーストのデモ
-- **[context-menu-example-v2.html](./examples/context-menu-example-v2.html)** - 右クリックメニューを簡単に
+- **[simple-usage-v2.html](./examples/simple-usage-v2.html)** - 最小限のコードでの基本グリッド
+- **[clipboard-example-v2.html](./examples/clipboard-example-v2.html)** - Excelライクなコピー/ペースト
+- **[context-menu-example-v2.html](./examples/context-menu-example-v2.html)** - 右クリックメニュー
 - **[validation-example-v2.html](./examples/validation-example-v2.html)** - リアルタイム検証
 - **[column-grouping-example-v2.html](./examples/column-grouping-example-v2.html)** - 複数レベルのヘッダー
 - **[readonly-columns-example-v2.html](./examples/readonly-columns-example-v2.html)** - 列の権限
@@ -651,36 +647,7 @@ const grid = DataGrid.from_container('my-grid', JSON.stringify(options));
 - **[sales-analysis-example-v2.html](./examples/sales-analysis-example-v2.html)** - 分析ダッシュボード
 - **[responsive-resize-example-v2.html](./examples/responsive-resize-example-v2.html)** - 自動リサイズサポート
 
-### 📚 完全なサンプル（直接API使用）
-
-完全な制御を示す完全なサンプル：
-
-- **[simple-usage.html](./examples/simple-usage.html)** - 基本的なグリッド設定とデータロード
-- **[advanced-config-example.html](./examples/advanced-config-example.html)** - 列の設定とデータ型
-- **[readonly-columns-example.html](./examples/readonly-columns-example.html)** - 列ごとの読み取り専用列設定
-- **[validation-example.html](./examples/validation-example.html)** - 正規表現パターンとカスタムエラーメッセージによる入力検証
-- **[column-grouping-example.html](./examples/column-grouping-example.html)** - グループ化による複数レベルの階層列ヘッダー
-- **[sales-analysis-example.html](./examples/sales-analysis-example.html)** - 3レベルの売上分析ダッシュボード（四半期→月→メトリクス）
-- **[editing-example.html](./examples/editing-example.html)** - 元に戻す/やり直しと編集履歴を持つセル編集機能
-- **[context-menu-editing-example.html](./examples/context-menu-editing-example.html)** - 行操作用のコンテキストメニュー（挿入、削除、元に戻す/やり直し）
-- **[full-screen-resize-example.html](./examples/full-screen-resize-example.html)** - 自動リサイズするブラウザ対応グリッド
-- **[responsive-resize-example.html](./examples/responsive-resize-example.html)** - レスポンシブレイアウトの例
-- **[worker-example.html](./examples/worker-example.html)** - Web Workersを使用したバックグラウンド処理
-- **[context-menu-example.html](./examples/context-menu-example.html)** - 右クリックコンテキストメニュー
-
-完全なサンプルショーケースは **[index.html](./examples/index.html)** を参照してください。
-
-## 📊 パフォーマンス
-
-MacBook Pro M1でテスト済み：
-
-| メトリック | パフォーマンス |
-|--------|------------|
-| 初期レンダリング（1万行） | < 50ms |
-| スクロールFPS | 60 FPS |
-| セル選択応答 | < 16ms |
-| メモリ使用量（10万行） | < 50MB |
-| WASMバンドルサイズ | < 200KB（gzip圧縮） |
+完全なショーケースは **[examples/index.html](./examples/index.html)** を参照してください。
 
 ## 🎯 使用例
 

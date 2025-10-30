@@ -111,14 +111,6 @@ python3 -m http.server 8080
 Open your browser and navigate to:
 - Main demo: http://localhost:8080/www/
 - Examples: http://localhost:8080/examples/
-- Read-only columns: http://localhost:8080/examples/readonly-columns-example.html
-- Validation example: http://localhost:8080/examples/validation-example.html
-- Column grouping: http://localhost:8080/examples/column-grouping-example.html
-- Sales analysis (3-level): http://localhost:8080/examples/sales-analysis-example.html
-- Editing example: http://localhost:8080/examples/editing-example.html
-- Context menu editing: http://localhost:8080/examples/context-menu-editing-example.html
-- Full-screen example: http://localhost:8080/examples/full-screen-resize-example.html
-- Responsive example: http://localhost:8080/examples/responsive-resize-example.html
 
 ### Build Script Options
 
@@ -632,18 +624,22 @@ const grid = DataGrid.from_container('my-grid', JSON.stringify(options));
 - **[Examples Guide (日本語)](./docs/EXAMPLES.ja.md)** - 使用例とチュートリアル
 - **[Task Progress](./TASK.md)** - Development roadmap and feature tracking
 
+## 🌐 Live Demo
+
+Try DataGrid5 in your browser:
+
+**🚀 [Live Demo Site](https://oga5.github.io/datagrid5/)**
+
+- [Examples Gallery](https://oga5.github.io/datagrid5/examples/) - Interactive demos
+- [Main Demo](https://oga5.github.io/datagrid5/www/) - Full-featured grid
+
 ## 📦 Examples
 
-The `examples/` directory contains comprehensive examples:
+The `examples/` directory contains comprehensive examples using DataGridWrapper:
 
-### 🚀 Simplified Examples (Using DataGridWrapper)
-
-These examples use DataGridWrapper for ~50-80% less code:
-
-- **[simple-usage-v2.html](./examples/simple-usage-v2.html)** - Basic grid with minimal code (~180 lines, 64% reduction)
-- **[editing-example-simple.html](./examples/editing-example-simple.html)** - Interactive editing simplified (~150 lines, 79% reduction)
-- **[clipboard-example-v2.html](./examples/clipboard-example-v2.html)** - Excel-like copy/paste demonstration
-- **[context-menu-example-v2.html](./examples/context-menu-example-v2.html)** - Right-click menus made easy
+- **[simple-usage-v2.html](./examples/simple-usage-v2.html)** - Basic grid with minimal code
+- **[clipboard-example-v2.html](./examples/clipboard-example-v2.html)** - Excel-like copy/paste
+- **[context-menu-example-v2.html](./examples/context-menu-example-v2.html)** - Right-click menus
 - **[validation-example-v2.html](./examples/validation-example-v2.html)** - Real-time validation
 - **[column-grouping-example-v2.html](./examples/column-grouping-example-v2.html)** - Multi-level headers
 - **[readonly-columns-example-v2.html](./examples/readonly-columns-example-v2.html)** - Column permissions
@@ -651,36 +647,7 @@ These examples use DataGridWrapper for ~50-80% less code:
 - **[sales-analysis-example-v2.html](./examples/sales-analysis-example-v2.html)** - Analytics dashboard
 - **[responsive-resize-example-v2.html](./examples/responsive-resize-example-v2.html)** - Auto-resize support
 
-### 📚 Full Examples (Direct API Usage)
-
-Complete examples showing full control:
-
-- **[simple-usage.html](./examples/simple-usage.html)** - Basic grid setup and data loading
-- **[advanced-config-example.html](./examples/advanced-config-example.html)** - Column configuration and data types
-- **[readonly-columns-example.html](./examples/readonly-columns-example.html)** - Read-only column configuration per column
-- **[validation-example.html](./examples/validation-example.html)** - Input validation with regex patterns and custom error messages
-- **[column-grouping-example.html](./examples/column-grouping-example.html)** - Multi-level hierarchical column headers with grouping
-- **[sales-analysis-example.html](./examples/sales-analysis-example.html)** - 3-level sales analysis dashboard (Quarter → Month → Metrics)
-- **[editing-example.html](./examples/editing-example.html)** - Cell editing features with undo/redo and edit history
-- **[context-menu-editing-example.html](./examples/context-menu-editing-example.html)** - Context menu for row operations (insert, delete, undo/redo)
-- **[full-screen-resize-example.html](./examples/full-screen-resize-example.html)** - Browser-responsive grid that auto-resizes
-- **[responsive-resize-example.html](./examples/responsive-resize-example.html)** - Responsive layout example
-- **[worker-example.html](./examples/worker-example.html)** - Background processing with Web Workers
-- **[context-menu-example.html](./examples/context-menu-example.html)** - Right-click context menus
-
-Visit **[index.html](./examples/index.html)** for a complete examples showcase.
-
-## 📊 Performance
-
-Tested on MacBook Pro M1:
-
-| Metric | Performance |
-|--------|------------|
-| Initial render (10k rows) | < 50ms |
-| Scroll FPS | 60 FPS |
-| Cell selection response | < 16ms |
-| Memory usage (100k rows) | < 50MB |
-| WASM bundle size | < 200KB (gzipped) |
+Visit **[examples/index.html](./examples/index.html)** for a complete showcase.
 
 ## 🎯 Use Cases
 
