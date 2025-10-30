@@ -154,18 +154,30 @@ button:active {
     display: flex;
     justify-content: center;
     position: relative;
+    height: 640px; /* 600px for grid + 40px padding */
+}
+
+/* Wrapper for grid components */
+#canvas-container {
+    position: relative;
+    width: 1200px;
+    height: 600px;
+    background: white;
+    overflow: hidden;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Virtual scroll container with native scrollbars */
 #scroll-container {
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     overflow: auto;
-    width: 1200px;
-    height: 600px;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    background: white;
+    z-index: 1;
 }
 
 /* Virtual content area (defines scrollable size) */
@@ -177,18 +189,18 @@ button:active {
 /* Stack canvases on top of each other */
 #webgl-canvas,
 #text-canvas {
-    position: sticky;
+    position: absolute;
     top: 0;
     left: 0;
     pointer-events: none;
 }
 
 #webgl-canvas {
-    z-index: 1;
+    z-index: 2;
 }
 
 #text-canvas {
-    z-index: 2;
+    z-index: 3;
     cursor: cell;
     pointer-events: all;
 }
