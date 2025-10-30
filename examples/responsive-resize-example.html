@@ -123,6 +123,8 @@
         #text-canvas:focus {
             outline: 3px solid #2196F3;
             outline-offset: -3px;
+            /* Adjust outline to not be covered by corner header */
+            clip-path: polygon(60px 0, 100% 0, 100% 100%, 0 100%, 0 30px, 60px 30px);
         }
 
         /* Corner header (top-left intersection of row and column headers) */
@@ -132,10 +134,10 @@
             left: 0;
             width: 60px; /* row header width */
             height: 30px; /* col header height */
-            background: #e0e0e0;
+            background: #f0f0f0;
             border-right: 1px solid #cccccc;
             border-bottom: 1px solid #cccccc;
-            z-index: 1;
+            z-index: 3;
             pointer-events: none;
         }
 
@@ -645,7 +647,11 @@
 
             // Double-click to edit
             canvas.addEventListener('dblclick', (e) => {
-                if (grid && !grid.is_editing()) {
+                if (grid) {
+                    // End any current edit first
+                    if (grid.is_editing()) {
+                        endCellEdit(true);
+                    }
                     const cellPos = grid.handle_double_click(e);
                     if (cellPos) {
                         startCellEdit(cellPos[0], cellPos[1]);
@@ -665,36 +671,48 @@
             const scrollContainer = document.getElementById('scroll-container');
             const gridContainer = document.querySelector('.grid-container');
 
-            const rect = grid.get_cell_edit_rect(row, col);
-            const [x, y, width, height] = rect;
-
-            const currentValue = grid.get_cell_value(row, col);
-
-            const scrollContainerRect = scrollContainer.getBoundingClientRect();
-            const gridContainerRect = gridContainer.getBoundingClientRect();
-            const offsetX = scrollContainerRect.left - gridContainerRect.left;
-            const offsetY = scrollContainerRect.top - gridContainerRect.top;
-
-            editor.style.left = `${x + offsetX - scrollContainer.scrollLeft}px`;
-            editor.style.top = `${y + offsetY - scrollContainer.scrollTop}px`;
-            editor.style.width = `${width}px`;
-            editor.style.height = `${height}px`;
-            editor.style.display = 'block';
-            editor.value = currentValue;
-
             editingRow = row;
             editingCol = col;
+
+            // Function to update editor position
+            const updateEditorPosition = () => {
+                if (editingRow === null || editingCol === null) return;
+
+                const rect = grid.get_cell_edit_rect(editingRow, editingCol);
+                const [x, y, width, height] = rect;
+
+                const scrollContainerRect = scrollContainer.getBoundingClientRect();
+                const gridContainerRect = gridContainer.getBoundingClientRect();
+                const offsetX = scrollContainerRect.left - gridContainerRect.left;
+                const offsetY = scrollContainerRect.top - gridContainerRect.top;
+
+                editor.style.left = `${x + offsetX}px`;
+                editor.style.top = `${y + offsetY}px`;
+                editor.style.width = `${width}px`;
+                editor.style.height = `${height}px`;
+            };
+
+            // Initial position
+            updateEditorPosition();
+            editor.style.display = 'block';
+
+            const currentValue = grid.get_cell_value(row, col);
+            editor.value = currentValue;
 
             editor.focus();
             editor.select();
 
-            setupEditorEvents(editor);
+            setupEditorEvents(editor, updateEditorPosition);
+
+            // Update position on scroll
+            scrollContainer.addEventListener('scroll', updateEditorPosition);
         }
 
         function endCellEdit(save = false) {
             if (!grid || editingRow === null || editingCol === null) return;
 
             const editor = document.getElementById('cell-editor');
+            const scrollContainer = document.getElementById('scroll-container');
 
             if (save) {
                 grid.update_cell_value(editingRow, editingCol, editor.value);
@@ -702,6 +720,12 @@
 
             editor.style.display = 'none';
             editor.value = '';
+
+            // Remove scroll event listener if it exists
+            if (editor._updatePosition) {
+                scrollContainer.removeEventListener('scroll', editor._updatePosition);
+                editor._updatePosition = null;
+            }
 
             grid.end_edit();
 
@@ -711,17 +735,59 @@
             document.getElementById('text-canvas').focus();
         }
 
-        function setupEditorEvents(editor) {
+        function setupEditorEvents(editor, updateEditorPosition) {
             const newEditor = editor.cloneNode(true);
             editor.parentNode.replaceChild(newEditor, editor);
 
             newEditor.addEventListener('keydown', (e) => {
+                // Allow arrow keys to work within the input field
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+                    e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
+                    e.key === 'Home' || e.key === 'End') {
+                    e.stopPropagation();
+                    return;
+                }
+
                 if (e.key === 'Enter') {
                     e.preventDefault();
+                    const currentRow = editingRow;
+                    const currentCol = editingCol;
                     endCellEdit(true);
+
+                    // Move to next row
+                    const maxRow = grid.row_count() - 1;
+                    const nextRow = currentRow < maxRow ? currentRow + 1 : currentRow;
+
+                    // Select the next cell by calculating its canvas position
+                    const rect = grid.get_cell_edit_rect(nextRow, currentCol);
+                    const [x, y, width, height] = rect;
+                    grid.handle_mouse_down_at(x + width / 2, y + height / 2);
+                    syncScrollPosition();
                 } else if (e.key === 'Escape') {
                     e.preventDefault();
+                    const currentRow = editingRow;
+                    const currentCol = editingCol;
                     endCellEdit(false);
+
+                    // Keep current cell selected
+                    const rect = grid.get_cell_edit_rect(currentRow, currentCol);
+                    const [x, y, width, height] = rect;
+                    grid.handle_mouse_down_at(x + width / 2, y + height / 2);
+                } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const currentRow = editingRow;
+                    const currentCol = editingCol;
+                    endCellEdit(true);
+
+                    // Move to next column
+                    const maxCol = grid.col_count() - 1;
+                    const nextCol = currentCol < maxCol ? currentCol + 1 : currentCol;
+
+                    // Select the next cell by calculating its canvas position
+                    const rect = grid.get_cell_edit_rect(currentRow, nextCol);
+                    const [x, y, width, height] = rect;
+                    grid.handle_mouse_down_at(x + width / 2, y + height / 2);
+                    syncScrollPosition();
                 }
             });
 
@@ -732,6 +798,9 @@
                     }
                 }, 100);
             });
+
+            // Store reference for scroll updates
+            document.getElementById('cell-editor')._updatePosition = updateEditorPosition;
         }
 
 
