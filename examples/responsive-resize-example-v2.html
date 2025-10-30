@@ -204,9 +204,9 @@
             await init();
 
             gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
-                rows: 10000,
+                rows: 100000,
                 cols: 26,
-                enableEditing: false,
+                enableEditing: true,
                 enableVirtualScroll: true,
                 enableResize: true
             });
@@ -215,7 +215,7 @@
             console.log('Grid initialized with automatic responsive resize!');
         }
 
-        function loadSampleData() {
+        async function loadSampleData() {
             const grid = gridWrapper.getGrid();
 
             // Set column headers (not as data, but as column names)
@@ -224,19 +224,32 @@
                 grid.set_column_name(col, `Column ${colName}`);
             }
 
-            // Data (starting from row 0)
-            for (let row = 0; row < 10000; row++) {
-                for (let col = 0; col < 26; col++) {
-                    grid.set_cell_value(row, col, `R${row + 1}C${col + 1}`);
+            // Try to load all 100K rows
+            // Process in chunks to avoid blocking the UI
+            const initialRows = 100000;
+            const chunkSize = 500; // Process 500 rows at a time to avoid blocking
 
-                    // Zebra striping
-                    if (row % 2 === 0) {
-                        grid.set_cell_bg_color(row, col, 0xF5F5F5FF);
+            for (let startRow = 0; startRow < initialRows; startRow += chunkSize) {
+                const endRow = Math.min(startRow + chunkSize, initialRows);
+
+                // Process chunk
+                for (let row = startRow; row < endRow; row++) {
+                    for (let col = 0; col < 26; col++) {
+                        grid.set_cell_value(row, col, `R${row + 1}C${col + 1}`);
+
+                        // Zebra striping
+                        if (row % 2 === 0) {
+                            grid.set_cell_bg_color(row, col, 0xF5F5F5FF);
+                        }
                     }
                 }
+
+                // Yield to event loop after each chunk
+                await new Promise(resolve => setTimeout(resolve, 0));
+                gridWrapper.render();
             }
 
-            console.log('Sample data loaded');
+            console.log(`Sample data loaded (${initialRows} rows shown, grid supports 100K rows with virtual scrolling)`);
             gridWrapper.render();
         }
 

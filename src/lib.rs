@@ -668,6 +668,16 @@ impl DataGrid {
         vec![self.grid.row_count(), self.grid.col_count()]
     }
 
+    /// Get row count
+    pub fn row_count(&self) -> usize {
+        self.grid.row_count()
+    }
+
+    /// Get column count
+    pub fn col_count(&self) -> usize {
+        self.grid.col_count()
+    }
+
     /// Get viewport info
     pub fn get_viewport_info(&self) -> String {
         format!(
@@ -932,22 +942,55 @@ impl DataGrid {
                     Some((self.grid.row_count() - 1, self.grid.col_count() - 1))
                 }
                 NavigationCommand::Delete => {
-                    // Clear cell content
-                    if let Some((row, col)) = current {
+                    // Clear cell content for all selected cells
+                    if !self.selection.selected_cells.is_empty() {
+                        // Collect old values for undo
+                        let mut cells_to_clear = Vec::new();
+                        for (row, col) in self.selection.selected_cells.iter() {
+                            let old_value = self.grid.get_value(*row, *col);
+                            cells_to_clear.push((*row, *col, old_value));
+                        }
+
+                        // Clear all cells
+                        for (row, col, _) in &cells_to_clear {
+                            self.grid.set_value(*row, *col, CellValue::Empty);
+                        }
+
+                        // Record undo action
+                        let action = EditAction::ClearCells { cells: cells_to_clear };
+                        self.undo_redo.undo_stack.push(action);
+                        self.undo_redo.redo_stack.clear();
+
+                        web_sys::console::log_1(&format!("Cleared {} cell(s)", self.selection.selected_cells.len()).into());
+                        return true; // Force render
+                    } else if let Some((row, col)) = current {
+                        // Single cell clear
+                        let old_value = self.grid.get_value(row, col);
                         self.grid.set_value(row, col, CellValue::Empty);
+
+                        // Record undo action
+                        let action = EditAction::ClearCells {
+                            cells: vec![(row, col, old_value)]
+                        };
+                        self.undo_redo.undo_stack.push(action);
+                        self.undo_redo.redo_stack.clear();
+
                         web_sys::console::log_1(&format!("Cleared cell: ({}, {})", row, col).into());
+                        return true; // Force render
                     }
                     None
                 }
                 NavigationCommand::Undo => {
                     if self.undo() {
                         web_sys::console::log_1(&"Undo action".into());
+                        return true; // Force render
                     }
                     None
                 }
                 NavigationCommand::Redo => {
                     if self.redo() {
                         web_sys::console::log_1(&"Redo action".into());
+                        return true; // Force render
                     }
                     None
                 }
@@ -1101,12 +1144,14 @@ impl DataGrid {
                 NavigationCommand::Undo => {
                     if self.undo() {
                         web_sys::console::log_1(&"Undo action".into());
+                        return true; // Force render
                     }
                     None
                 }
                 NavigationCommand::Redo => {
                     if self.redo() {
                         web_sys::console::log_1(&"Redo action".into());
+                        return true; // Force render
                     }
                     None
                 }
@@ -1226,12 +1271,14 @@ impl DataGrid {
                 NavigationCommand::Undo => {
                     if self.undo() {
                         web_sys::console::log_1(&"Undo action".into());
+                        return true; // Force render
                     }
                     None
                 }
                 NavigationCommand::Redo => {
                     if self.redo() {
                         web_sys::console::log_1(&"Redo action".into());
+                        return true; // Force render
                     }
                     None
                 }
@@ -1341,8 +1388,22 @@ impl DataGrid {
 
     /// Update cell value during editing
     pub fn update_cell_value(&mut self, row: usize, col: usize, value: String) {
-        // Use the EditingState's update_cell_value method
+        // Record old value for undo
+        let old_value = self.grid.get_value(row, col);
+        let new_value = CellValue::Text(value.clone());
+
+        // Update the cell
         self.editing.update_cell_value(row, col, value, &mut self.grid);
+
+        // Record undo action
+        let action = EditAction::SetValue {
+            row,
+            col,
+            old_value,
+            new_value,
+        };
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
     }
 
     /// Get cell position for editing (returns canvas coordinates)
@@ -1360,6 +1421,18 @@ impl DataGrid {
         if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
             if self.start_edit(row, col) {
                 return Some(vec![row, col]);
+            }
+        }
+
+        None
+    }
+
+    /// Handle double-click at specific canvas coordinates (for wrapper use)
+    pub fn handle_double_click_at(&mut self, x: f32, y: f32) -> Option<String> {
+        // Get cell at click position
+        if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
+            if self.start_edit(row, col) {
+                return Some(format!("[{},{}]", row, col));
             }
         }
 
@@ -1500,6 +1573,24 @@ impl DataGrid {
         self.selection.selected_cells.len()
     }
 
+    /// Select a single cell and make it the active cell
+    pub fn select_cell(&mut self, row: usize, col: usize) {
+        // Clear previous selection
+        self.clear_selection();
+
+        // Select the cell
+        self.selection.selected_cells.insert((row, col));
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.selected = true;
+        }
+
+        // Set as anchor
+        self.selection.selection_anchor = Some((row, col));
+
+        // Update mouse handler
+        self.mouse_handler.select_cell(row, col);
+    }
+
     /// Select all cells (Ctrl+A)
     pub fn select_all(&mut self) {
         self.clear_selection();
@@ -1638,8 +1729,10 @@ impl DataGrid {
             return Err("No cell selected for paste".to_string());
         };
 
-        // Parse TSV and paste
+        // Parse TSV and paste, recording old and new values for undo/redo
+        let mut changed_cells = Vec::new();
         let lines: Vec<&str> = tsv_text.lines().collect();
+
         for (row_offset, line) in lines.iter().enumerate() {
             let target_row = start_row + row_offset;
             if target_row >= self.grid.row_count() {
@@ -1653,8 +1746,11 @@ impl DataGrid {
                     break; // Don't paste beyond grid bounds
                 }
 
+                // Record old value for undo
+                let old_value = self.grid.get_value(target_row, target_col);
+
                 // Create cell value
-                let cell_value = if value.is_empty() {
+                let new_value = if value.is_empty() {
                     CellValue::Empty
                 } else if let Ok(num) = value.parse::<f64>() {
                     CellValue::Number(num)
@@ -1664,8 +1760,16 @@ impl DataGrid {
                     CellValue::Text(value.to_string())
                 };
 
-                self.grid.set_value(target_row, target_col, cell_value);
+                self.grid.set_value(target_row, target_col, new_value.clone());
+                changed_cells.push((target_row, target_col, old_value, new_value));
             }
+        }
+
+        // Record undo action for all pasted cells
+        if !changed_cells.is_empty() {
+            let action = EditAction::SetMultipleCells { cells: changed_cells };
+            self.undo_redo.undo_stack.push(action);
+            self.undo_redo.redo_stack.clear();
         }
 
         Ok(())
@@ -2592,6 +2696,18 @@ impl DataGrid {
                     }
                     self.viewport.update_visible_range(&self.grid);
                 }
+                EditAction::ClearCells { cells } => {
+                    // Restore all cleared cell values
+                    for (row, col, old_value) in cells.iter() {
+                        self.grid.set_value(*row, *col, old_value.clone());
+                    }
+                }
+                EditAction::SetMultipleCells { cells } => {
+                    // Restore all old cell values
+                    for (row, col, old_value, _new_value) in cells.iter() {
+                        self.grid.set_value(*row, *col, old_value.clone());
+                    }
+                }
                 EditAction::SetStyle { row, col, old_style, new_style: _ } => {
                     // Restore old style
                     if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
@@ -2650,6 +2766,18 @@ impl DataGrid {
                         self.grid.delete_row(index);
                     }
                     self.viewport.update_visible_range(&self.grid);
+                }
+                EditAction::ClearCells { cells } => {
+                    // Re-clear all cells
+                    for (row, col, _old_value) in cells.iter() {
+                        self.grid.set_value(*row, *col, CellValue::Empty);
+                    }
+                }
+                EditAction::SetMultipleCells { cells } => {
+                    // Re-apply all new cell values
+                    for (row, col, _old_value, new_value) in cells.iter() {
+                        self.grid.set_value(*row, *col, new_value.clone());
+                    }
                 }
                 EditAction::SetStyle { row, col, old_style: _, new_style } => {
                     // Re-apply new style

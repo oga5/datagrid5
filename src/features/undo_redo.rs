@@ -42,6 +42,14 @@ pub enum EditAction {
         // Store multiple rows for bulk deletion undo
         rows: Vec<(usize, Vec<(usize, Cell)>)>, // (row_index, cells)
     },
+    ClearCells {
+        // Store multiple cell values for bulk clear/delete undo
+        cells: Vec<(usize, usize, CellValue)>, // (row, col, old_value)
+    },
+    SetMultipleCells {
+        // Store multiple cell changes (e.g., for paste, bulk edit)
+        cells: Vec<(usize, usize, CellValue, CellValue)>, // (row, col, old_value, new_value)
+    },
     SetStyle {
         row: usize,
         col: usize,
@@ -108,6 +116,18 @@ impl UndoRedoState {
                     }
                     viewport.update_visible_range(grid);
                 }
+                EditAction::ClearCells { cells } => {
+                    // Restore all cleared cell values
+                    for (row, col, old_value) in cells.iter() {
+                        grid.set_value(*row, *col, old_value.clone());
+                    }
+                }
+                EditAction::SetMultipleCells { cells } => {
+                    // Restore all old cell values
+                    for (row, col, old_value, _new_value) in cells.iter() {
+                        grid.set_value(*row, *col, old_value.clone());
+                    }
+                }
                 EditAction::SetStyle { row, col, old_style, new_style: _ } => {
                     // Restore old style
                     if let Some(cell) = grid.get_cell_mut(*row, *col) {
@@ -166,6 +186,18 @@ impl UndoRedoState {
                         grid.delete_row(index);
                     }
                     viewport.update_visible_range(grid);
+                }
+                EditAction::ClearCells { cells } => {
+                    // Re-clear all cells
+                    for (row, col, _old_value) in cells.iter() {
+                        grid.set_value(*row, *col, CellValue::Empty);
+                    }
+                }
+                EditAction::SetMultipleCells { cells } => {
+                    // Re-apply all new cell values
+                    for (row, col, _old_value, new_value) in cells.iter() {
+                        grid.set_value(*row, *col, new_value.clone());
+                    }
                 }
                 EditAction::SetStyle { row, col, old_style: _, new_style } => {
                     // Re-apply new style

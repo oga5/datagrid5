@@ -229,7 +229,7 @@ export class DataGridWrapper {
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
 
-                const cellInfo = this.grid.handle_double_click(x, y);
+                const cellInfo = this.grid.handle_double_click_at(x, y);
                 if (cellInfo) {
                     const [row, col] = JSON.parse(cellInfo);
                     this.startCellEdit(row, col);
@@ -353,13 +353,27 @@ export class DataGridWrapper {
         this.cellEditor.style.background = 'white';
         this.cellEditor.style.display = 'none';
         this.container.appendChild(this.cellEditor);
+
+        // Setup event listeners once
+        this.setupEditorEvents();
     }
 
     startCellEdit(row, col) {
         if (!this.options.enableEditing || !this.cellEditor) return;
 
+        console.log(`[Wrapper] startCellEdit called for (${row}, ${col})`);
+        console.log(`[Wrapper] Current editing state: row=${this.editingRow}, col=${this.editingCol}`);
+
+        // If already editing, end the current edit first
+        if (this.editingRow !== null || this.editingCol !== null) {
+            console.log(`[Wrapper] Ending previous edit first`);
+            this.endCellEdit(true, false, false);
+        }
+
         // Start edit in grid
+        console.log(`[Wrapper] Calling grid.start_edit(${row}, ${col})`);
         const canEdit = this.grid.start_edit(row, col);
+        console.log(`[Wrapper] grid.start_edit returned: ${canEdit}`);
         if (!canEdit) {
             console.log('Cannot edit this cell');
             return;
@@ -389,10 +403,11 @@ export class DataGridWrapper {
         this.editingRow = row;
         this.editingCol = col;
 
-        this.cellEditor.focus();
-        this.cellEditor.select();
-
-        this.setupEditorEvents();
+        // Focus and select after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            this.cellEditor.focus();
+            this.cellEditor.select();
+        }, 0);
 
         // Emit edit start event
         this.container.dispatchEvent(new CustomEvent('celleditstart', {
@@ -402,6 +417,8 @@ export class DataGridWrapper {
 
     endCellEdit(save = false, moveDown = false, moveRight = false) {
         if (!this.grid || this.editingRow === null || this.editingCol === null) return;
+
+        console.log(`[Wrapper] endCellEdit called: save=${save}, moveDown=${moveDown}, moveRight=${moveRight}`);
 
         const oldValue = this.grid.get_cell_value(this.editingRow, this.editingCol);
         let changed = false;
@@ -413,18 +430,19 @@ export class DataGridWrapper {
             this.requestRender();
         }
 
+        // Clear editing state immediately to prevent re-entry
+        const currentRow = this.editingRow;
+        const currentCol = this.editingCol;
+
+        this.editingRow = null;
+        this.editingCol = null;
+
         // Hide editor
         this.cellEditor.style.display = 'none';
         this.cellEditor.value = '';
 
         // End edit mode
         this.grid.end_edit();
-
-        const currentRow = this.editingRow;
-        const currentCol = this.editingCol;
-
-        this.editingRow = null;
-        this.editingCol = null;
 
         // Emit edit end event
         this.container.dispatchEvent(new CustomEvent('celleditend', {
@@ -443,22 +461,25 @@ export class DataGridWrapper {
         const maxCol = this.grid.col_count() - 1;
 
         if (save && moveDown && currentRow < maxRow) {
-            setTimeout(() => this.startCellEdit(currentRow + 1, currentCol), 10);
+            const nextRow = currentRow + 1;
+            this.grid.select_cell(nextRow, currentCol);
+            this.requestRender();
+            setTimeout(() => this.startCellEdit(nextRow, currentCol), 10);
         } else if (save && moveRight && currentCol < maxCol) {
-            setTimeout(() => this.startCellEdit(currentRow, currentCol + 1), 10);
+            const nextCol = currentCol + 1;
+            this.grid.select_cell(currentRow, nextCol);
+            this.requestRender();
+            setTimeout(() => this.startCellEdit(currentRow, nextCol), 10);
         } else {
             this.textCanvas.focus();
         }
     }
 
     setupEditorEvents() {
-        // Remove old listeners by cloning
-        const newEditor = this.cellEditor.cloneNode(true);
-        this.cellEditor.parentNode.replaceChild(newEditor, this.cellEditor);
-        this.cellEditor = newEditor;
+        // Setup event listeners (called once during initialization)
 
         // Enter to save and move down
-        newEditor.addEventListener('keydown', (e) => {
+        this.cellEditor.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 this.endCellEdit(true, true, false);
@@ -471,9 +492,26 @@ export class DataGridWrapper {
             }
         });
 
-        // Click outside to save
-        newEditor.addEventListener('blur', () => {
-            setTimeout(() => this.endCellEdit(true), 100);
+        // Click outside to save - but only after a delay to avoid immediate blur
+        let blurTimeout = null;
+        this.cellEditor.addEventListener('focus', () => {
+            console.log('[Wrapper] Editor focused');
+            // Clear any pending blur handler when focused
+            if (blurTimeout) {
+                clearTimeout(blurTimeout);
+                blurTimeout = null;
+            }
+        });
+
+        this.cellEditor.addEventListener('blur', () => {
+            console.log('[Wrapper] Editor blur event');
+            // Only end edit if we're actually editing and this isn't an immediate blur after focus
+            blurTimeout = setTimeout(() => {
+                if (this.editingRow !== null && this.editingCol !== null) {
+                    console.log('[Wrapper] Blur timeout - ending edit');
+                    this.endCellEdit(true);
+                }
+            }, 150);
         });
     }
 
