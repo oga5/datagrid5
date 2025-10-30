@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Responsive Resize Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 0 20px 20px 20px;
+        }
+
+        .header {
+            padding: 20px;
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #718096;
+            font-size: 14px;
+        }
+
+        .controls {
+            padding: 15px 20px;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+        }
+
+        button.secondary {
+            background: #48bb78;
+        }
+
+        button.secondary:hover {
+            background: #38a169;
+        }
+
+        .grid-container {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+            background: white;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .info-section {
+            padding: 15px 20px;
+            background: rgba(255,255,255,0.85);
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .info-title {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .info-content {
+            font-size: 13px;
+            color: #4a5568;
+            line-height: 1.6;
+        }
+
+        .metrics {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .metric {
+            display: flex;
+            gap: 5px;
+        }
+
+        .metric-label {
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .metric-value {
+            color: #667eea;
+        }
+
+        .resize-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(102, 126, 234, 0.95);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 8px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 10000;
+        }
+
+        .resize-indicator.show {
+            display: block;
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>DataGrid5 - Responsive Resize Example</h1>
+        <p class="subtitle">Automatic grid resizing with browser window - powered by DataGridWrapper</p>
+    </div>
+
+    <div class="controls">
+        <button id="load-data-btn" class="secondary">Load Sample Data</button>
+        <button id="simulate-mobile-btn">📱 Simulate Mobile (400x600)</button>
+        <button id="simulate-tablet-btn">📱 Simulate Tablet (768x1024)</button>
+        <button id="simulate-desktop-btn">🖥️ Simulate Desktop (1920x1080)</button>
+        <button id="fullscreen-btn">⛶ Toggle Fullscreen</button>
+    </div>
+
+    <div class="grid-container" id="grid-container"></div>
+
+    <div class="info-section">
+        <div class="info-title">✨ Responsive Features:</div>
+        <div class="info-content">
+            The grid automatically adapts to window size changes. Try resizing your browser window or using the simulation buttons above.
+            DataGridWrapper handles all resize events automatically - no manual setup required!
+        </div>
+        <div class="metrics">
+            <div class="metric">
+                <span class="metric-label">Window Size:</span>
+                <span class="metric-value" id="window-size">-</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Grid Size:</span>
+                <span class="metric-value" id="grid-size">-</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Resize Count:</span>
+                <span class="metric-value" id="resize-count">0</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="resize-indicator" id="resize-indicator">
+        Resizing...
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+        import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
+
+        let gridWrapper = null;
+        let resizeCount = 0;
+
+        async function initGrid() {
+            await init();
+
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
+                rows: 10000,
+                cols: 26,
+                enableEditing: false,
+                enableVirtualScroll: true,
+                enableResize: true
+            });
+
+            updateMetrics();
+            console.log('Grid initialized with automatic responsive resize!');
+        }
+
+        function loadSampleData() {
+            const grid = gridWrapper.getGrid();
+
+            // Set column headers (not as data, but as column names)
+            for (let col = 0; col < 26; col++) {
+                const colName = String.fromCharCode(65 + col);
+                grid.set_column_name(col, `Column ${colName}`);
+            }
+
+            // Data (starting from row 0)
+            for (let row = 0; row < 10000; row++) {
+                for (let col = 0; col < 26; col++) {
+                    grid.set_cell_value(row, col, `R${row + 1}C${col + 1}`);
+
+                    // Zebra striping
+                    if (row % 2 === 0) {
+                        grid.set_cell_bg_color(row, col, 0xF5F5F5FF);
+                    }
+                }
+            }
+
+            console.log('Sample data loaded');
+            gridWrapper.render();
+        }
+
+        function updateMetrics() {
+            const windowSize = `${window.innerWidth} × ${window.innerHeight}`;
+            const container = document.getElementById('grid-container');
+            const rect = container.getBoundingClientRect();
+            const gridSize = `${Math.floor(rect.width)} × ${Math.floor(rect.height)}`;
+
+            document.getElementById('window-size').textContent = windowSize;
+            document.getElementById('grid-size').textContent = gridSize;
+            document.getElementById('resize-count').textContent = resizeCount;
+        }
+
+        function showResizeIndicator() {
+            const indicator = document.getElementById('resize-indicator');
+            indicator.classList.add('show');
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 500);
+        }
+
+        // Monitor window resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                resizeCount++;
+                updateMetrics();
+                showResizeIndicator();
+            }, 100);
+        });
+
+        // Simulation functions
+        function simulateMobile() {
+            // Note: This simulates by resizing the container, not the actual window
+            const container = document.querySelector('.grid-container');
+            container.style.margin = '20px auto';
+            container.style.maxWidth = '400px';
+            container.style.height = '600px';
+
+            setTimeout(() => {
+                resizeCount++;
+                updateMetrics();
+                showResizeIndicator();
+            }, 100);
+        }
+
+        function simulateTablet() {
+            const container = document.querySelector('.grid-container');
+            container.style.margin = '20px auto';
+            container.style.maxWidth = '768px';
+            container.style.height = '1024px';
+
+            setTimeout(() => {
+                resizeCount++;
+                updateMetrics();
+                showResizeIndicator();
+            }, 100);
+        }
+
+        function simulateDesktop() {
+            const container = document.querySelector('.grid-container');
+            container.style.margin = '20px 0';
+            container.style.maxWidth = 'none';
+            container.style.height = '';
+
+            setTimeout(() => {
+                resizeCount++;
+                updateMetrics();
+                showResizeIndicator();
+            }, 100);
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // Button handlers
+        document.getElementById('load-data-btn').addEventListener('click', loadSampleData);
+        document.getElementById('simulate-mobile-btn').addEventListener('click', simulateMobile);
+        document.getElementById('simulate-tablet-btn').addEventListener('click', simulateTablet);
+        document.getElementById('simulate-desktop-btn').addEventListener('click', simulateDesktop);
+        document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
+
+        // Fullscreen change handler
+        document.addEventListener('fullscreenchange', () => {
+            setTimeout(() => {
+                resizeCount++;
+                updateMetrics();
+                showResizeIndicator();
+            }, 100);
+        });
+
+        // Initialize
+        initGrid().then(() => {
+            // Wait a bit for ResizeObserver to set correct canvas size
+            setTimeout(() => {
+                loadSampleData();
+                updateMetrics();
+            }, 100);
+        });
+
+        // Update metrics periodically
+        setInterval(updateMetrics, 1000);
+    </script>
+</body>
+</html>

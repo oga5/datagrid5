@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Context Menu Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .description {
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .grid-wrapper {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .info {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .info h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .info ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .info li {
+            margin: 8px 0;
+            color: #555;
+        }
+
+        /* Custom Context Menu */
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            padding: 4px 0;
+            min-width: 200px;
+            z-index: 10000;
+            display: none;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #333;
+        }
+
+        .context-menu-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .context-menu-item.disabled {
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .context-menu-item.disabled:hover {
+            background-color: transparent;
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background-color: #e0e0e0;
+            margin: 4px 0;
+        }
+
+        .context-menu-icon {
+            width: 16px;
+            text-align: center;
+        }
+
+        .status-bar {
+            margin-top: 15px;
+            padding: 12px;
+            background-color: rgba(255,255,255,0.95);
+            border-radius: 6px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .status-bar strong {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖱️ DataGrid5 - Context Menu Example</h1>
+        <div class="description">
+            Right-click on cells, row headers, or column headers to see custom context menus.
+            The DataGridWrapper automatically handles the gridcontextmenu event.
+        </div>
+
+        <div class="grid-wrapper" id="grid-container"></div>
+
+        <div class="status-bar" id="status-bar">
+            <strong>Status:</strong> Ready - Right-click on any cell, row, or column
+        </div>
+
+        <div class="info">
+            <h3>📝 Instructions:</h3>
+            <ul>
+                <li><strong>Right-click on a Cell:</strong> Shows cell-specific context menu (Copy, Cut, Paste, Delete)</li>
+                <li><strong>Right-click on Row Header:</strong> Shows row operations menu (Insert, Delete, Hide Row)</li>
+                <li><strong>Right-click on Column Header:</strong> Shows column operations menu (Sort, Filter, Hide Column)</li>
+                <li><strong>Custom Actions:</strong> Each menu item logs the action to the console and status bar</li>
+            </ul>
+        </div>
+
+        <!-- Custom Context Menu -->
+        <div class="context-menu" id="context-menu">
+            <!-- Menu items will be dynamically generated -->
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+        import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
+
+        let gridWrapper = null;
+        const contextMenu = document.getElementById('context-menu');
+        let currentContext = null;
+
+        async function initGrid() {
+            await init();
+
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
+                rows: 50,
+                cols: 20,
+                enableEditing: false,
+                enableVirtualScroll: true,
+                enableResize: true
+            });
+
+            // Setup context menu listener
+            setupContextMenuListener();
+
+            // Fill sample data
+            fillSampleData();
+
+            console.log('Grid initialized with context menu support!');
+        }
+
+        function setupContextMenuListener() {
+            const container = document.getElementById('grid-container');
+
+            // Listen to gridcontextmenu event from wrapper
+            container.addEventListener('gridcontextmenu', (e) => {
+                e.preventDefault();
+                const { type, row, col } = e.detail;
+                currentContext = { type, row, col };
+
+                showContextMenu(e.detail, e.clientX, e.clientY);
+                updateStatus(`Right-clicked on ${type}: ${type === 'cell' ? `(${row}, ${col})` : type === 'row' ? `Row ${row}` : `Column ${col}`}`);
+            });
+
+            // Hide context menu on click outside
+            document.addEventListener('click', () => {
+                hideContextMenu();
+            });
+        }
+
+        function showContextMenu(context, x, y) {
+            const { type, row, col } = context;
+
+            // Generate menu items based on context type
+            let menuHTML = '';
+
+            if (type === 'cell') {
+                menuHTML = `
+                    <div class="context-menu-item" onclick="handleMenuAction('copy')">
+                        <span class="context-menu-icon">📋</span>
+                        <span>Copy</span>
+                    </div>
+                    <div class="context-menu-item" onclick="handleMenuAction('cut')">
+                        <span class="context-menu-icon">✂️</span>
+                        <span>Cut</span>
+                    </div>
+                    <div class="context-menu-item" onclick="handleMenuAction('paste')">
+                        <span class="context-menu-icon">📄</span>
+                        <span>Paste</span>
+                    </div>
+                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" onclick="handleMenuAction('delete')">
+                        <span class="context-menu-icon">🗑️</span>
+                        <span>Delete</span>
+                    </div>
+                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" onclick="handleMenuAction('format')">
+                        <span class="context-menu-icon">🎨</span>
+                        <span>Format Cell...</span>
+                    </div>
+                `;
+            } else if (type === 'row') {
+                menuHTML = `
+                    <div class="context-menu-item" onclick="handleMenuAction('insert-row-above')">
+                        <span class="context-menu-icon">⬆️</span>
+                        <span>Insert Row Above</span>
+                    </div>
+                    <div class="context-menu-item" onclick="handleMenuAction('insert-row-below')">
+                        <span class="context-menu-icon">⬇️</span>
+                        <span>Insert Row Below</span>
+                    </div>
+                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" onclick="handleMenuAction('delete-row')">
+                        <span class="context-menu-icon">❌</span>
+                        <span>Delete Row</span>
+                    </div>
+                    <div class="context-menu-item" onclick="handleMenuAction('hide-row')">
+                        <span class="context-menu-icon">👁️</span>
+                        <span>Hide Row</span>
+                    </div>
+                `;
+            } else if (type === 'column') {
+                menuHTML = `
+                    <div class="context-menu-item" onclick="handleMenuAction('sort-asc')">
+                        <span class="context-menu-icon">⬆️</span>
+                        <span>Sort Ascending</span>
+                    </div>
+                    <div class="context-menu-item" onclick="handleMenuAction('sort-desc')">
+                        <span class="context-menu-icon">⬇️</span>
+                        <span>Sort Descending</span>
+                    </div>
+                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" onclick="handleMenuAction('filter')">
+                        <span class="context-menu-icon">🔍</span>
+                        <span>Filter Column...</span>
+                    </div>
+                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" onclick="handleMenuAction('hide-column')">
+                        <span class="context-menu-icon">👁️</span>
+                        <span>Hide Column</span>
+                    </div>
+                    <div class="context-menu-item" onclick="handleMenuAction('resize-column')">
+                        <span class="context-menu-icon">↔️</span>
+                        <span>Auto-resize Column</span>
+                    </div>
+                `;
+            }
+
+            contextMenu.innerHTML = menuHTML;
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = x + 'px';
+            contextMenu.style.top = y + 'px';
+        }
+
+        function hideContextMenu() {
+            contextMenu.style.display = 'none';
+        }
+
+        // Make handleMenuAction global so inline onclick works
+        window.handleMenuAction = function(action) {
+            if (!currentContext) return;
+
+            const { type, row, col } = currentContext;
+            let message = '';
+
+            switch (action) {
+                case 'copy':
+                    message = `Copied cell (${row}, ${col})`;
+                    break;
+                case 'cut':
+                    message = `Cut cell (${row}, ${col})`;
+                    break;
+                case 'paste':
+                    message = `Pasted to cell (${row}, ${col})`;
+                    break;
+                case 'delete':
+                    message = `Deleted cell (${row}, ${col})`;
+                    gridWrapper.setCellValue(row, col, '');
+                    gridWrapper.render();
+                    break;
+                case 'format':
+                    message = `Opening format dialog for cell (${row}, ${col})`;
+                    break;
+                case 'insert-row-above':
+                    message = `Insert row above row ${row}`;
+                    break;
+                case 'insert-row-below':
+                    message = `Insert row below row ${row}`;
+                    break;
+                case 'delete-row':
+                    message = `Delete row ${row}`;
+                    break;
+                case 'hide-row':
+                    message = `Hide row ${row}`;
+                    break;
+                case 'sort-asc':
+                    message = `Sort column ${col} ascending`;
+                    gridWrapper.getGrid().toggle_column_sort(col);
+                    gridWrapper.render();
+                    break;
+                case 'sort-desc':
+                    message = `Sort column ${col} descending`;
+                    gridWrapper.getGrid().toggle_column_sort(col);
+                    gridWrapper.render();
+                    break;
+                case 'filter':
+                    message = `Open filter for column ${col}`;
+                    break;
+                case 'hide-column':
+                    message = `Hide column ${col}`;
+                    break;
+                case 'resize-column':
+                    message = `Auto-resize column ${col}`;
+                    break;
+            }
+
+            updateStatus(message);
+            console.log(message);
+            hideContextMenu();
+        };
+
+        function updateStatus(message) {
+            document.getElementById('status-bar').innerHTML =
+                `<strong>Status:</strong> ${message}`;
+        }
+
+        function fillSampleData() {
+            const grid = gridWrapper.getGrid();
+
+            // Headers
+            for (let col = 0; col < 20; col++) {
+                const colName = String.fromCharCode(65 + col);
+                grid.set_cell_value(0, col, `Column ${colName}`);
+                grid.set_cell_bg_color(0, col, 0x667eeaFF);
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
+                grid.set_cell_font_style(0, col, true, false);
+            }
+
+            // Sample data
+            for (let row = 1; row < 50; row++) {
+                for (let col = 0; col < 20; col++) {
+                    grid.set_cell_value(row, col, `R${row}C${col}`);
+                }
+            }
+
+            gridWrapper.render();
+        }
+
+        initGrid();
+    </script>
+</body>
+</html>

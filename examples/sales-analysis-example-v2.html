@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Sales Analysis Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .metric-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1e3c72;
+            margin-bottom: 5px;
+        }
+
+        .metric-change {
+            font-size: 14px;
+            color: #4caf50;
+        }
+
+        .metric-change.negative {
+            color: #f44336;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #1976D2;
+            transform: translateY(-1px);
+        }
+
+        button.success {
+            background: #4caf50;
+        }
+
+        button.success:hover {
+            background: #45a049;
+        }
+
+        button.warning {
+            background: #ff9800;
+        }
+
+        button.warning:hover {
+            background: #f57c00;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .grid-wrapper {
+            height: 600px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .info-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+        }
+
+        .info-panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .feature-item {
+            padding: 12px;
+            background: #f8f9fa;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+
+        .feature-item strong {
+            color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 DataGrid5 - Sales Analysis Dashboard</h1>
+        <p class="subtitle">Interactive sales data visualization with real-time metrics and conditional formatting</p>
+
+        <!-- KPI Dashboard -->
+        <div class="dashboard">
+            <div class="metric-card">
+                <h3>Total Revenue</h3>
+                <div class="metric-value" id="total-revenue">$0</div>
+                <div class="metric-change">+12.5% from last month</div>
+            </div>
+            <div class="metric-card">
+                <h3>Total Orders</h3>
+                <div class="metric-value" id="total-orders">0</div>
+                <div class="metric-change">+8.3% from last month</div>
+            </div>
+            <div class="metric-card">
+                <h3>Average Order Value</h3>
+                <div class="metric-value" id="avg-order">$0</div>
+                <div class="metric-change">+3.7% from last month</div>
+            </div>
+            <div class="metric-card">
+                <h3>Top Region</h3>
+                <div class="metric-value" id="top-region" style="font-size: 24px;">-</div>
+                <div class="metric-change">Leading by revenue</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="load-data-btn" class="success">📥 Load Sales Data</button>
+            <button id="highlight-high-btn">💰 Highlight High Value</button>
+            <button id="color-by-region-btn">🌍 Color by Region</button>
+            <button id="color-by-status-btn">📌 Color by Status</button>
+            <button id="reset-colors-btn" class="warning">🔄 Reset Colors</button>
+            <label>
+                Filter by Region:
+                <select id="region-filter">
+                    <option value="">All Regions</option>
+                    <option value="North">North</option>
+                    <option value="South">South</option>
+                    <option value="East">East</option>
+                    <option value="West">West</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="grid-wrapper" id="grid-container"></div>
+
+        <div class="info-panel">
+            <h3>✨ Dashboard Features:</h3>
+            <div class="features">
+                <div class="feature-item">
+                    <strong>Real-time KPIs:</strong> Automatically calculated metrics based on loaded data
+                </div>
+                <div class="feature-item">
+                    <strong>Conditional Formatting:</strong> Visual indicators for high-value orders and status
+                </div>
+                <div class="feature-item">
+                    <strong>Region-based Coloring:</strong> Color code rows by geographic region
+                </div>
+                <div class="feature-item">
+                    <strong>Status Tracking:</strong> Visual status indicators (Completed, Pending, Shipped)
+                </div>
+                <div class="feature-item">
+                    <strong>Data Filtering:</strong> Filter sales data by region
+                </div>
+                <div class="feature-item">
+                    <strong>Instant Analytics:</strong> Calculate totals, averages, and trends
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+        import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
+
+        let gridWrapper = null;
+        let salesData = [];
+
+        async function initGrid() {
+            await init();
+
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
+                rows: 100,
+                cols: 10,
+                enableEditing: false,
+                enableVirtualScroll: true,
+                enableResize: true
+            });
+
+            console.log('Sales dashboard initialized!');
+        }
+
+        function generateSalesData() {
+            const products = [
+                'Laptop Pro 15"', 'Wireless Mouse', 'Mechanical Keyboard', '4K Monitor',
+                'USB-C Hub', 'Webcam HD', 'Gaming Headset', 'Portable SSD', 'Desk Mat', 'Cable Organizer'
+            ];
+            const regions = ['North', 'South', 'East', 'West'];
+            const statuses = ['Completed', 'Pending', 'Shipped', 'Processing'];
+            const customers = [
+                'Acme Corp', 'Global Tech', 'StartupXYZ', 'Enterprise Inc', 'Digital Solutions',
+                'Cloud Systems', 'Data Dynamics', 'Tech Innovators', 'Future Labs', 'Smart Business'
+            ];
+
+            salesData = [];
+
+            for (let i = 0; i < 95; i++) {
+                const quantity = Math.floor(Math.random() * 20) + 1;
+                const unitPrice = (Math.random() * 1500 + 50).toFixed(2);
+                const total = (quantity * parseFloat(unitPrice)).toFixed(2);
+                const discount = (Math.random() * 0.2 * parseFloat(total)).toFixed(2);
+                const netTotal = (parseFloat(total) - parseFloat(discount)).toFixed(2);
+
+                salesData.push({
+                    orderId: `ORD-${2024}-${String(i + 1).padStart(4, '0')}`,
+                    date: `2024-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+                    customer: customers[Math.floor(Math.random() * customers.length)],
+                    product: products[Math.floor(Math.random() * products.length)],
+                    quantity,
+                    unitPrice: `$${unitPrice}`,
+                    total: `$${total}`,
+                    discount: `$${discount}`,
+                    netTotal: `$${netTotal}`,
+                    status: statuses[Math.floor(Math.random() * statuses.length)],
+                    region: regions[Math.floor(Math.random() * regions.length)]
+                });
+            }
+
+            return salesData;
+        }
+
+        function loadSalesData() {
+            const grid = gridWrapper.getGrid();
+
+            // Setup headers
+            const headers = [
+                'Order ID', 'Date', 'Customer', 'Product', 'Quantity',
+                'Unit Price', 'Total', 'Discount', 'Net Total', 'Status', 'Region'
+            ];
+
+            for (let col = 0; col < headers.length; col++) {
+                grid.set_cell_value(0, col, headers[col]);
+                grid.set_cell_bg_color(0, col, 0x1E3C72FF);
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
+                grid.set_cell_font_style(0, col, true, false);
+            }
+
+            // Generate and load data
+            const data = generateSalesData();
+
+            for (let i = 0; i < data.length; i++) {
+                const row = i + 1;
+                const item = data[i];
+
+                grid.set_cell_value(row, 0, item.orderId);
+                grid.set_cell_value(row, 1, item.date);
+                grid.set_cell_value(row, 2, item.customer);
+                grid.set_cell_value(row, 3, item.product);
+                grid.set_cell_value(row, 4, String(item.quantity));
+                grid.set_cell_value(row, 5, item.unitPrice);
+                grid.set_cell_value(row, 6, item.total);
+                grid.set_cell_value(row, 7, item.discount);
+                grid.set_cell_value(row, 8, item.netTotal);
+                grid.set_cell_value(row, 9, item.status);
+                grid.set_cell_value(row, 10, item.region);
+            }
+
+            gridWrapper.render();
+            updateMetrics();
+            console.log('Sales data loaded');
+        }
+
+        function updateMetrics() {
+            let totalRevenue = 0;
+            const regionRevenue = { North: 0, South: 0, East: 0, West: 0 };
+
+            salesData.forEach(item => {
+                const revenue = parseFloat(item.netTotal.replace(/[$,]/g, ''));
+                totalRevenue += revenue;
+                regionRevenue[item.region] += revenue;
+            });
+
+            const avgOrder = totalRevenue / salesData.length;
+            const topRegion = Object.keys(regionRevenue).reduce((a, b) =>
+                regionRevenue[a] > regionRevenue[b] ? a : b
+            );
+
+            document.getElementById('total-revenue').textContent = `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('total-orders').textContent = salesData.length;
+            document.getElementById('avg-order').textContent = `$${avgOrder.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+            document.getElementById('top-region').textContent = topRegion;
+        }
+
+        function highlightHighValue() {
+            const grid = gridWrapper.getGrid();
+
+            for (let i = 0; i < salesData.length; i++) {
+                const row = i + 1;
+                const netTotal = parseFloat(salesData[i].netTotal.replace(/[$,]/g, ''));
+
+                if (netTotal > 10000) {
+                    // Highlight high-value orders
+                    for (let col = 0; col < 11; col++) {
+                        grid.set_cell_bg_color(row, col, 0xFFD700FF); // Gold
+                        grid.set_cell_font_style(row, col, true, false);
+                    }
+                } else if (netTotal > 5000) {
+                    for (let col = 0; col < 11; col++) {
+                        grid.set_cell_bg_color(row, col, 0xFFEB3BFF); // Yellow
+                    }
+                }
+            }
+
+            gridWrapper.render();
+            console.log('High-value orders highlighted');
+        }
+
+        function colorByRegion() {
+            const grid = gridWrapper.getGrid();
+            const regionColors = {
+                'North': 0xE3F2FDFF,  // Light Blue
+                'South': 0xFFF3E0FF,  // Light Orange
+                'East': 0xF3E5F5FF,   // Light Purple
+                'West': 0xE8F5E9FF    // Light Green
+            };
+
+            for (let i = 0; i < salesData.length; i++) {
+                const row = i + 1;
+                const color = regionColors[salesData[i].region];
+
+                for (let col = 0; col < 11; col++) {
+                    grid.set_cell_bg_color(row, col, color);
+                }
+            }
+
+            gridWrapper.render();
+            console.log('Colored by region');
+        }
+
+        function colorByStatus() {
+            const grid = gridWrapper.getGrid();
+
+            for (let i = 0; i < salesData.length; i++) {
+                const row = i + 1;
+                let color;
+
+                switch (salesData[i].status) {
+                    case 'Completed':
+                        color = 0xC8E6C9FF; // Light Green
+                        break;
+                    case 'Pending':
+                        color = 0xFFE082FF; // Light Yellow
+                        break;
+                    case 'Shipped':
+                        color = 0xBBDEFBFF; // Light Blue
+                        break;
+                    case 'Processing':
+                        color = 0xFFCCBCFF; // Light Orange
+                        break;
+                }
+
+                for (let col = 0; col < 11; col++) {
+                    grid.set_cell_bg_color(row, col, color);
+                }
+            }
+
+            gridWrapper.render();
+            console.log('Colored by status');
+        }
+
+        function resetColors() {
+            const grid = gridWrapper.getGrid();
+
+            for (let row = 1; row < 100; row++) {
+                for (let col = 0; col < 11; col++) {
+                    grid.set_cell_bg_color(row, col, 0xFFFFFFFF);
+                    grid.set_cell_fg_color(row, col, 0x000000FF);
+                    grid.set_cell_font_style(row, col, false, false);
+                }
+            }
+
+            gridWrapper.render();
+            console.log('Colors reset');
+        }
+
+        // Button handlers
+        document.getElementById('load-data-btn').addEventListener('click', loadSalesData);
+        document.getElementById('highlight-high-btn').addEventListener('click', highlightHighValue);
+        document.getElementById('color-by-region-btn').addEventListener('click', colorByRegion);
+        document.getElementById('color-by-status-btn').addEventListener('click', colorByStatus);
+        document.getElementById('reset-colors-btn').addEventListener('click', resetColors);
+
+        // Region filter
+        document.getElementById('region-filter').addEventListener('change', (e) => {
+            const selectedRegion = e.target.value;
+            const grid = gridWrapper.getGrid();
+
+            for (let i = 0; i < salesData.length; i++) {
+                const row = i + 1;
+                const matches = !selectedRegion || salesData[i].region === selectedRegion;
+
+                // Simple hide/show by setting opacity (would need proper row hiding in real implementation)
+                if (!matches) {
+                    for (let col = 0; col < 11; col++) {
+                        grid.set_cell_fg_color(row, col, 0xCCCCCCFF); // Gray out
+                    }
+                } else {
+                    for (let col = 0; col < 11; col++) {
+                        grid.set_cell_fg_color(row, col, 0x000000FF); // Black
+                    }
+                }
+            }
+
+            gridWrapper.render();
+            console.log(`Filtered by region: ${selectedRegion || 'All'}`);
+        });
+
+        // Initialize
+        initGrid().then(() => {
+            loadSalesData();
+        });
+    </script>
+</body>
+</html>

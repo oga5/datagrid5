@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Ultra-Fast WebAssembly Grid Control</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>DataGrid5</h1>
+            <p class="subtitle">Ultra-Fast WebAssembly Grid Control</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Rows:</label>
+                <input type="number" id="rows" value="1000" min="1" max="100000">
+            </div>
+            <div class="control-group">
+                <label>Columns:</label>
+                <input type="number" id="cols" value="50" min="1" max="1000">
+            </div>
+            <button id="recreate-btn">Recreate Grid</button>
+            <button id="fill-data-btn">Fill Sample Data</button>
+            <button id="test-colors-btn">Test Cell Colors</button>
+            <button id="test-fonts-btn">Test Font Styles</button>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-item">
+                <span class="label">Grid Size:</span>
+                <span id="grid-size">-</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Viewport:</span>
+                <span id="viewport-info">-</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Performance:</span>
+                <span id="fps">60 FPS</span>
+            </div>
+        </div>
+
+        <div class="search-panel">
+            <div class="search-row">
+                <input type="text" id="search-input" placeholder="Search in grid..." />
+                <button id="search-btn">Search</button>
+                <button id="search-prev-btn">◀ Prev</button>
+                <button id="search-next-btn">Next ▶</button>
+                <button id="search-clear-btn">Clear</button>
+                <span id="search-results">-</span>
+            </div>
+            <div class="search-row">
+                <input type="text" id="replace-input" placeholder="Replace with..." />
+                <button id="replace-btn">Replace</button>
+                <button id="replace-all-btn">Replace All</button>
+                <label>
+                    <input type="checkbox" id="case-sensitive" />
+                    Case sensitive
+                </label>
+                <label>
+                    <input type="checkbox" id="whole-word" />
+                    Whole word
+                </label>
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvas-container">
+            <div id="scroll-container">
+                <div id="scroll-content">
+                    <canvas id="webgl-canvas" width="1200" height="600"></canvas>
+                    <canvas id="text-canvas" width="1200" height="600" tabindex="0"></canvas>
+                </div>
+            </div>
+            <input type="text" id="cell-editor" style="display: none;" />
+        </div>
+
+        <div class="instructions">
+            <h3>使い方 / Instructions</h3>
+            <ul>
+                <li><strong>マウスドラッグ / Mouse Drag:</strong> グリッドをパン / Pan the grid</li>
+                <li><strong>マウスホイール / Mouse Wheel:</strong> スクロール / Scroll</li>
+                <li><strong>セルクリック / Click Cell:</strong> セル選択（コンソールに表示） / Select cell (shown in console)</li>
+                <li><strong>矢印キー / Arrow Keys:</strong> セル間を移動 / Navigate between cells</li>
+                <li><strong>Page Up/Down:</strong> ページスクロール / Scroll by page</li>
+                <li><strong>Home/End:</strong> 行の最初/最後のセルへ移動 / Jump to first/last cell in row</li>
+                <li><strong>ダブルクリック / Double Click:</strong> セルを編集 / Edit cell</li>
+                <li><strong>Enter:</strong> 編集を確定 / Confirm edit</li>
+                <li><strong>Escape:</strong> 編集をキャンセル / Cancel edit</li>
+                <li><strong>列/行の境界をドラッグ / Drag Column/Row Border:</strong> サイズ変更 / Resize</li>
+                <li><strong>Shift+クリック / Shift+Click:</strong> 範囲選択 / Range selection</li>
+                <li><strong>Ctrl/Cmd+クリック / Ctrl/Cmd+Click:</strong> 複数選択 / Multi selection</li>
+                <li><strong>Ctrl/Cmd+C:</strong> 選択したセルをコピー / Copy selected cells</li>
+                <li><strong>Ctrl/Cmd+X:</strong> 選択したセルを切り取り / Cut selected cells</li>
+                <li><strong>Ctrl/Cmd+V:</strong> セルに貼り付け / Paste to cells</li>
+                <li><strong>Ctrl/Cmd+A:</strong> 全選択 / Select all cells</li>
+                <li><strong>行ヘッダークリック / Row Header Click:</strong> 行全体を選択 / Select entire row</li>
+                <li><strong>列ヘッダークリック / Column Header Click:</strong> 列全体を選択 / Select entire column</li>
+                <li><strong>左上角クリック / Top-Left Corner Click:</strong> 全選択 / Select all</li>
+            </ul>
+        </div>
+
+        <footer>
+            <p>
+                <strong>技術スタック / Tech Stack:</strong>
+                Rust + WebAssembly + WebGL |
+                <a href="https://github.com/oga5/datagrid5" target="_blank">GitHub</a>
+            </p>
+            <p class="license">BSD 2-Clause License</p>
+        </footer>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+
+        let grid = null;
+        let animationFrameId = null;
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+        let fps = 60;
+
+        async function initGrid() {
+            await init();
+
+            const rows = parseInt(document.getElementById('rows').value);
+            const cols = parseInt(document.getElementById('cols').value);
+
+            try {
+                // Stop existing animation loop
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+
+                // Create new grid with two canvas layers
+                grid = new DataGrid('webgl-canvas', 'text-canvas', rows, cols);
+
+                // Setup virtual scroll
+                setupVirtualScroll();
+
+                // Update info
+                updateInfo();
+
+                // Start render loop
+                renderLoop();
+
+                console.log('DataGrid initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize DataGrid:', error);
+                alert('Failed to initialize DataGrid: ' + error);
+            }
+        }
+
+        function renderLoop() {
+            if (!grid) return;
+
+            // Render the grid
+            grid.render();
+
+            // Calculate FPS
+            frameCount++;
+            const currentTime = performance.now();
+            const elapsed = currentTime - lastFrameTime;
+
+            if (elapsed >= 1000) {
+                fps = Math.round((frameCount * 1000) / elapsed);
+                document.getElementById('fps').textContent = fps + ' FPS';
+                frameCount = 0;
+                lastFrameTime = currentTime;
+            }
+
+            // Continue loop
+            animationFrameId = requestAnimationFrame(renderLoop);
+        }
+
+        function updateInfo() {
+            if (!grid) return;
+
+            const dimensions = grid.get_dimensions();
+            const selectionCount = grid.get_selection_count();
+
+            document.getElementById('grid-size').textContent =
+                `${dimensions[0]} rows × ${dimensions[1]} cols`;
+
+            const viewportText = grid.get_viewport_info();
+            const selectionText = selectionCount > 0 ? ` | Selected: ${selectionCount} cells` : '';
+            document.getElementById('viewport-info').textContent =
+                viewportText + selectionText;
+        }
+
+        // Setup virtual scroll container
+        let isInternalScroll = false; // Flag to prevent scroll event loops
+
+        function setupVirtualScroll() {
+            if (!grid) return;
+
+            const scrollContainer = document.getElementById('scroll-container');
+            const scrollContent = document.getElementById('scroll-content');
+
+            // Update virtual content size
+            updateVirtualScrollSize();
+
+            // Handle scroll events
+            let scrollTimeout = null;
+            scrollContainer.addEventListener('scroll', (e) => {
+                if (!grid) return;
+
+                // Skip if this is a programmatic scroll from keyboard navigation
+                if (isInternalScroll) {
+                    isInternalScroll = false;
+                    return;
+                }
+
+                // Get scroll position from container
+                const scrollX = scrollContainer.scrollLeft;
+                const scrollY = scrollContainer.scrollTop;
+
+                // Update grid scroll position
+                grid.set_scroll(scrollX, scrollY);
+
+                // Debounce render for smoother scrolling
+                if (scrollTimeout) {
+                    clearTimeout(scrollTimeout);
+                }
+                scrollTimeout = setTimeout(() => {
+                    updateInfo();
+                }, 100);
+            });
+
+            console.log('Virtual scroll setup complete');
+        }
+
+        // Update virtual scroll content size
+        function updateVirtualScrollSize() {
+            if (!grid) return;
+
+            const scrollContent = document.getElementById('scroll-content');
+
+            // Get total content size from grid
+            const totalSize = JSON.parse(grid.get_total_size());
+            const [totalWidth, totalHeight] = totalSize;
+
+            // Set virtual content size
+            scrollContent.style.width = totalWidth + 'px';
+            scrollContent.style.height = totalHeight + 'px';
+
+            console.log(`Virtual scroll size: ${totalWidth} x ${totalHeight}`);
+        }
+
+        // Sync scroll container position with grid internal scroll
+        function syncScrollPosition() {
+            if (!grid) return;
+
+            const scrollContainer = document.getElementById('scroll-container');
+
+            // Get current scroll position from grid
+            const viewport = JSON.parse(grid.get_viewport_info_array());
+            const [canvasWidth, canvasHeight, scrollY, scrollX] = viewport;
+
+            // Set flag to prevent scroll event loop
+            isInternalScroll = true;
+
+            // Update scroll container to match grid's internal scroll
+            scrollContainer.scrollLeft = scrollX;
+            scrollContainer.scrollTop = scrollY;
+        }
+
+        // Cell editing functions
+        let editingRow = null;
+        let editingCol = null;
+
+        function startCellEdit(row, col) {
+            if (!grid) return;
+
+            const editor = document.getElementById('cell-editor');
+            const scrollContainer = document.getElementById('scroll-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            // Get cell position and size
+            const rect = grid.get_cell_edit_rect(row, col);
+            const [x, y, width, height] = rect;
+
+            // Get current cell value
+            const currentValue = grid.get_cell_value(row, col);
+
+            // Calculate position relative to canvas-container
+            const scrollContainerRect = scrollContainer.getBoundingClientRect();
+            const canvasContainerRect = canvasContainer.getBoundingClientRect();
+            const offsetX = scrollContainerRect.left - canvasContainerRect.left;
+            const offsetY = scrollContainerRect.top - canvasContainerRect.top;
+
+            // Position and show editor
+            editor.style.position = 'absolute';
+            editor.style.left = `${x + offsetX - scrollContainer.scrollLeft}px`;
+            editor.style.top = `${y + offsetY - scrollContainer.scrollTop}px`;
+            editor.style.width = `${width}px`;
+            editor.style.height = `${height}px`;
+            editor.style.display = 'block';
+            editor.value = currentValue;
+
+            // Store editing cell
+            editingRow = row;
+            editingCol = col;
+
+            // Focus and select all text
+            editor.focus();
+            editor.select();
+
+            // Setup editor event handlers
+            setupEditorEvents(editor, row, col);
+        }
+
+        function endCellEdit(save = false) {
+            if (!grid || editingRow === null || editingCol === null) return;
+
+            const editor = document.getElementById('cell-editor');
+
+            if (save) {
+                // Save the value
+                const newValue = editor.value;
+                grid.update_cell_value(editingRow, editingCol, newValue);
+            }
+
+            // Hide editor
+            editor.style.display = 'none';
+            editor.value = '';
+
+            // End edit mode in grid
+            grid.end_edit();
+
+            // Clear editing state
+            editingRow = null;
+            editingCol = null;
+
+            // Refocus canvas
+            document.getElementById('text-canvas').focus();
+        }
+
+        function setupEditorEvents(editor, row, col) {
+            // Remove existing listeners to avoid duplicates
+            const newEditor = editor.cloneNode(true);
+            editor.parentNode.replaceChild(newEditor, editor);
+
+            // Enter to save
+            newEditor.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    endCellEdit(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    endCellEdit(false);
+                }
+            });
+
+            // Click outside to save
+            newEditor.addEventListener('blur', () => {
+                // Small delay to allow other events to process
+                setTimeout(() => {
+                    if (grid && grid.is_editing()) {
+                        endCellEdit(true);
+                    }
+                }, 100);
+            });
+        }
+
+        // Event handlers
+        function setupEventHandlers() {
+            // Use text canvas for event handling (it's on top)
+            const canvas = document.getElementById('text-canvas');
+
+            // Mouse events
+            let isResizingLocal = false;
+
+            canvas.addEventListener('mousedown', (e) => {
+                if (!grid) return;
+
+                const x = e.offsetX;
+                const y = e.offsetY;
+
+                // Header dimensions (should match Rust code)
+                const ROW_HEADER_WIDTH = 60;
+                const COL_HEADER_HEIGHT = 30;
+
+                // Check if clicking on top-left corner (select all)
+                if (x < ROW_HEADER_WIDTH && y < COL_HEADER_HEIGHT) {
+                    grid.select_all();
+                    renderLoop();
+                    updateInfo();
+                    return;
+                }
+
+                // Check if clicking on row header
+                if (x < ROW_HEADER_WIDTH && y >= COL_HEADER_HEIGHT) {
+                    // For row header click, we need to calculate which row
+                    // Temporarily use a simplified approach - click position in header area
+                    const dimensions = grid.get_dimensions();
+                    const avgRowHeight = 600 / dimensions[0]; // Approximate
+                    const row = Math.floor((y - COL_HEADER_HEIGHT) / avgRowHeight);
+                    if (row >= 0 && row < dimensions[0]) {
+                        grid.select_row(row);
+                        renderLoop();
+                        updateInfo();
+                        console.log(`Selected row ${row + 1}`);
+                        return;
+                    }
+                }
+
+                // Check if clicking on column header
+                if (y < COL_HEADER_HEIGHT && x >= ROW_HEADER_WIDTH) {
+                    const dimensions = grid.get_dimensions();
+                    const avgColWidth = 1200 / dimensions[1]; // Approximate
+                    const col = Math.floor((x - ROW_HEADER_WIDTH) / avgColWidth);
+                    if (col >= 0 && col < dimensions[1]) {
+                        grid.select_col(col);
+                        renderLoop();
+                        updateInfo();
+                        console.log(`Selected column ${col}`);
+                        return;
+                    }
+                }
+
+                // Check if clicking on resize handle
+                const resizeType = grid.check_resize_handle(x, y);
+                if (resizeType !== 'none') {
+                    isResizingLocal = true;
+                    grid.start_resize(x, y, resizeType);
+                    e.preventDefault();
+                } else {
+                    // Check modifier keys for multi-selection
+                    const shift = e.shiftKey;
+                    const ctrl = e.ctrlKey || e.metaKey; // metaKey for Mac Cmd
+                    grid.handle_mouse_down_with_modifiers(e, shift, ctrl);
+                }
+                renderLoop();
+            });
+
+            canvas.addEventListener('mouseup', (e) => {
+                if (!grid) return;
+
+                if (isResizingLocal) {
+                    grid.end_resize();
+                    isResizingLocal = false;
+                } else {
+                    grid.handle_mouse_up(e);
+                }
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (!grid) return;
+
+                const x = e.offsetX;
+                const y = e.offsetY;
+
+                if (isResizingLocal) {
+                    // Update resize
+                    grid.update_resize(x, y);
+                } else {
+                    // Check for resize handle to change cursor
+                    const resizeType = grid.check_resize_handle(x, y);
+                    if (resizeType === 'col') {
+                        canvas.style.cursor = 'col-resize';
+                    } else if (resizeType === 'row') {
+                        canvas.style.cursor = 'row-resize';
+                    } else {
+                        canvas.style.cursor = 'cell';
+                    }
+
+                    // Handle mouse move for drag selection
+                    grid.handle_mouse_move(e);
+                }
+            });
+
+            canvas.addEventListener('mouseleave', (e) => {
+                if (!grid) return;
+
+                if (isResizingLocal) {
+                    grid.end_resize();
+                    isResizingLocal = false;
+                }
+                grid.handle_mouse_up(e);
+                canvas.style.cursor = 'cell';
+            });
+
+            // Wheel event is now handled by native scroll container
+            // Removed custom wheel handler for smoother native scrolling
+
+            // Keyboard events
+            window.addEventListener('keydown', async (e) => {
+                if (!grid) return;
+
+                // Handle copy (Ctrl+C or Cmd+C)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                    e.preventDefault();
+                    const tsvData = grid.copy_selected_cells();
+                    if (tsvData) {
+                        try {
+                            await navigator.clipboard.writeText(tsvData);
+                            console.log('Copied to clipboard:', tsvData);
+                        } catch (err) {
+                            console.error('Failed to copy to clipboard:', err);
+                        }
+                    }
+                    return;
+                }
+
+                // Handle cut (Ctrl+X or Cmd+X)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+                    e.preventDefault();
+                    const tsvData = grid.cut_selected_cells();
+                    if (tsvData) {
+                        try {
+                            await navigator.clipboard.writeText(tsvData);
+                            console.log('Cut to clipboard:', tsvData);
+                            renderLoop();
+                        } catch (err) {
+                            console.error('Failed to cut to clipboard:', err);
+                        }
+                    }
+                    return;
+                }
+
+                // Handle paste (Ctrl+V or Cmd+V)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                    e.preventDefault();
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                            grid.paste_cells(text);
+                            renderLoop(); // Force re-render after paste
+                            updateInfo();
+                            console.log('Pasted from clipboard');
+                        }
+                    } catch (err) {
+                        console.error('Failed to paste from clipboard:', err);
+                    }
+                    return;
+                }
+
+                // Handle select all (Ctrl+A or Cmd+A)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                    e.preventDefault();
+                    grid.select_all();
+                    renderLoop();
+                    updateInfo();
+                    console.log('Selected all cells');
+                    return;
+                }
+
+                // Handle keyboard navigation with modifiers
+                const ctrl = e.ctrlKey || e.metaKey;
+                const handled = grid.handle_keyboard_with_modifiers(e, ctrl);
+                if (handled) {
+                    e.preventDefault();
+                    syncScrollPosition();
+                    updateInfo();
+                }
+            });
+
+            // Focus canvas on click to enable keyboard events
+            canvas.addEventListener('click', () => {
+                canvas.focus();
+            });
+
+            // Double-click to edit
+            canvas.addEventListener('dblclick', (e) => {
+                if (grid && !grid.is_editing()) {
+                    const cellPos = grid.handle_double_click(e);
+                    if (cellPos) {
+                        startCellEdit(cellPos[0], cellPos[1]);
+                    }
+                }
+            });
+
+            // Window resize
+            window.addEventListener('resize', () => {
+                if (grid) {
+                    const scrollContainer = document.getElementById('scroll-container');
+                    const webglCanvas = document.getElementById('webgl-canvas');
+                    const textCanvas = document.getElementById('text-canvas');
+                    const width = scrollContainer.clientWidth;
+                    const height = scrollContainer.clientHeight;
+                    webglCanvas.width = width;
+                    webglCanvas.height = height;
+                    textCanvas.width = width;
+                    textCanvas.height = height;
+                    grid.resize(width, height);
+                    updateVirtualScrollSize();
+                    updateInfo();
+                }
+            });
+
+            // Recreate button
+            document.getElementById('recreate-btn').addEventListener('click', () => {
+                initGrid();
+            });
+
+            // Fill data button (placeholder for now)
+            document.getElementById('fill-data-btn').addEventListener('click', () => {
+                if (!grid) return;
+
+                // Define column headers
+                const columnHeaders = [
+                    "ID", "Name", "Email", "Age", "Department",
+                    "City", "Country", "Salary", "Start Date", "Status",
+                    "Phone", "Manager", "Team", "Projects", "Rating"
+                ];
+
+                // Set column headers (row 0)
+                for (let col = 0; col < Math.min(columnHeaders.length, 50); col++) {
+                    grid.update_cell_value(0, col, columnHeaders[col] || `Column ${col + 1}`);
+
+                    // Style header row
+                    grid.set_cell_bg_color(0, col, 0x667eeaFF); // Blue background
+                    grid.set_cell_fg_color(0, col, 0xFFFFFFFF); // White text
+                    grid.set_cell_font_style(0, col, true, false); // Bold
+                }
+
+                // Fill sample data
+                const sampleNames = ["Alice Johnson", "Bob Smith", "Charlie Brown", "Diana Prince", "Emma Wilson"];
+                const departments = ["Engineering", "Sales", "Marketing", "HR", "Finance"];
+                const cities = ["Tokyo", "New York", "London", "Paris", "Sydney"];
+                const countries = ["Japan", "USA", "UK", "France", "Australia"];
+                const statuses = ["Active", "On Leave", "Remote", "In Office"];
+
+                for (let row = 1; row <= 20; row++) {
+                    const nameIdx = (row - 1) % sampleNames.length;
+
+                    grid.update_cell_value(row, 0, String(1000 + row)); // ID
+                    grid.update_cell_value(row, 1, sampleNames[nameIdx]); // Name
+                    grid.update_cell_value(row, 2, `${sampleNames[nameIdx].toLowerCase().replace(' ', '.')}@company.com`); // Email
+                    grid.update_cell_value(row, 3, String(25 + (row % 30))); // Age
+                    grid.update_cell_value(row, 4, departments[row % departments.length]); // Department
+                    grid.update_cell_value(row, 5, cities[row % cities.length]); // City
+                    grid.update_cell_value(row, 6, countries[row % countries.length]); // Country
+                    grid.update_cell_value(row, 7, `$${50000 + row * 1000}`); // Salary
+                    grid.update_cell_value(row, 8, `2020-0${1 + (row % 9)}-15`); // Start Date
+                    grid.update_cell_value(row, 9, statuses[row % statuses.length]); // Status
+                }
+
+                console.log('Filled sample data with custom column headers');
+            });
+
+            // Test cell colors button
+            document.getElementById('test-colors-btn').addEventListener('click', () => {
+                if (!grid) return;
+
+                // Set background colors (RGBA as u32: 0xRRGGBBAA)
+                grid.set_cell_bg_color(1, 1, 0xFF6B6BFF); // Red
+                grid.set_cell_bg_color(1, 2, 0x4ECDC4FF); // Turquoise
+                grid.set_cell_bg_color(1, 3, 0xFFE66DFF); // Yellow
+                grid.set_cell_bg_color(2, 1, 0x95E1D3FF); // Mint
+                grid.set_cell_bg_color(2, 2, 0xF38181FF); // Light red
+                grid.set_cell_bg_color(2, 3, 0xAA96DAFF); // Purple
+
+                // Set foreground colors
+                grid.set_cell_fg_color(3, 1, 0xFF0000FF); // Red text
+                grid.set_cell_fg_color(3, 2, 0x0000FFFF); // Blue text
+                grid.set_cell_fg_color(3, 3, 0x00FF00FF); // Green text
+
+                // Combined: background + foreground
+                grid.set_cell_bg_color(4, 1, 0x000000FF); // Black bg
+                grid.set_cell_fg_color(4, 1, 0xFFFFFFFF); // White text
+
+                renderLoop();
+                console.log('Applied test colors to cells');
+            });
+
+            // Test font styles button
+            document.getElementById('test-fonts-btn').addEventListener('click', () => {
+                if (!grid) return;
+
+                // Bold text
+                grid.set_cell_font_style(5, 1, true, false);
+
+                // Italic text
+                grid.set_cell_font_style(5, 2, false, true);
+
+                // Bold + Italic
+                grid.set_cell_font_style(5, 3, true, true);
+
+                // Combined with colors
+                grid.set_cell_style(6, 1, 0xFFD93DFF, 0x000000FF, true, false); // Yellow bg, black bold text
+                grid.set_cell_style(6, 2, 0x6C5CE7FF, 0xFFFFFFFF, false, true); // Purple bg, white italic text
+                grid.set_cell_style(6, 3, 0x00B894FF, 0xFFFFFFFF, true, true);  // Green bg, white bold+italic text
+
+                renderLoop();
+                console.log('Applied test font styles to cells');
+            });
+
+            // Search button
+            document.getElementById('search-btn').addEventListener('click', () => {
+                if (!grid) return;
+                const query = document.getElementById('search-input').value;
+                if (query) {
+                    const caseSensitive = document.getElementById('case-sensitive').checked;
+                    const wholeWord = document.getElementById('whole-word').checked;
+                    const count = grid.search_text_with_options(query, caseSensitive, wholeWord);
+                    updateSearchResults(count);
+                    renderLoop();
+                }
+            });
+
+            // Search next
+            document.getElementById('search-next-btn').addEventListener('click', () => {
+                if (!grid) return;
+                grid.search_next();
+                updateSearchResults();
+                renderLoop();
+            });
+
+            // Search previous
+            document.getElementById('search-prev-btn').addEventListener('click', () => {
+                if (!grid) return;
+                grid.search_prev();
+                updateSearchResults();
+                renderLoop();
+            });
+
+            // Clear search
+            document.getElementById('search-clear-btn').addEventListener('click', () => {
+                if (!grid) return;
+                grid.clear_search();
+                document.getElementById('search-input').value = '';
+                document.getElementById('search-results').textContent = '-';
+                renderLoop();
+            });
+
+            // Replace current match
+            document.getElementById('replace-btn').addEventListener('click', () => {
+                if (!grid) return;
+                const replacement = document.getElementById('replace-input').value;
+                const success = grid.replace_current(replacement);
+                if (success) {
+                    updateSearchResults();
+                    renderLoop();
+                }
+            });
+
+            // Replace all matches
+            document.getElementById('replace-all-btn').addEventListener('click', () => {
+                if (!grid) return;
+                const replacement = document.getElementById('replace-input').value;
+                const count = grid.replace_all(replacement);
+                console.log(`Replaced ${count} occurrences`);
+                document.getElementById('search-results').textContent = `Replaced ${count} occurrences`;
+                renderLoop();
+            });
+
+            // Search on Enter key
+            document.getElementById('search-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('search-btn').click();
+                }
+            });
+        }
+
+        function updateSearchResults(count) {
+            if (!grid) return;
+            const resultCount = count !== undefined ? count : grid.get_search_result_count();
+            const currentIndex = grid.get_current_search_index();
+
+            if (resultCount > 0) {
+                document.getElementById('search-results').textContent =
+                    `${currentIndex} / ${resultCount} results`;
+            } else {
+                document.getElementById('search-results').textContent = 'No results';
+            }
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            setupEventHandlers();
+            initGrid();
+        });
+
+        // Update viewport info periodically
+        setInterval(() => {
+            updateInfo();
+        }, 500);
+    </script>
+</body>
+</html>

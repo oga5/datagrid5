@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Column Grouping Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .description {
+            color: rgba(255,255,255,0.95);
+            margin-bottom: 20px;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #fa709a;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #e96089;
+            transform: translateY(-1px);
+        }
+
+        .grid-wrapper {
+            height: 600px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .info-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+        }
+
+        .info-panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .info-panel p {
+            margin: 10px 0;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .group-structure {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .group-level {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+
+        .group-level-0 {
+            color: #e91e63;
+            font-weight: bold;
+        }
+
+        .group-level-1 {
+            color: #2196f3;
+            font-weight: bold;
+        }
+
+        .group-level-2 {
+            color: #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗂️ DataGrid5 - Column Grouping Example</h1>
+        <div class="description">
+            This example demonstrates multi-level column grouping (hierarchical headers).
+            Columns can be organized into groups and sub-groups for better data organization.
+        </div>
+
+        <div class="controls">
+            <button id="setup-simple-btn">Simple Grouping (2 levels)</button>
+            <button id="setup-complex-btn">Complex Grouping (3 levels)</button>
+            <button id="fill-data-btn">Fill Sample Data</button>
+        </div>
+
+        <div class="grid-wrapper" id="grid-container"></div>
+
+        <div class="info-panel">
+            <h3>📊 Column Grouping Structure:</h3>
+            <div id="structure-display" class="group-structure">
+                Click a button above to see the grouping structure
+            </div>
+
+            <h3 style="margin-top: 20px;">ℹ️ About Column Grouping:</h3>
+            <p>
+                <strong>Column Grouping</strong> allows you to organize columns into hierarchical groups,
+                making it easier to understand complex datasets with many columns.
+            </p>
+            <p>
+                <strong>Use Cases:</strong>
+                Financial reports (Revenue, Expenses, Profit),
+                Personal data (Name, Contact, Address),
+                Product catalogs (Basic Info, Pricing, Inventory),
+                Analytics dashboards (Metrics, Demographics, Behavior)
+            </p>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+        import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
+
+        let gridWrapper = null;
+
+        async function initGrid() {
+            await init();
+
+            // Start with basic grid
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
+                rows: 50,
+                cols: 15,
+                enableEditing: false,
+                enableVirtualScroll: true,
+                enableResize: true
+            });
+
+            console.log('Grid initialized - ready for column grouping!');
+        }
+
+        function setupSimpleGrouping() {
+            const grid = gridWrapper.getGrid();
+
+            // Clear existing groups
+            grid.clear_column_groups();
+
+            // Define 2-level grouping structure:
+            // Level 0 (top): Customer Info | Order Details | Financial
+            // Level 1 (bottom): Individual columns
+
+            // Group 1: Customer Info (columns 0-3)
+            grid.add_column_group("Customer Information", 0, 3, 0, 0xE91E63FF);
+
+            // Group 2: Order Details (columns 4-8)
+            grid.add_column_group("Order Details", 4, 8, 0, 0x2196F3FF);
+
+            // Group 3: Financial (columns 9-11)
+            grid.add_column_group("Financial", 9, 11, 0, 0x4CAF50FF);
+
+            // Set header levels
+            grid.set_header_levels(2);
+
+            // Set column names (level 1)
+            const columnNames = [
+                "Customer ID", "Name", "Email", "Phone",              // Customer Info
+                "Order ID", "Product", "Quantity", "Date", "Status", // Order Details
+                "Price", "Tax", "Total",                              // Financial
+                "Notes", "Region", "Priority"                         // Ungrouped
+            ];
+
+            for (let col = 0; col < columnNames.length && col < 15; col++) {
+                grid.set_column_display_name(col, columnNames[col]);
+            }
+
+            displayStructure(`
+Level 0 (Groups):
+  ├─ Customer Information (Cols A-D)
+  ├─ Order Details (Cols E-I)
+  └─ Financial (Cols J-L)
+
+Level 1 (Columns):
+  Customer ID | Name | Email | Phone | Order ID | Product | Quantity | Date | Status | Price | Tax | Total | Notes | Region | Priority
+            `);
+
+            gridWrapper.render();
+            console.log('Simple grouping applied');
+        }
+
+        function setupComplexGrouping() {
+            const grid = gridWrapper.getGrid();
+
+            // Clear existing groups
+            grid.clear_column_groups();
+
+            // Define 3-level grouping structure:
+            // Level 0 (top): Business Data
+            // Level 1 (middle): Customer Info | Transaction | Metadata
+            // Level 2 (bottom): Individual columns
+
+            // Level 0: Top-level group spanning everything
+            grid.add_column_group("Business Data Overview", 0, 11, 0, 0x9C27B0FF);
+
+            // Level 1: Sub-groups
+            grid.add_column_group("Customer", 0, 3, 1, 0xE91E63FF);
+            grid.add_column_group("Transaction", 4, 8, 1, 0x2196F3FF);
+            grid.add_column_group("Metadata", 9, 11, 1, 0xFF9800FF);
+
+            // Set header levels (3 levels)
+            grid.set_header_levels(3);
+
+            // Set column names (level 2)
+            const columnNames = [
+                "ID", "Full Name", "Contact", "Location",        // Customer
+                "Trans ID", "Item", "Qty", "Amount", "Method",  // Transaction
+                "Created", "Modified", "Status",                 // Metadata
+                "Extra1", "Extra2", "Extra3"                     // Ungrouped
+            ];
+
+            for (let col = 0; col < columnNames.length && col < 15; col++) {
+                grid.set_column_display_name(col, columnNames[col]);
+            }
+
+            displayStructure(`
+Level 0 (Super Group):
+  └─ Business Data Overview (Cols A-L)
+
+Level 1 (Groups):
+  ├─ Customer (Cols A-D)
+  ├─ Transaction (Cols E-I)
+  └─ Metadata (Cols J-L)
+
+Level 2 (Columns):
+  ID | Full Name | Contact | Location | Trans ID | Item | Qty | Amount | Method | Created | Modified | Status | Extra1 | Extra2 | Extra3
+            `);
+
+            gridWrapper.render();
+            console.log('Complex grouping applied');
+        }
+
+        function fillSampleData() {
+            const grid = gridWrapper.getGrid();
+
+            // Sample customer data
+            const customers = [
+                ['C001', 'John Smith', 'john@email.com', '555-0100'],
+                ['C002', 'Jane Doe', 'jane@email.com', '555-0101'],
+                ['C003', 'Bob Wilson', 'bob@email.com', '555-0102'],
+                ['C004', 'Alice Brown', 'alice@email.com', '555-0103'],
+                ['C005', 'Charlie Davis', 'charlie@email.com', '555-0104'],
+            ];
+
+            const products = ['Laptop', 'Mouse', 'Keyboard', 'Monitor', 'Headset'];
+            const statuses = ['Pending', 'Shipped', 'Delivered', 'Processing'];
+            const regions = ['North', 'South', 'East', 'West'];
+
+            for (let row = 0; row < 50; row++) {
+                const customerIdx = row % customers.length;
+                const customer = customers[customerIdx];
+
+                // Customer info
+                for (let i = 0; i < customer.length; i++) {
+                    grid.set_cell_value(row, i, customer[i]);
+                }
+
+                // Order details
+                grid.set_cell_value(row, 4, `ORD${1000 + row}`);
+                grid.set_cell_value(row, 5, products[row % products.length]);
+                grid.set_cell_value(row, 6, `${(row % 5) + 1}`);
+                grid.set_cell_value(row, 7, `2024-10-${String(row % 28 + 1).padStart(2, '0')}`);
+                grid.set_cell_value(row, 8, statuses[row % statuses.length]);
+
+                // Financial
+                const price = (50 + (row * 13) % 500).toFixed(2);
+                const tax = (parseFloat(price) * 0.08).toFixed(2);
+                const total = (parseFloat(price) + parseFloat(tax)).toFixed(2);
+                grid.set_cell_value(row, 9, `$${price}`);
+                grid.set_cell_value(row, 10, `$${tax}`);
+                grid.set_cell_value(row, 11, `$${total}`);
+
+                // Other columns
+                grid.set_cell_value(row, 12, row % 3 === 0 ? 'Important' : '');
+                grid.set_cell_value(row, 13, regions[row % regions.length]);
+                grid.set_cell_value(row, 14, row % 2 === 0 ? 'High' : 'Normal');
+            }
+
+            gridWrapper.render();
+            console.log('Sample data filled');
+        }
+
+        function displayStructure(structure) {
+            document.getElementById('structure-display').textContent = structure;
+        }
+
+        // Button handlers
+        document.getElementById('setup-simple-btn').addEventListener('click', setupSimpleGrouping);
+        document.getElementById('setup-complex-btn').addEventListener('click', setupComplexGrouping);
+        document.getElementById('fill-data-btn').addEventListener('click', fillSampleData);
+
+        // Initialize
+        initGrid().then(() => {
+            setupSimpleGrouping();
+            fillSampleData();
+        });
+    </script>
+</body>
+</html>

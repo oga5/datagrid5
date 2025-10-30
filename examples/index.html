@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Examples Index</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .example-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .example-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card-icon {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+            font-size: 3rem;
+        }
+
+        .card-content {
+            padding: 25px;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .card-description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .card-features {
+            list-style: none;
+            margin-bottom: 15px;
+        }
+
+        .card-features li {
+            padding: 5px 0;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        .card-features li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .card-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: background 0.3s ease;
+        }
+
+        .card-button:hover {
+            background: #5568d3;
+        }
+
+        .intro-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 40px;
+        }
+
+        .intro-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.8rem;
+        }
+
+        .intro-section p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .docs-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .docs-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .docs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .doc-link {
+            display: block;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #333;
+            transition: background 0.3s ease;
+        }
+
+        .doc-link:hover {
+            background: #e0e0e0;
+        }
+
+        .doc-link strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #667eea;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 50px;
+            opacity: 0.9;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>DataGrid5 Examples</h1>
+            <p class="subtitle">Explore comprehensive examples of DataGrid5 features with DataGridWrapper</p>
+        </header>
+
+        <div class="intro-section">
+            <h2>🚀 DataGridWrapper - Simplified Development</h2>
+            <p>
+                All examples use the new <strong>DataGridWrapper</strong> - a high-level API that makes DataGrid5 development cleaner and more maintainable:
+            </p>
+            <ul class="card-features">
+                <li>50-80% less boilerplate code</li>
+                <li>Automatic setup and configuration</li>
+                <li>Built-in virtual scrolling and resize handling</li>
+                <li>Excel-like copy/paste functionality</li>
+                <li>Simplified event handling</li>
+            </ul>
+        </div>
+
+        <div class="examples-grid">
+            <a href="./simple-usage-v2.html" class="example-card">
+                <div class="card-icon">📊</div>
+                <div class="card-content">
+                    <h3 class="card-title">Simple Usage</h3>
+                    <p class="card-description">
+                        Learn the basics of DataGrid5 with minimal setup code.
+                    </p>
+                    <ul class="card-features">
+                        <li>Basic grid initialization</li>
+                        <li>Data loading</li>
+                        <li>Interactive demos</li>
+                        <li>Keyboard navigation</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./responsive-resize-example-v2.html" class="example-card">
+                <div class="card-icon">📐</div>
+                <div class="card-content">
+                    <h3 class="card-title">Responsive Resize</h3>
+                    <p class="card-description">
+                        Automatic grid resizing for responsive layouts.
+                    </p>
+                    <ul class="card-features">
+                        <li>Auto-resize with container</li>
+                        <li>ResizeObserver integration</li>
+                        <li>Fullscreen support</li>
+                        <li>Real-time size display</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./clipboard-example-v2.html" class="example-card">
+                <div class="card-icon">📋</div>
+                <div class="card-content">
+                    <h3 class="card-title">Clipboard Operations</h3>
+                    <p class="card-description">
+                        Excel-like copy, cut, and paste functionality.
+                    </p>
+                    <ul class="card-features">
+                        <li>Copy/Cut/Paste (Ctrl+C/X/V)</li>
+                        <li>TSV format support</li>
+                        <li>Multiple cell selection</li>
+                        <li>Range operations</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./context-menu-example-v2.html" class="example-card">
+                <div class="card-icon">🖱️</div>
+                <div class="card-content">
+                    <h3 class="card-title">Context Menu</h3>
+                    <p class="card-description">
+                        Right-click operations for intuitive row management.
+                    </p>
+                    <ul class="card-features">
+                        <li>Right-click context menu</li>
+                        <li>Insert/delete rows</li>
+                        <li>Copy/cut/paste operations</li>
+                        <li>Move rows up/down</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./validation-example-v2.html" class="example-card">
+                <div class="card-icon">✅</div>
+                <div class="card-content">
+                    <h3 class="card-title">Input Validation</h3>
+                    <p class="card-description">
+                        Column-based input validation with real-time feedback.
+                    </p>
+                    <ul class="card-features">
+                        <li>Regex pattern validation</li>
+                        <li>Real-time feedback</li>
+                        <li>Custom error messages</li>
+                        <li>Data type constraints</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./column-grouping-example-v2.html" class="example-card">
+                <div class="card-icon">🗂️</div>
+                <div class="card-content">
+                    <h3 class="card-title">Column Grouping</h3>
+                    <p class="card-description">
+                        Multi-level column headers with hierarchical grouping.
+                    </p>
+                    <ul class="card-features">
+                        <li>Multi-level headers</li>
+                        <li>Column group spanning</li>
+                        <li>Hierarchical organization</li>
+                        <li>Custom group labels</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./readonly-columns-example-v2.html" class="example-card">
+                <div class="card-icon">🔒</div>
+                <div class="card-content">
+                    <h3 class="card-title">Read-Only Columns</h3>
+                    <p class="card-description">
+                        Configure specific columns as read-only while allowing others to be edited.
+                    </p>
+                    <ul class="card-features">
+                        <li>Column-level permissions</li>
+                        <li>Mixed editable/read-only</li>
+                        <li>Visual indicators</li>
+                        <li>Flexible configuration</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./advanced-config-example-v2.html" class="example-card">
+                <div class="card-icon">⚙️</div>
+                <div class="card-content">
+                    <h3 class="card-title">Advanced Configuration</h3>
+                    <p class="card-description">
+                        Explore advanced grid configuration with column definitions.
+                    </p>
+                    <ul class="card-features">
+                        <li>Column configurations</li>
+                        <li>Data types (text, number, date, boolean)</li>
+                        <li>Frozen rows and columns</li>
+                        <li>Styling and theming</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+
+            <a href="./sales-analysis-example-v2.html" class="example-card">
+                <div class="card-icon">📈</div>
+                <div class="card-content">
+                    <h3 class="card-title">Sales Dashboard</h3>
+                    <p class="card-description">
+                        Comprehensive sales data analysis with 3-level column grouping.
+                    </p>
+                    <ul class="card-features">
+                        <li>3-level column groups</li>
+                        <li>Quarterly/monthly data</li>
+                        <li>Performance metrics</li>
+                        <li>Regional analysis</li>
+                    </ul>
+                    <span class="card-button">View Example →</span>
+                </div>
+            </a>
+        </div>
+
+        <div class="docs-section">
+            <h2>📖 Documentation</h2>
+            <div class="docs-grid">
+                <a href="../docs/API_REFERENCE.md" class="doc-link">
+                    <strong>API Reference (English)</strong>
+                    Complete API documentation
+                </a>
+                <a href="../docs/API_REFERENCE.ja.md" class="doc-link">
+                    <strong>APIリファレンス (日本語)</strong>
+                    APIドキュメント（日本語版）
+                </a>
+                <a href="../README.md" class="doc-link">
+                    <strong>README (English)</strong>
+                    Project overview and quick start
+                </a>
+                <a href="../README.ja.md" class="doc-link">
+                    <strong>README (日本語)</strong>
+                    プロジェクト概要とクイックスタート
+                </a>
+            </div>
+        </div>
+
+        <footer>
+            <p>DataGrid5 - Ultra-fast WebAssembly Grid Control</p>
+            <p>Built with Rust and WebAssembly</p>
+        </footer>
+    </div>
+</body>
+</html>

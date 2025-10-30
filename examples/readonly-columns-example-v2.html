@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Read-only Columns Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .description {
+            color: rgba(255,255,255,0.95);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        button.danger {
+            background: #f56565;
+        }
+
+        button.danger:hover {
+            background: #e53e3e;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .grid-wrapper {
+            height: 500px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .status-bar {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .info-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+        }
+
+        .info-panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .column-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .column-card {
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+
+        .column-card.readonly {
+            background: #ffebee;
+            border-color: #f44336;
+        }
+
+        .column-card.editable {
+            background: #e8f5e9;
+            border-color: #4caf50;
+        }
+
+        .column-card h4 {
+            margin-bottom: 8px;
+        }
+
+        .column-card p {
+            font-size: 13px;
+            color: #666;
+            margin: 4px 0;
+        }
+
+        .legend {
+            margin-top: 15px;
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .legend-readonly {
+            background: #ffcdd2;
+        }
+
+        .legend-editable {
+            background: #c8e6c9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 DataGrid5 - Read-only Columns Example</h1>
+        <div class="description">
+            This example demonstrates column-level edit permissions. Some columns are read-only (protected),
+            while others are editable. Double-click cells to test the functionality!
+        </div>
+
+        <div class="controls">
+            <button id="load-data-btn">Load Employee Data</button>
+            <button id="toggle-col-btn">Toggle Column B Edit</button>
+            <button id="clear-btn" class="danger">Clear All</button>
+            <label>
+                <input type="checkbox" id="global-readonly" />
+                Global Read-only Mode
+            </label>
+        </div>
+
+        <div class="grid-wrapper" id="grid-container"></div>
+
+        <div class="status-bar" id="status-bar">
+            <strong>Status:</strong> Ready - Try double-clicking cells in different columns
+        </div>
+
+        <div class="info-panel">
+            <h3>📋 Column Permissions:</h3>
+            <div class="column-info">
+                <div class="column-card readonly">
+                    <h4>🔒 Column A: Employee ID</h4>
+                    <p><strong>Read-only:</strong> System generated, cannot be edited</p>
+                </div>
+                <div class="column-card editable">
+                    <h4>✏️ Column B: Name</h4>
+                    <p><strong>Editable:</strong> Can be modified by users</p>
+                </div>
+                <div class="column-card readonly">
+                    <h4>🔒 Column C: Email</h4>
+                    <p><strong>Read-only:</strong> Managed by IT department</p>
+                </div>
+                <div class="column-card editable">
+                    <h4>✏️ Column D: Department</h4>
+                    <p><strong>Editable:</strong> Can be updated</p>
+                </div>
+                <div class="column-card editable">
+                    <h4>✏️ Column E: Position</h4>
+                    <p><strong>Editable:</strong> Can be changed</p>
+                </div>
+                <div class="column-card readonly">
+                    <h4>🔒 Column F: Hire Date</h4>
+                    <p><strong>Read-only:</strong> Historical record</p>
+                </div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color legend-readonly"></div>
+                    <span>Read-only columns (cannot edit)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-editable"></div>
+                    <span>Editable columns (can edit)</span>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 20px;">💡 Instructions:</h3>
+            <ul style="padding-left: 20px; margin-top: 10px;">
+                <li style="margin: 8px 0;">Double-click on a <strong style="color: #4caf50;">green cell</strong> to edit (editable)</li>
+                <li style="margin: 8px 0;">Try double-clicking on a <strong style="color: #f44336;">red cell</strong> (read-only) - editing will be prevented</li>
+                <li style="margin: 8px 0;">Check the console for edit attempt messages</li>
+                <li style="margin: 8px 0;">Use "Toggle Column B Edit" to dynamically change permissions</li>
+                <li style="margin: 8px 0;">Enable "Global Read-only Mode" to make entire grid read-only</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+        import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
+
+        let gridWrapper = null;
+        let columnBEditable = true;
+
+        // Column configuration: true = editable, false = read-only
+        const columnPermissions = {
+            0: false,  // Employee ID - read-only
+            1: true,   // Name - editable
+            2: false,  // Email - read-only
+            3: true,   // Department - editable
+            4: true,   // Position - editable
+            5: false   // Hire Date - read-only
+        };
+
+        async function initGrid() {
+            await init();
+
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
+                rows: 20,
+                cols: 6,
+                enableEditing: true,
+                enableVirtualScroll: true,
+                enableResize: true
+            });
+
+            setupEditListener();
+            setupColumnPermissions();
+
+            console.log('Grid initialized with column permissions!');
+        }
+
+        function setupEditListener() {
+            const container = document.getElementById('grid-container');
+
+            // Listen to edit start event
+            container.addEventListener('celleditstart', (e) => {
+                const { row, col } = e.detail;
+
+                // Check global read-only mode
+                if (document.getElementById('global-readonly').checked) {
+                    updateStatus(`❌ Cannot edit: Global read-only mode is enabled`, 'error');
+                    return;
+                }
+
+                // Check column permission (skip headers)
+                if (row > 0 && !columnPermissions[col]) {
+                    updateStatus(`❌ Cannot edit Column ${String.fromCharCode(65 + col)}: Read-only column`, 'error');
+                } else if (row > 0) {
+                    updateStatus(`✏️ Editing cell (${row}, ${col}) in editable column`, 'normal');
+                }
+            });
+
+            // Listen to successful edits
+            container.addEventListener('celleditend', (e) => {
+                const { row, col, changed, saved } = e.detail;
+                if (changed && saved) {
+                    updateStatus(`✅ Successfully updated cell (${row}, ${col})`, 'success');
+                }
+            });
+        }
+
+        function setupColumnPermissions() {
+            const grid = gridWrapper.getGrid();
+
+            // Set headers
+            const headers = ['Employee ID', 'Name', 'Email', 'Department', 'Position', 'Hire Date'];
+            for (let col = 0; col < headers.length; col++) {
+                grid.set_cell_value(0, col, headers[col]);
+                grid.set_cell_bg_color(0, col, 0x667eeaFF);
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
+                grid.set_cell_font_style(0, col, true, false);
+            }
+
+            // Apply visual indicators for permissions
+            for (let row = 1; row < 20; row++) {
+                for (let col = 0; col < 6; col++) {
+                    if (columnPermissions[col]) {
+                        // Editable - light green
+                        grid.set_cell_bg_color(row, col, 0xC8E6C9FF);
+                    } else {
+                        // Read-only - light red
+                        grid.set_cell_bg_color(row, col, 0xFFCDD2FF);
+                    }
+                }
+            }
+
+            // Set column edit permissions in the grid
+            for (let col = 0; col < 6; col++) {
+                grid.set_column_editable(col, columnPermissions[col]);
+            }
+
+            gridWrapper.render();
+        }
+
+        function loadEmployeeData() {
+            const grid = gridWrapper.getGrid();
+
+            const employees = [
+                ['EMP001', 'John Smith', 'john.smith@company.com', 'Engineering', 'Senior Developer', '2020-01-15'],
+                ['EMP002', 'Jane Doe', 'jane.doe@company.com', 'Marketing', 'Manager', '2019-03-22'],
+                ['EMP003', 'Bob Wilson', 'bob.wilson@company.com', 'Sales', 'Sales Rep', '2021-06-10'],
+                ['EMP004', 'Alice Brown', 'alice.brown@company.com', 'Engineering', 'Team Lead', '2018-11-05'],
+                ['EMP005', 'Charlie Davis', 'charlie.davis@company.com', 'HR', 'Recruiter', '2022-02-14'],
+                ['EMP006', 'Diana Evans', 'diana.evans@company.com', 'Finance', 'Analyst', '2020-09-30'],
+                ['EMP007', 'Frank Green', 'frank.green@company.com', 'Engineering', 'Junior Dev', '2023-01-20'],
+                ['EMP008', 'Grace Hill', 'grace.hill@company.com', 'Marketing', 'Designer', '2021-04-18'],
+            ];
+
+            for (let i = 0; i < employees.length; i++) {
+                for (let col = 0; col < employees[i].length; col++) {
+                    grid.set_cell_value(i + 1, col, employees[i][col]);
+                }
+            }
+
+            gridWrapper.render();
+            updateStatus('Employee data loaded', 'success');
+        }
+
+        function toggleColumnBEdit() {
+            const grid = gridWrapper.getGrid();
+            columnBEditable = !columnBEditable;
+            columnPermissions[1] = columnBEditable;
+
+            // Update column permission
+            grid.set_column_editable(1, columnBEditable);
+
+            // Update visual indicator
+            for (let row = 1; row < 20; row++) {
+                if (columnBEditable) {
+                    grid.set_cell_bg_color(row, 1, 0xC8E6C9FF); // Green
+                } else {
+                    grid.set_cell_bg_color(row, 1, 0xFFCDD2FF); // Red
+                }
+            }
+
+            gridWrapper.render();
+            updateStatus(`Column B is now ${columnBEditable ? 'editable' : 'read-only'}`, 'success');
+        }
+
+        function clearAll() {
+            const grid = gridWrapper.getGrid();
+
+            for (let row = 1; row < 20; row++) {
+                for (let col = 0; col < 6; col++) {
+                    grid.set_cell_value(row, col, '');
+                }
+            }
+
+            gridWrapper.render();
+            updateStatus('Data cleared', 'success');
+        }
+
+        function updateStatus(message, type = 'normal') {
+            const statusBar = document.getElementById('status-bar');
+            let color = '#333';
+            if (type === 'error') color = '#f44336';
+            if (type === 'success') color = '#4caf50';
+
+            statusBar.innerHTML = `<strong>Status:</strong> <span style="color: ${color}">${message}</span>`;
+        }
+
+        // Global read-only toggle
+        document.getElementById('global-readonly').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                updateStatus('🔒 Global read-only mode ENABLED - No editing allowed', 'error');
+            } else {
+                updateStatus('✅ Global read-only mode DISABLED - Editing allowed', 'success');
+            }
+        });
+
+        // Button handlers
+        document.getElementById('load-data-btn').addEventListener('click', loadEmployeeData);
+        document.getElementById('toggle-col-btn').addEventListener('click', toggleColumnBEdit);
+        document.getElementById('clear-btn').addEventListener('click', clearAll);
+
+        // Initialize
+        initGrid().then(() => {
+            loadEmployeeData();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "datagrid5",
+  "type": "module",
+  "collaborators": [
+    "datagrid5 contributors"
+  ],
+  "description": "Ultra-fast WebAssembly-based grid control for browsers",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "datagrid5_bg.wasm",
+    "datagrid5.js",
+    "datagrid5.d.ts"
+  ],
+  "main": "datagrid5.js",
+  "types": "datagrid5.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

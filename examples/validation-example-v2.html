@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataGrid5 - Validation Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .description {
+            color: rgba(255,255,255,0.95);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #f5576c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #e0475b;
+            transform: translateY(-1px);
+        }
+
+        button.secondary {
+            background: #667eea;
+        }
+
+        button.secondary:hover {
+            background: #5a67d8;
+        }
+
+        .grid-wrapper {
+            height: 500px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .validation-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+        }
+
+        .validation-info h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .validation-rules {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .rule-item {
+            padding: 12px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+
+        .rule-item strong {
+            color: #667eea;
+        }
+
+        .status-bar {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .status-error {
+            color: #f5576c;
+            font-weight: bold;
+        }
+
+        .status-success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+        }
+
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .instructions ul {
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin: 8px 0;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ DataGrid5 - Cell Validation Example</h1>
+        <div class="description">
+            This example demonstrates real-time cell validation with visual feedback.
+            Try editing cells with invalid data to see validation in action!
+        </div>
+
+        <div class="controls">
+            <button id="setup-btn">Setup Validation Rules</button>
+            <button id="test-valid-btn" class="secondary">Fill Valid Data</button>
+            <button id="test-invalid-btn" class="secondary">Fill Invalid Data</button>
+            <button id="clear-btn" class="secondary">Clear All</button>
+        </div>
+
+        <div class="grid-wrapper" id="grid-container"></div>
+
+        <div class="status-bar" id="status-bar">
+            <strong>Status:</strong> Ready - Double-click cells to edit
+        </div>
+
+        <div class="validation-info">
+            <h3>📋 Validation Rules:</h3>
+            <div class="validation-rules">
+                <div class="rule-item">
+                    <strong>Email (Column B):</strong><br>
+                    Must contain @ and domain (e.g., user@example.com)
+                </div>
+                <div class="rule-item">
+                    <strong>Age (Column C):</strong><br>
+                    Must be a number between 1 and 120
+                </div>
+                <div class="rule-item">
+                    <strong>Phone (Column D):</strong><br>
+                    Must be 10-15 digits (e.g., 555-123-4567)
+                </div>
+                <div class="rule-item">
+                    <strong>Postal Code (Column E):</strong><br>
+                    Must be 5 digits or 5+4 format (e.g., 12345 or 12345-6789)
+                </div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>🎯 How to Use:</h3>
+            <ul>
+                <li><strong>Double-click</strong> any cell in columns B, C, D, or E to edit</li>
+                <li><strong>Enter invalid data</strong> to see the validation error (red background)</li>
+                <li><strong>Enter valid data</strong> to see success (green background)</li>
+                <li>Press <strong>Enter</strong> to save and move to next row</li>
+                <li>Press <strong>Escape</strong> to cancel editing</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { DataGrid } from '../pkg/datagrid5.js';
+        import { DataGridWrapper } from '../www/datagrid5-wrapper.js';
+
+        let gridWrapper = null;
+        const validationRules = {
+            1: { name: 'Email', validator: validateEmail },      // Column B (index 1)
+            2: { name: 'Age', validator: validateAge },          // Column C (index 2)
+            3: { name: 'Phone', validator: validatePhone },      // Column D (index 3)
+            4: { name: 'Postal', validator: validatePostalCode } // Column E (index 4)
+        };
+
+        // Validation functions
+        function validateEmail(value) {
+            const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return regex.test(value);
+        }
+
+        function validateAge(value) {
+            const age = parseInt(value);
+            return !isNaN(age) && age >= 1 && age <= 120;
+        }
+
+        function validatePhone(value) {
+            const cleaned = value.replace(/\D/g, '');
+            return cleaned.length >= 10 && cleaned.length <= 15;
+        }
+
+        function validatePostalCode(value) {
+            const regex = /^\d{5}(-\d{4})?$/;
+            return regex.test(value);
+        }
+
+        async function initGrid() {
+            await init();
+
+            gridWrapper = new DataGridWrapper('grid-container', { DataGrid }, {
+                rows: 20,
+                cols: 6,
+                enableEditing: true,
+                enableVirtualScroll: true,
+                enableResize: true
+            });
+
+            // Setup validation listener
+            setupValidationListener();
+
+            console.log('Grid initialized with validation!');
+        }
+
+        function setupValidationListener() {
+            const container = document.getElementById('grid-container');
+
+            // Listen to cell edit end event
+            container.addEventListener('celleditend', (e) => {
+                const { row, col, newValue, changed, saved } = e.detail;
+
+                if (!changed || !saved || row === 0) return; // Skip headers
+
+                // Check if this column has validation
+                if (validationRules[col]) {
+                    const rule = validationRules[col];
+                    const isValid = rule.validator(newValue);
+
+                    const grid = gridWrapper.getGrid();
+
+                    if (isValid) {
+                        // Valid: Green background
+                        grid.set_cell_bg_color(row, col, 0xC8E6C9FF); // Light green
+                        gridWrapper.render();
+                        updateStatus(`✅ Valid ${rule.name}: "${newValue}"`, 'success');
+                    } else {
+                        // Invalid: Red background
+                        grid.set_cell_bg_color(row, col, 0xFFCDD2FF); // Light red
+                        gridWrapper.render();
+                        updateStatus(`❌ Invalid ${rule.name}: "${newValue}"`, 'error');
+                    }
+                }
+            });
+        }
+
+        function setupValidationRules() {
+            const grid = gridWrapper.getGrid();
+
+            // Setup headers
+            const headers = ['Name', 'Email', 'Age', 'Phone', 'Postal Code', 'Notes'];
+            for (let col = 0; col < headers.length; col++) {
+                grid.set_cell_value(0, col, headers[col]);
+                grid.set_cell_bg_color(0, col, 0x667eeaFF);
+                grid.set_cell_fg_color(0, col, 0xFFFFFFFF);
+                grid.set_cell_font_style(0, col, true, false);
+            }
+
+            gridWrapper.render();
+            updateStatus('Validation rules applied!', 'success');
+        }
+
+        function fillValidData() {
+            const grid = gridWrapper.getGrid();
+
+            const validData = [
+                ['John Doe', 'john@example.com', '30', '555-123-4567', '12345', 'Valid data'],
+                ['Jane Smith', 'jane.smith@company.com', '25', '(555) 987-6543', '67890-1234', 'All good'],
+                ['Bob Wilson', 'bob.wilson@email.net', '45', '5551234567', '11111', 'Perfect'],
+                ['Alice Brown', 'alice@test.org', '28', '555-999-8888', '22222-3333', 'Validated'],
+                ['Charlie Davis', 'charlie.d@mail.com', '35', '555.777.6666', '44444', 'OK']
+            ];
+
+            for (let i = 0; i < validData.length; i++) {
+                for (let col = 0; col < validData[i].length; col++) {
+                    const value = validData[i][col];
+                    grid.set_cell_value(i + 1, col, value);
+
+                    // Apply green background to validated columns
+                    if (validationRules[col]) {
+                        grid.set_cell_bg_color(i + 1, col, 0xC8E6C9FF);
+                    }
+                }
+            }
+
+            gridWrapper.render();
+            updateStatus('Filled with valid data', 'success');
+        }
+
+        function fillInvalidData() {
+            const grid = gridWrapper.getGrid();
+
+            const invalidData = [
+                ['Test User', 'not-an-email', '999', 'abc', 'wrong', 'Invalid'],
+                ['Bad Data', 'missing@', '-5', '123', '12', 'Fails validation'],
+                ['Wrong Format', '@nodomain', '0', 'phone', '123456', 'Bad'],
+            ];
+
+            for (let i = 0; i < invalidData.length; i++) {
+                for (let col = 0; col < invalidData[i].length; col++) {
+                    const value = invalidData[i][col];
+                    grid.set_cell_value(i + 1, col, value);
+
+                    // Apply red background to validated columns with invalid data
+                    if (validationRules[col]) {
+                        grid.set_cell_bg_color(i + 1, col, 0xFFCDD2FF);
+                    }
+                }
+            }
+
+            gridWrapper.render();
+            updateStatus('Filled with invalid data - see red cells', 'error');
+        }
+
+        function clearAll() {
+            const grid = gridWrapper.getGrid();
+
+            for (let row = 1; row < 20; row++) {
+                for (let col = 0; col < 6; col++) {
+                    grid.set_cell_value(row, col, '');
+                    grid.set_cell_bg_color(row, col, 0xFFFFFFFF);
+                }
+            }
+
+            gridWrapper.render();
+            updateStatus('Grid cleared', 'success');
+        }
+
+        function updateStatus(message, type = 'normal') {
+            const statusBar = document.getElementById('status-bar');
+            const className = type === 'error' ? 'status-error' : type === 'success' ? 'status-success' : '';
+            statusBar.innerHTML = `<strong>Status:</strong> <span class="${className}">${message}</span>`;
+        }
+
+        // Button handlers
+        document.getElementById('setup-btn').addEventListener('click', setupValidationRules);
+        document.getElementById('test-valid-btn').addEventListener('click', fillValidData);
+        document.getElementById('test-invalid-btn').addEventListener('click', fillInvalidData);
+        document.getElementById('clear-btn').addEventListener('click', clearAll);
+
+        // Initialize
+        initGrid().then(() => {
+            setupValidationRules();
+        });
+    </script>
+</body>
+</html>
