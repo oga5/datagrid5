@@ -27,6 +27,7 @@ export class DataGridWrapper {
         this.editingRow = null;
         this.editingCol = null;
         this.renderLoopId = null;
+        this.clipboardData = ''; // Fallback clipboard storage
 
         this.init();
     }
@@ -215,9 +216,31 @@ export class DataGridWrapper {
 
         // Keyboard events
         this.textCanvas.addEventListener('keydown', (e) => {
+            const isCtrl = e.ctrlKey || e.metaKey;
+
+            // Handle clipboard operations
+            if (isCtrl) {
+                if (e.key === 'c' || e.key === 'C') {
+                    // Copy
+                    e.preventDefault();
+                    this.handleCopy();
+                    return;
+                } else if (e.key === 'x' || e.key === 'X') {
+                    // Cut
+                    e.preventDefault();
+                    this.handleCut();
+                    return;
+                } else if (e.key === 'v' || e.key === 'V') {
+                    // Paste
+                    e.preventDefault();
+                    this.handlePaste();
+                    return;
+                }
+            }
+
             const handled = this.grid.handle_keyboard_with_modifiers(
                 e.key,
-                e.ctrlKey || e.metaKey,
+                isCtrl,
                 e.shiftKey
             );
 
@@ -476,5 +499,107 @@ export class DataGridWrapper {
     getViewportInfo() {
         const info = this.grid.get_viewport_info_array();
         return JSON.parse(info);
+    }
+
+    // Clipboard operations
+    handleCopy() {
+        try {
+            const tsvData = this.grid.copy_selected_cells();
+
+            if (tsvData) {
+                // Copy to system clipboard
+                navigator.clipboard.writeText(tsvData).then(() => {
+                    console.log('Copied to clipboard');
+
+                    // Emit custom event
+                    this.container.dispatchEvent(new CustomEvent('gridcopy', {
+                        detail: { data: tsvData }
+                    }));
+                }).catch(err => {
+                    console.error('Failed to copy to clipboard:', err);
+
+                    // Fallback: store in memory
+                    this.clipboardData = tsvData;
+                    this.container.dispatchEvent(new CustomEvent('gridcopy', {
+                        detail: { data: tsvData, fallback: true }
+                    }));
+                });
+            }
+        } catch (err) {
+            console.error('Copy error:', err);
+        }
+    }
+
+    handleCut() {
+        try {
+            const tsvData = this.grid.cut_selected_cells();
+
+            if (tsvData) {
+                // Copy to system clipboard
+                navigator.clipboard.writeText(tsvData).then(() => {
+                    console.log('Cut to clipboard');
+
+                    // Emit custom event
+                    this.container.dispatchEvent(new CustomEvent('gridcut', {
+                        detail: { data: tsvData }
+                    }));
+                }).catch(err => {
+                    console.error('Failed to cut to clipboard:', err);
+
+                    // Fallback: store in memory
+                    this.clipboardData = tsvData;
+                    this.container.dispatchEvent(new CustomEvent('gridcut', {
+                        detail: { data: tsvData, fallback: true }
+                    }));
+                });
+            }
+        } catch (err) {
+            console.error('Cut error:', err);
+        }
+    }
+
+    async handlePaste() {
+        try {
+            let tsvData;
+
+            // Try to read from system clipboard
+            try {
+                tsvData = await navigator.clipboard.readText();
+            } catch (err) {
+                console.log('Cannot read from clipboard, using fallback');
+                // Fallback: use memory clipboard
+                tsvData = this.clipboardData || '';
+            }
+
+            if (tsvData) {
+                // Paste into grid
+                this.grid.paste_cells(tsvData);
+                console.log('Pasted from clipboard');
+
+                // Emit custom event
+                this.container.dispatchEvent(new CustomEvent('gridpaste', {
+                    detail: { data: tsvData }
+                }));
+            }
+        } catch (err) {
+            console.error('Paste error:', err);
+        }
+    }
+
+    // Manual clipboard methods
+    copy() {
+        this.handleCopy();
+    }
+
+    cut() {
+        this.handleCut();
+    }
+
+    paste(tsvData) {
+        if (tsvData) {
+            this.grid.paste_cells(tsvData);
+        } else {
+            this.handlePaste();
+        }
     }
 }
