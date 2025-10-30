@@ -8,7 +8,7 @@
 
 DataGrid5 is a high-performance, feature-rich data grid component built with Rust and WebAssembly. It provides Excel-like functionality with GPU-accelerated rendering using WebGL.
 
-[日本語版 README](./README.ja.md) | [Documentation](./docs/) | [Examples](./examples/) | [DataGridWrapper Guide](./www/README.md)
+🌐 **[Live Demo](https://oga5.github.io/datagrid5/)** | [日本語版 README](./README.ja.md) | [Documentation](./docs/) | [Examples](./examples/) | [DataGridWrapper Guide](./www/README.md)
 
 ## ✨ Features
 

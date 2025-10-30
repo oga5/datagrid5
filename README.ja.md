@@ -8,7 +8,7 @@
 
 DataGrid5は、RustとWebAssemblyで構築された高性能で機能豊富なデータグリッドコンポーネントです。WebGLを使用したGPUアクセラレーションレンダリングにより、Excelライクな機能を提供します。
 
-[English README](./README.md) | [ドキュメント](./docs/) | [サンプル](./examples/) | [DataGridWrapper ガイド](./www/README.md)
+🌐 **[ライブデモ](https://oga5.github.io/datagrid5/)** | [English README](./README.md) | [ドキュメント](./docs/) | [サンプル](./examples/) | [DataGridWrapper ガイド](./www/README.md)
 
 ## ✨ 特徴
 
