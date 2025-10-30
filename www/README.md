@@ -20,9 +20,19 @@
 - Escape to cancel
 - Automatic positioning and scrolling
 
+✅ **Excel-Compatible Clipboard**: Automatic copy/cut/paste operations
+- Ctrl+C to copy selected cells
+- Ctrl+X to cut selected cells
+- Ctrl+V to paste from clipboard
+- TSV format for Excel compatibility
+- System clipboard integration with fallback
+
 ✅ **Event System**: Custom events for application integration
 - `celleditstart` - Fired when editing begins
 - `celleditend` - Fired when editing ends (with old/new values)
+- `gridcopy` - Fired when cells are copied
+- `gridcut` - Fired when cells are cut
+- `gridpaste` - Fired when cells are pasted
 - `gridcontextmenu` - Fired on right-click
 
 ✅ **Simplified API**: Easy-to-use methods for common operations
@@ -137,6 +147,22 @@ gridWrapper.startCellEdit(row, col);
 gridWrapper.endCellEdit(save, moveDown, moveRight);
 ```
 
+### Clipboard Operations
+
+```javascript
+// Copy selected cells to clipboard (same as Ctrl+C)
+gridWrapper.copy();
+
+// Cut selected cells to clipboard (same as Ctrl+X)
+gridWrapper.cut();
+
+// Paste from clipboard (same as Ctrl+V)
+gridWrapper.paste();
+
+// Paste specific TSV data
+gridWrapper.paste(tsvData);
+```
+
 ### Scroll Control
 
 ```javascript
@@ -176,6 +202,28 @@ container.addEventListener('celleditend', (e) => {
     } else if (!saved) {
         console.log(`Edit cancelled`);
     }
+});
+```
+
+### Clipboard Events
+
+```javascript
+// Listen for copy operations
+container.addEventListener('gridcopy', (e) => {
+    const { data } = e.detail;
+    console.log(`Copied ${data.split('\n').length} rows to clipboard`);
+});
+
+// Listen for cut operations
+container.addEventListener('gridcut', (e) => {
+    const { data } = e.detail;
+    console.log(`Cut ${data.split('\n').length} rows to clipboard`);
+});
+
+// Listen for paste operations
+container.addEventListener('gridpaste', (e) => {
+    const { data } = e.detail;
+    console.log(`Pasted ${data.split('\n').length} rows from clipboard`);
 });
 ```
 
@@ -291,14 +339,21 @@ function loadSampleData() {
 
 ## Examples
 
-See `/examples/editing-example-simple.html` for a complete working example using the wrapper.
+See these complete working examples using the wrapper:
 
-Key differences in the simplified example:
+- `/examples/editing-example-simple.html` - Cell editing with wrapper
+- `/examples/clipboard-example-v2.html` - Excel-like copy/paste demonstration
+- `/examples/simple-usage-v2.html` - Basic grid setup
+- `/examples/validation-example-v2.html` - Input validation
+- `/examples/context-menu-example-v2.html` - Context menus
+
+Key differences in the simplified examples:
 - ✅ No manual canvas setup
 - ✅ No manual event handler registration
 - ✅ No render loop management
 - ✅ No virtual scroll setup
 - ✅ No cell editor DOM manipulation
+- ✅ Automatic clipboard handling
 - ✅ Simple event-based integration
 - ✅ Focus on application logic only
 
