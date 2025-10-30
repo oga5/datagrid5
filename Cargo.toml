@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["datagrid5 contributors"]
 description = "Ultra-fast WebAssembly-based grid control for browsers"
-license = "BSD-2-Clause"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
