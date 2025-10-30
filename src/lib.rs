@@ -10,7 +10,7 @@ use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
 
 use core::{cell::CellBorder, Cell, CellValue, ColumnConfig, DataType, Grid, Viewport};
 use features::{
-    clipboard::ClipboardOps, editing::EditingState, resize::ResizeState, search::SearchState,
+    editing::EditingState, resize::ResizeState, search::SearchState,
     selection::SelectionState, undo_redo::UndoRedoState, EditAction, CellStyle,
 };
 use input::{KeyboardHandler, MouseHandler, NavigationCommand};
@@ -195,22 +195,11 @@ impl DataGrid {
             keyboard_handler,
             webgl_canvas,
             text_canvas,
-            is_editing: false,
-            editing_cell: None,
-            is_resizing: false,
-            resizing_column: None,
-            resizing_row: None,
-            resize_start_pos: 0.0,
-            resize_start_size: 0.0,
-            selected_cells: HashSet::new(),
-            selection_anchor: None,
-            search_query: String::new(),
-            search_results: Vec::new(),
-            current_search_index: None,
-            search_case_sensitive: false,
-            search_whole_word: false,
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
+            editing: EditingState::new(),
+            selection: SelectionState::new(),
+            resize: ResizeState::new(),
+            search: SearchState::new(),
+            undo_redo: UndoRedoState::new(),
             fps_samples: Vec::new(),
             last_frame_time: 0.0,
             frame_count: 0,
@@ -249,7 +238,7 @@ impl DataGrid {
         let canvas_width = webgl_canvas.width() as f32;
         let canvas_height = webgl_canvas.height() as f32;
 
-        let mut grid = Grid::new(rows, cols);
+        let grid = Grid::new(rows, cols);
 
         let mut viewport = Viewport::new(canvas_width, canvas_height);
         viewport.update_visible_range(&grid);
@@ -272,22 +261,11 @@ impl DataGrid {
             keyboard_handler,
             webgl_canvas,
             text_canvas,
-            is_editing: false,
-            editing_cell: None,
-            is_resizing: false,
-            resizing_column: None,
-            resizing_row: None,
-            resize_start_pos: 0.0,
-            resize_start_size: 0.0,
-            selected_cells: HashSet::new(),
-            selection_anchor: None,
-            search_query: String::new(),
-            search_results: Vec::new(),
-            current_search_index: None,
-            search_case_sensitive: false,
-            search_whole_word: false,
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
+            editing: EditingState::new(),
+            selection: SelectionState::new(),
+            resize: ResizeState::new(),
+            search: SearchState::new(),
+            undo_redo: UndoRedoState::new(),
             fps_samples: Vec::new(),
             last_frame_time: 0.0,
             frame_count: 0,
@@ -308,8 +286,8 @@ impl DataGrid {
         self.text_renderer.render_with_search(
             &self.grid,
             &self.viewport,
-            &self.search_results,
-            self.current_search_index
+            &self.search.search_results,
+            self.search.current_search_index
         );
 
         web_sys::console::log_1(&format!("DataGrid::render() completed. Viewport: first_row={}, last_row={}, first_col={}, last_col={}",
@@ -380,7 +358,7 @@ impl DataGrid {
             }
 
             self.mouse_handler.select_cell(row, col);
-            web_sys::console::log_1(&format!("Selected {} cells", self.selected_cells.len()).into());
+            web_sys::console::log_1(&format!("Selected {} cells", self.selection.selected_cells.len()).into());
         } else {
             // Clicked outside grid, clear selection
             if !ctrl {
@@ -422,7 +400,7 @@ impl DataGrid {
             self.select_single_cell(row, col);
             self.mouse_handler.start_selection(x, y);
             self.mouse_handler.select_cell(row, col);
-            web_sys::console::log_1(&format!("Selected {} cells", self.selected_cells.len()).into());
+            web_sys::console::log_1(&format!("Selected {} cells", self.selection.selected_cells.len()).into());
         } else {
             web_sys::console::log_1(&"No cell found at coordinates".into());
             // Clicked outside grid, clear selection
@@ -617,10 +595,10 @@ impl DataGrid {
                 new_value,
             };
 
-            self.undo_stack.push(action);
+            self.undo_redo.undo_stack.push(action);
 
             // Clear redo stack on new edit
-            self.redo_stack.clear();
+            self.undo_redo.redo_stack.clear();
         }
     }
 
@@ -1053,10 +1031,10 @@ impl DataGrid {
             if let Some((new_row, new_col)) = new_selection {
                 if shift {
                     // Shift is pressed: extend selection (range selection)
-                    if self.selection_anchor.is_none() {
+                    if self.selection.selection_anchor.is_none() {
                         // No anchor yet, set current cell as anchor
                         if let Some((row, col)) = current {
-                            self.selection_anchor = Some((row, col));
+                            self.selection.selection_anchor = Some((row, col));
                         }
                     }
                     // Extend selection to new cell
@@ -1134,8 +1112,8 @@ impl DataGrid {
             }
         }
 
-        self.is_editing = true;
-        self.editing_cell = Some((row, col));
+        self.editing.is_editing = true;
+        self.editing.editing_cell = Some((row, col));
 
         web_sys::console::log_1(&format!("Started editing cell: ({}, {})", row, col).into());
         true
@@ -1143,19 +1121,19 @@ impl DataGrid {
 
     /// End editing mode
     pub fn end_edit(&mut self) {
-        self.is_editing = false;
-        self.editing_cell = None;
+        self.editing.is_editing = false;
+        self.editing.editing_cell = None;
         web_sys::console::log_1(&"Ended editing".into());
     }
 
     /// Check if currently editing
     pub fn is_editing(&self) -> bool {
-        self.is_editing
+        self.editing.is_editing
     }
 
     /// Update cell value during editing
     pub fn update_cell_value(&mut self, row: usize, col: usize, value: String) {
-        if self.is_editing && self.editing_cell == Some((row, col)) {
+        if self.editing.is_editing && self.editing.editing_cell == Some((row, col)) {
             self.set_cell_value(row, col, &value);
             web_sys::console::log_1(&format!("Updated cell ({}, {}) to: {}", row, col, value).into());
         }
@@ -1192,8 +1170,8 @@ impl DataGrid {
     pub fn check_resize_handle(&self, x: f32, y: f32) -> String {
         const RESIZE_HANDLE_WIDTH: f32 = 5.0;
 
-        let grid_x = x + self.viewport.scroll_x;
-        let grid_y = y + self.viewport.scroll_y;
+        let _grid_x = x + self.viewport.scroll_x;
+        let _grid_y = y + self.viewport.scroll_y;
 
         // Column resize: only detect in column header area
         if y < self.grid.col_header_height {
@@ -1238,10 +1216,10 @@ impl DataGrid {
                 col_x += width;
 
                 if (x - col_x).abs() < RESIZE_HANDLE_WIDTH {
-                    self.is_resizing = true;
-                    self.resizing_column = Some(col);
-                    self.resize_start_pos = x;
-                    self.resize_start_size = width;
+                    self.resize.is_resizing = true;
+                    self.resize.resizing_column = Some(col);
+                    self.resize.resize_start_pos = x;
+                    self.resize.resize_start_size = width;
                     web_sys::console::log_1(&format!("Started resizing column {}", col).into());
                     return true;
                 }
@@ -1254,10 +1232,10 @@ impl DataGrid {
                 row_y += height;
 
                 if (y - row_y).abs() < RESIZE_HANDLE_WIDTH {
-                    self.is_resizing = true;
-                    self.resizing_row = Some(row);
-                    self.resize_start_pos = y;
-                    self.resize_start_size = height;
+                    self.resize.is_resizing = true;
+                    self.resize.resizing_row = Some(row);
+                    self.resize.resize_start_pos = y;
+                    self.resize.resize_start_size = height;
                     web_sys::console::log_1(&format!("Started resizing row {}", row).into());
                     return true;
                 }
@@ -1269,36 +1247,36 @@ impl DataGrid {
 
     /// Update resize during drag
     pub fn update_resize(&mut self, x: f32, y: f32) {
-        if !self.is_resizing {
+        if !self.resize.is_resizing {
             return;
         }
 
-        if let Some(col) = self.resizing_column {
-            let delta = x - self.resize_start_pos;
-            let new_width = (self.resize_start_size + delta).max(30.0); // Minimum 30px
+        if let Some(col) = self.resize.resizing_column {
+            let delta = x - self.resize.resize_start_pos;
+            let new_width = (self.resize.resize_start_size + delta).max(30.0); // Minimum 30px
             self.grid.set_col_width(col, new_width);
-        } else if let Some(row) = self.resizing_row {
-            let delta = y - self.resize_start_pos;
-            let new_height = (self.resize_start_size + delta).max(20.0); // Minimum 20px
+        } else if let Some(row) = self.resize.resizing_row {
+            let delta = y - self.resize.resize_start_pos;
+            let new_height = (self.resize.resize_start_size + delta).max(20.0); // Minimum 20px
             self.grid.set_row_height(row, new_height);
         }
     }
 
     /// End resize
     pub fn end_resize(&mut self) {
-        if self.is_resizing {
+        if self.resize.is_resizing {
             web_sys::console::log_1(&"Ended resizing".into());
         }
-        self.is_resizing = false;
-        self.resizing_column = None;
-        self.resizing_row = None;
-        self.resize_start_pos = 0.0;
-        self.resize_start_size = 0.0;
+        self.resize.is_resizing = false;
+        self.resize.resizing_column = None;
+        self.resize.resizing_row = None;
+        self.resize.resize_start_pos = 0.0;
+        self.resize.resize_start_size = 0.0;
     }
 
     /// Check if currently resizing
     pub fn is_resizing(&self) -> bool {
-        self.is_resizing
+        self.resize.is_resizing
     }
 
     /// Select a single cell (clears previous selection)
@@ -1307,8 +1285,8 @@ impl DataGrid {
         self.clear_selection();
 
         // Add new selection
-        self.selected_cells.insert((row, col));
-        self.selection_anchor = Some((row, col));
+        self.selection.selected_cells.insert((row, col));
+        self.selection.selection_anchor = Some((row, col));
 
         // Update cell state
         if let Some(cell) = self.grid.get_cell_mut(row, col) {
@@ -1322,15 +1300,15 @@ impl DataGrid {
 
     /// Toggle cell selection (add/remove from selection)
     fn toggle_cell_selection(&mut self, row: usize, col: usize) {
-        if self.selected_cells.contains(&(row, col)) {
+        if self.selection.selected_cells.contains(&(row, col)) {
             // Remove from selection
-            self.selected_cells.remove(&(row, col));
+            self.selection.selected_cells.remove(&(row, col));
             if let Some(cell) = self.grid.get_cell_mut(row, col) {
                 cell.selected = false;
             }
         } else {
             // Add to selection
-            self.selected_cells.insert((row, col));
+            self.selection.selected_cells.insert((row, col));
             if let Some(cell) = self.grid.get_cell_mut(row, col) {
                 cell.selected = true;
             } else {
@@ -1341,14 +1319,14 @@ impl DataGrid {
         }
 
         // Update anchor
-        if !self.selected_cells.is_empty() {
-            self.selection_anchor = Some((row, col));
+        if !self.selection.selected_cells.is_empty() {
+            self.selection.selection_anchor = Some((row, col));
         }
     }
 
     /// Select range from anchor to target cell
     fn select_range(&mut self, target_row: usize, target_col: usize) {
-        if let Some((anchor_row, anchor_col)) = self.selection_anchor {
+        if let Some((anchor_row, anchor_col)) = self.selection.selection_anchor {
             // Clear previous selection
             self.clear_selection();
 
@@ -1362,7 +1340,7 @@ impl DataGrid {
             for r in min_row..=max_row {
                 for c in min_col..=max_col {
                     if r < self.grid.row_count() && c < self.grid.col_count() {
-                        self.selected_cells.insert((r, c));
+                        self.selection.selected_cells.insert((r, c));
 
                         if let Some(cell) = self.grid.get_cell_mut(r, c) {
                             cell.selected = true;
@@ -1382,18 +1360,18 @@ impl DataGrid {
 
     /// Clear all selections
     fn clear_selection(&mut self) {
-        for (row, col) in &self.selected_cells {
+        for (row, col) in &self.selection.selected_cells {
             if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
                 cell.selected = false;
             }
         }
-        self.selected_cells.clear();
+        self.selection.selected_cells.clear();
     }
 
     /// Get selected cells as a JSON array of [row, col] pairs
     /// Returns: "[[row1, col1], [row2, col2], ...]"
     pub fn get_selected_cells(&self) -> String {
-        let cells: Vec<Vec<usize>> = self.selected_cells
+        let cells: Vec<Vec<usize>> = self.selection.selected_cells
             .iter()
             .map(|(row, col)| vec![*row, *col])
             .collect();
@@ -1402,7 +1380,7 @@ impl DataGrid {
 
     /// Get selection count
     pub fn get_selection_count(&self) -> usize {
-        self.selected_cells.len()
+        self.selection.selected_cells.len()
     }
 
     /// Select all cells (Ctrl+A)
@@ -1411,7 +1389,7 @@ impl DataGrid {
 
         for row in 0..self.grid.row_count() {
             for col in 0..self.grid.col_count() {
-                self.selected_cells.insert((row, col));
+                self.selection.selected_cells.insert((row, col));
                 if let Some(cell) = self.grid.get_cell_mut(row, col) {
                     cell.selected = true;
                 }
@@ -1419,7 +1397,7 @@ impl DataGrid {
         }
 
         // Set anchor to first cell
-        self.selection_anchor = Some((0, 0));
+        self.selection.selection_anchor = Some((0, 0));
     }
 
     /// Select entire row
@@ -1431,13 +1409,13 @@ impl DataGrid {
         self.clear_selection();
 
         for col in 0..self.grid.col_count() {
-            self.selected_cells.insert((row, col));
+            self.selection.selected_cells.insert((row, col));
             if let Some(cell) = self.grid.get_cell_mut(row, col) {
                 cell.selected = true;
             }
         }
 
-        self.selection_anchor = Some((row, 0));
+        self.selection.selection_anchor = Some((row, 0));
     }
 
     /// Select entire column
@@ -1449,24 +1427,24 @@ impl DataGrid {
         self.clear_selection();
 
         for row in 0..self.grid.row_count() {
-            self.selected_cells.insert((row, col));
+            self.selection.selected_cells.insert((row, col));
             if let Some(cell) = self.grid.get_cell_mut(row, col) {
                 cell.selected = true;
             }
         }
 
-        self.selection_anchor = Some((0, col));
+        self.selection.selection_anchor = Some((0, col));
     }
 
     /// Copy selected cells to TSV (Tab-Separated Values) format
     /// Returns a string with cells separated by tabs and rows separated by newlines
     pub fn copy_selected_cells(&self) -> String {
-        if self.selected_cells.is_empty() {
+        if self.selection.selected_cells.is_empty() {
             return String::new();
         }
 
         // Sort selected cells by row, then by column
-        let mut cells: Vec<(usize, usize)> = self.selected_cells.iter().copied().collect();
+        let mut cells: Vec<(usize, usize)> = self.selection.selected_cells.iter().copied().collect();
         cells.sort_by(|a, b| {
             if a.0 == b.0 {
                 a.1.cmp(&b.1)
@@ -1485,7 +1463,7 @@ impl DataGrid {
         let mut result = String::new();
         for row in *min_row..=*max_row {
             for col in *min_col..=*max_col {
-                if self.selected_cells.contains(&(row, col)) {
+                if self.selection.selected_cells.contains(&(row, col)) {
                     let value = self.grid.get_value_string(row, col);
                     result.push_str(&value);
                 } else {
@@ -1511,7 +1489,7 @@ impl DataGrid {
         let clipboard_text = self.copy_selected_cells();
 
         // Then clear all selected cells
-        let cells_to_clear: Vec<(usize, usize)> = self.selected_cells.iter().copied().collect();
+        let cells_to_clear: Vec<(usize, usize)> = self.selection.selected_cells.iter().copied().collect();
         for (row, col) in cells_to_clear {
             self.grid.set_value(row, col, CellValue::Empty);
         }
@@ -1527,10 +1505,10 @@ impl DataGrid {
         }
 
         // Determine starting position (focus cell or first selected cell)
-        let (start_row, start_col) = if let Some(anchor) = self.selection_anchor {
+        let (start_row, start_col) = if let Some(anchor) = self.selection.selection_anchor {
             anchor
-        } else if !self.selected_cells.is_empty() {
-            let mut cells: Vec<(usize, usize)> = self.selected_cells.iter().copied().collect();
+        } else if !self.selection.selected_cells.is_empty() {
+            let mut cells: Vec<(usize, usize)> = self.selection.selected_cells.iter().copied().collect();
             cells.sort_by(|a, b| {
                 if a.0 == b.0 {
                     a.1.cmp(&b.1)
@@ -1610,8 +1588,8 @@ impl DataGrid {
 
         let new_style = self.get_cell_style(row, col);
         let action = EditAction::SetStyle { row, col, old_style, new_style };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
     }
 
     /// Set foreground (text) color for a cell (RGBA as u32: 0xRRGGBBAA)
@@ -1628,8 +1606,8 @@ impl DataGrid {
 
         let new_style = self.get_cell_style(row, col);
         let action = EditAction::SetStyle { row, col, old_style, new_style };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
     }
 
     /// Set font style for a cell
@@ -1648,8 +1626,8 @@ impl DataGrid {
 
         let new_style = self.get_cell_style(row, col);
         let action = EditAction::SetStyle { row, col, old_style, new_style };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
     }
 
     /// Clear background color for a cell
@@ -1662,8 +1640,8 @@ impl DataGrid {
 
         let new_style = self.get_cell_style(row, col);
         let action = EditAction::SetStyle { row, col, old_style, new_style };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
     }
 
     /// Clear foreground color for a cell
@@ -1676,8 +1654,8 @@ impl DataGrid {
 
         let new_style = self.get_cell_style(row, col);
         let action = EditAction::SetStyle { row, col, old_style, new_style };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
     }
 
     /// Set cell style (background, foreground, font) in one call
@@ -1708,8 +1686,8 @@ impl DataGrid {
 
         let new_style = self.get_cell_style(row, col);
         let action = EditAction::SetStyle { row, col, old_style, new_style };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
     }
 
     /// Set custom border for a cell (top, right, bottom, or left)
@@ -1876,8 +1854,8 @@ impl DataGrid {
             index: at_index,
             cells: Vec::new(), // Empty row being inserted
         };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
 
         self.grid.insert_row(at_index);
         self.clear_selection();
@@ -1893,8 +1871,8 @@ impl DataGrid {
             index,
             cells,
         };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
 
         self.grid.delete_row(index);
         self.clear_selection();
@@ -1931,8 +1909,8 @@ impl DataGrid {
         let action = EditAction::DeleteRows {
             rows: deleted_rows.clone(),
         };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
 
         // Delete rows from bottom to top
         for &index in &sorted_indices {
@@ -1950,7 +1928,7 @@ impl DataGrid {
     /// Get unique row indices from selected cells
     /// Returns JSON array of row indices, e.g., "[0, 2, 5]"
     pub fn get_selected_row_indices(&self) -> String {
-        let mut rows: Vec<usize> = self.selected_cells
+        let mut rows: Vec<usize> = self.selection.selected_cells
             .iter()
             .map(|(row, _)| *row)
             .collect();
@@ -1969,8 +1947,8 @@ impl DataGrid {
             index: at_index,
             cells: Vec::new(), // Empty column being inserted
         };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
 
         self.grid.insert_column(at_index);
         self.clear_selection();
@@ -1986,8 +1964,8 @@ impl DataGrid {
             index,
             cells,
         };
-        self.undo_stack.push(action);
-        self.redo_stack.clear();
+        self.undo_redo.undo_stack.push(action);
+        self.undo_redo.redo_stack.clear();
 
         self.grid.delete_column(index);
         self.clear_selection();
@@ -2035,27 +2013,27 @@ impl DataGrid {
 
     /// Find all modified (edited) cells
     pub fn find_modified_cells(&mut self) -> usize {
-        self.search_results.clear();
-        self.current_search_index = None;
+        self.search.search_results.clear();
+        self.search.current_search_index = None;
 
         for row in 0..self.grid.row_count() {
             for col in 0..self.grid.col_count() {
                 if let Some(cell) = self.grid.get_cell(row, col) {
                     if cell.modified {
-                        self.search_results.push((row, col));
+                        self.search.search_results.push((row, col));
                     }
                 }
             }
         }
 
-        if !self.search_results.is_empty() {
-            self.current_search_index = Some(0);
-            let (row, col) = self.search_results[0];
+        if !self.search.search_results.is_empty() {
+            self.search.current_search_index = Some(0);
+            let (row, col) = self.search.search_results[0];
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
         }
 
-        self.search_results.len()
+        self.search.search_results.len()
     }
 
     /// Clear modified flags from all cells
@@ -2100,11 +2078,11 @@ impl DataGrid {
 
     /// Search for text with options
     pub fn search_text_with_options(&mut self, query: String, case_sensitive: bool, whole_word: bool) -> usize {
-        self.search_case_sensitive = case_sensitive;
-        self.search_whole_word = whole_word;
-        self.search_query = if case_sensitive { query.clone() } else { query.to_lowercase() };
-        self.search_results.clear();
-        self.current_search_index = None;
+        self.search.search_case_sensitive = case_sensitive;
+        self.search.search_whole_word = whole_word;
+        self.search.search_query = if case_sensitive { query.clone() } else { query.to_lowercase() };
+        self.search.search_results.clear();
+        self.search.current_search_index = None;
 
         if query.is_empty() {
             return 0;
@@ -2118,39 +2096,39 @@ impl DataGrid {
 
                 let is_match = if whole_word {
                     // Whole word matching: split by whitespace and check for exact match
-                    search_text.split_whitespace().any(|word| word == self.search_query)
+                    search_text.split_whitespace().any(|word| word == self.search.search_query)
                 } else {
                     // Substring matching
-                    search_text.contains(&self.search_query)
+                    search_text.contains(&self.search.search_query)
                 };
 
                 if is_match {
-                    self.search_results.push((row, col));
+                    self.search.search_results.push((row, col));
                 }
             }
         }
 
-        if !self.search_results.is_empty() {
-            self.current_search_index = Some(0);
-            let (row, col) = self.search_results[0];
+        if !self.search.search_results.is_empty() {
+            self.search.current_search_index = Some(0);
+            let (row, col) = self.search.search_results[0];
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
         }
 
-        self.search_results.len()
+        self.search.search_results.len()
     }
 
     /// Move to next search result
     pub fn search_next(&mut self) -> bool {
-        if self.search_results.is_empty() {
+        if self.search.search_results.is_empty() {
             return false;
         }
 
-        if let Some(current_idx) = self.current_search_index {
-            let next_idx = (current_idx + 1) % self.search_results.len();
-            self.current_search_index = Some(next_idx);
+        if let Some(current_idx) = self.search.current_search_index {
+            let next_idx = (current_idx + 1) % self.search.search_results.len();
+            self.search.current_search_index = Some(next_idx);
 
-            let (row, col) = self.search_results[next_idx];
+            let (row, col) = self.search.search_results[next_idx];
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
             true
@@ -2161,19 +2139,19 @@ impl DataGrid {
 
     /// Move to previous search result
     pub fn search_prev(&mut self) -> bool {
-        if self.search_results.is_empty() {
+        if self.search.search_results.is_empty() {
             return false;
         }
 
-        if let Some(current_idx) = self.current_search_index {
+        if let Some(current_idx) = self.search.current_search_index {
             let prev_idx = if current_idx == 0 {
-                self.search_results.len() - 1
+                self.search.search_results.len() - 1
             } else {
                 current_idx - 1
             };
-            self.current_search_index = Some(prev_idx);
+            self.search.current_search_index = Some(prev_idx);
 
-            let (row, col) = self.search_results[prev_idx];
+            let (row, col) = self.search.search_results[prev_idx];
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
             true
@@ -2195,11 +2173,11 @@ impl DataGrid {
             Err(e) => return Err(format!("Invalid regex pattern: {}", e)),
         };
 
-        self.search_query = pattern;
-        self.search_case_sensitive = case_sensitive;
-        self.search_whole_word = false; // Not applicable for regex
-        self.search_results.clear();
-        self.current_search_index = None;
+        self.search.search_query = pattern;
+        self.search.search_case_sensitive = case_sensitive;
+        self.search.search_whole_word = false; // Not applicable for regex
+        self.search.search_results.clear();
+        self.search.current_search_index = None;
 
         // Search through all cells
         for row in 0..self.grid.row_count() {
@@ -2207,19 +2185,19 @@ impl DataGrid {
                 let cell_text = self.grid.get_value_string(row, col);
 
                 if regex.is_match(&cell_text) {
-                    self.search_results.push((row, col));
+                    self.search.search_results.push((row, col));
                 }
             }
         }
 
-        if !self.search_results.is_empty() {
-            self.current_search_index = Some(0);
-            let (row, col) = self.search_results[0];
+        if !self.search.search_results.is_empty() {
+            self.search.current_search_index = Some(0);
+            let (row, col) = self.search.search_results[0];
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
         }
 
-        Ok(self.search_results.len())
+        Ok(self.search.search_results.len())
     }
 
     /// Validate regex pattern without performing search
@@ -2230,19 +2208,19 @@ impl DataGrid {
 
     /// Clear search results
     pub fn clear_search(&mut self) {
-        self.search_query.clear();
-        self.search_results.clear();
-        self.current_search_index = None;
+        self.search.search_query.clear();
+        self.search.search_results.clear();
+        self.search.current_search_index = None;
     }
 
     /// Get search result count
     pub fn get_search_result_count(&self) -> usize {
-        self.search_results.len()
+        self.search.search_results.len()
     }
 
     /// Get current search index (1-based for display)
     pub fn get_current_search_index(&self) -> i32 {
-        if let Some(idx) = self.current_search_index {
+        if let Some(idx) = self.search.current_search_index {
             (idx + 1) as i32
         } else {
             -1
@@ -2251,14 +2229,14 @@ impl DataGrid {
 
     /// Check if a cell is a search result
     pub fn is_search_result(&self, row: usize, col: usize) -> bool {
-        self.search_results.contains(&(row, col))
+        self.search.search_results.contains(&(row, col))
     }
 
     /// Check if a cell is the current (active) search result
     pub fn is_current_search_result(&self, row: usize, col: usize) -> bool {
-        if let Some(idx) = self.current_search_index {
-            if idx < self.search_results.len() {
-                self.search_results[idx] == (row, col)
+        if let Some(idx) = self.search.current_search_index {
+            if idx < self.search.search_results.len() {
+                self.search.search_results[idx] == (row, col)
             } else {
                 false
             }
@@ -2269,9 +2247,9 @@ impl DataGrid {
 
     /// Replace current search result with new text
     pub fn replace_current(&mut self, replacement: String) -> bool {
-        if let Some(idx) = self.current_search_index {
-            if idx < self.search_results.len() {
-                let (row, col) = self.search_results[idx];
+        if let Some(idx) = self.search.current_search_index {
+            if idx < self.search.search_results.len() {
+                let (row, col) = self.search.search_results[idx];
 
                 // Parse replacement as number if possible
                 if let Ok(num) = replacement.parse::<f64>() {
@@ -2293,10 +2271,10 @@ impl DataGrid {
 
     /// Replace all search results with new text
     pub fn replace_all(&mut self, replacement: String) -> usize {
-        let count = self.search_results.len();
+        let count = self.search.search_results.len();
 
         // Replace all matching cells
-        for (row, col) in &self.search_results {
+        for (row, col) in &self.search.search_results {
             // Parse replacement as number if possible
             if let Ok(num) = replacement.parse::<f64>() {
                 self.grid.set_value(*row, *col, CellValue::Number(num));
@@ -2316,7 +2294,7 @@ impl DataGrid {
         let search_str = if case_sensitive { search.clone() } else { search.to_lowercase() };
 
         // Get list of selected cells
-        let selected: Vec<(usize, usize)> = self.selected_cells.iter().cloned().collect();
+        let selected: Vec<(usize, usize)> = self.selection.selected_cells.iter().cloned().collect();
 
         for (row, col) in selected {
             let cell_text = self.grid.get_value_string(row, col);
@@ -2461,13 +2439,13 @@ impl DataGrid {
 
     /// Undo last edit action
     pub fn undo(&mut self) -> bool {
-        if let Some(action) = self.undo_stack.pop() {
+        if let Some(action) = self.undo_redo.undo_stack.pop() {
             match &action {
                 EditAction::SetValue { row, col, old_value, new_value: _ } => {
                     // Restore old value without recording undo
                     self.grid.set_value(*row, *col, old_value.clone());
                 }
-                EditAction::InsertRow { index, cells } => {
+                EditAction::InsertRow { index, cells: _ } => {
                     // Undo insert by deleting the row
                     self.grid.delete_row(*index);
                     self.viewport.update_visible_range(&self.grid);
@@ -2478,7 +2456,7 @@ impl DataGrid {
                     self.grid.restore_row_cells(*index, cells);
                     self.viewport.update_visible_range(&self.grid);
                 }
-                EditAction::InsertColumn { index, cells } => {
+                EditAction::InsertColumn { index, cells: _ } => {
                     // Undo insert by deleting the column
                     self.grid.delete_column(*index);
                     self.viewport.update_visible_range(&self.grid);
@@ -2509,7 +2487,7 @@ impl DataGrid {
             }
 
             // Move action to redo stack
-            self.redo_stack.push(action);
+            self.undo_redo.redo_stack.push(action);
             true
         } else {
             false
@@ -2518,7 +2496,7 @@ impl DataGrid {
 
     /// Redo last undone action
     pub fn redo(&mut self) -> bool {
-        if let Some(action) = self.redo_stack.pop() {
+        if let Some(action) = self.undo_redo.redo_stack.pop() {
             match &action {
                 EditAction::SetValue { row, col, old_value: _, new_value } => {
                     // Re-apply new value without recording undo
@@ -2568,7 +2546,7 @@ impl DataGrid {
             }
 
             // Move action back to undo stack
-            self.undo_stack.push(action);
+            self.undo_redo.undo_stack.push(action);
             true
         } else {
             false
@@ -2577,22 +2555,22 @@ impl DataGrid {
 
     /// Check if undo is available
     pub fn can_undo(&self) -> bool {
-        !self.undo_stack.is_empty()
+        !self.undo_redo.undo_stack.is_empty()
     }
 
     /// Check if redo is available
     pub fn can_redo(&self) -> bool {
-        !self.redo_stack.is_empty()
+        !self.undo_redo.redo_stack.is_empty()
     }
 
     /// Get undo stack size
     pub fn get_undo_count(&self) -> usize {
-        self.undo_stack.len()
+        self.undo_redo.undo_stack.len()
     }
 
     /// Get redo stack size
     pub fn get_redo_count(&self) -> usize {
-        self.redo_stack.len()
+        self.undo_redo.redo_stack.len()
     }
 
     /// Auto-fit column width to content
@@ -2826,11 +2804,11 @@ impl DataGrid {
     /// Optimize memory by reserving capacity for expected data size
     pub fn reserve_capacity(&mut self, expected_cells: usize) {
         // Reserve capacity in undo/redo stacks
-        if self.undo_stack.capacity() < expected_cells {
-            self.undo_stack.reserve(expected_cells);
+        if self.undo_redo.undo_stack.capacity() < expected_cells {
+            self.undo_redo.undo_stack.reserve(expected_cells);
         }
-        if self.redo_stack.capacity() < expected_cells {
-            self.redo_stack.reserve(expected_cells);
+        if self.undo_redo.redo_stack.capacity() < expected_cells {
+            self.undo_redo.redo_stack.reserve(expected_cells);
         }
 
         // Reserve capacity for dirty cells tracking
@@ -2839,20 +2817,20 @@ impl DataGrid {
         }
 
         // Reserve capacity for selected cells
-        if self.selected_cells.capacity() < expected_cells / 10 {
-            self.selected_cells.reserve(expected_cells / 10);
+        if self.selection.selected_cells.capacity() < expected_cells / 10 {
+            self.selection.selected_cells.reserve(expected_cells / 10);
         }
 
         // Reserve capacity for search results
-        if self.search_results.capacity() < expected_cells / 100 {
-            self.search_results.reserve(expected_cells / 100);
+        if self.search.search_results.capacity() < expected_cells / 100 {
+            self.search.search_results.reserve(expected_cells / 100);
         }
     }
 
     /// Clear all non-essential cached data to free memory
     pub fn clear_caches(&mut self) {
-        self.search_results.clear();
-        self.search_results.shrink_to_fit();
+        self.search.search_results.clear();
+        self.search.search_results.shrink_to_fit();
 
         self.dirty_cells.clear();
         self.dirty_cells.shrink_to_fit();
@@ -2864,10 +2842,10 @@ impl DataGrid {
     /// Get estimated memory usage in bytes (approximate)
     pub fn get_memory_usage(&self) -> usize {
         let cell_count = self.grid.row_count() * self.grid.col_count();
-        let selected_cells_mem = self.selected_cells.len() * std::mem::size_of::<(usize, usize)>();
-        let search_results_mem = self.search_results.len() * std::mem::size_of::<(usize, usize)>();
-        let undo_stack_mem = self.undo_stack.capacity() * std::mem::size_of::<EditAction>();
-        let redo_stack_mem = self.redo_stack.capacity() * std::mem::size_of::<EditAction>();
+        let selected_cells_mem = self.selection.selected_cells.len() * std::mem::size_of::<(usize, usize)>();
+        let search_results_mem = self.search.search_results.len() * std::mem::size_of::<(usize, usize)>();
+        let undo_stack_mem = self.undo_redo.undo_stack.capacity() * std::mem::size_of::<EditAction>();
+        let redo_stack_mem = self.undo_redo.redo_stack.capacity() * std::mem::size_of::<EditAction>();
         let dirty_cells_mem = self.dirty_cells.len() * std::mem::size_of::<(usize, usize)>();
 
         // Base structure + hash maps + vectors
@@ -2881,17 +2859,17 @@ impl DataGrid {
     /// Compact memory by removing unused allocations
     pub fn compact_memory(&mut self) {
         // Shrink vectors to fit actual data
-        self.search_results.shrink_to_fit();
-        self.undo_stack.shrink_to_fit();
-        self.redo_stack.shrink_to_fit();
+        self.search.search_results.shrink_to_fit();
+        self.undo_redo.undo_stack.shrink_to_fit();
+        self.undo_redo.redo_stack.shrink_to_fit();
         self.fps_samples.shrink_to_fit();
 
         // Keep dirty_cells and selected_cells at reasonable capacity
         if self.dirty_cells.capacity() > self.dirty_cells.len() * 2 {
             self.dirty_cells.shrink_to_fit();
         }
-        if self.selected_cells.capacity() > self.selected_cells.len() * 2 {
-            self.selected_cells.shrink_to_fit();
+        if self.selection.selected_cells.capacity() > self.selection.selected_cells.len() * 2 {
+            self.selection.selected_cells.shrink_to_fit();
         }
     }
 
@@ -2906,7 +2884,7 @@ impl DataGrid {
 
         for row in 0..self.grid.row_count() {
             for col in 0..self.grid.col_count() {
-                if let Some(cell) = self.grid.get_cell(row, col) {
+                if let Some(_cell) = self.grid.get_cell(row, col) {
                     let value = self.grid.get_value(row, col);
                     if !matches!(value, CellValue::Empty) {
                         let (value_str, type_str) = match value {

@@ -570,7 +570,7 @@ impl Grid {
 
         // Sort rows based on multiple column values
         row_values.sort_by(|(_, values_a), (_, values_b)| {
-            for (i, (col, ascending)) in self.sort_columns.iter().enumerate() {
+            for (i, (_col, ascending)) in self.sort_columns.iter().enumerate() {
                 if i >= values_a.len() || i >= values_b.len() {
                     break;
                 }

@@ -192,7 +192,7 @@ impl WebGLRenderer {
     fn render_region(
         &self,
         grid: &Grid,
-        viewport: &Viewport,
+        _viewport: &Viewport,
         row_start: usize,
         row_end: usize,
         col_start: usize,
