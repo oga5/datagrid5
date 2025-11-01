@@ -1406,6 +1406,11 @@ impl DataGrid {
         let old_value = self.grid.get_value(row, col);
         let new_value = CellValue::Text(value.clone());
 
+        log::info!("[UndoRedo] Recording cell edit: ({}, {}) \"{}\" -> \"{}\"",
+                   row, col,
+                   old_value.to_string(),
+                   new_value.to_string());
+
         // Update the cell
         self.editing.update_cell_value(row, col, value, &mut self.grid);
 
@@ -1413,11 +1418,15 @@ impl DataGrid {
         let action = EditAction::SetValue {
             row,
             col,
-            old_value,
-            new_value,
+            old_value: old_value.clone(),
+            new_value: new_value.clone(),
         };
         self.undo_redo.undo_stack.push(action);
         self.undo_redo.redo_stack.clear();
+
+        log::info!("[UndoRedo] Undo stack size: {}, Can undo: {}",
+                   self.undo_redo.undo_stack.len(),
+                   !self.undo_redo.undo_stack.is_empty());
     }
 
     /// Get cell position for editing (returns canvas coordinates)
@@ -1516,6 +1525,15 @@ impl DataGrid {
             .map(|(row, col)| vec![*row, *col])
             .collect();
         serde_json::to_string(&cells).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Get the currently selected cell (first cell in selection)
+    /// Returns: "[row, col]" or null if no selection
+    pub fn get_selected_cell(&self) -> Option<String> {
+        self.selection.selected_cells
+            .iter()
+            .next()
+            .map(|(row, col)| format!("[{},{}]", row, col))
     }
 
     /// Get selection count
@@ -2574,12 +2592,18 @@ impl DataGrid {
 
     /// Undo last edit action
     pub fn undo(&mut self) -> bool {
-        self.undo_redo.undo(&mut self.grid, &mut self.viewport)
+        log::info!("[UndoRedo] Undo requested - stack size: {}", self.undo_redo.undo_stack.len());
+        let result = self.undo_redo.undo(&mut self.grid, &mut self.viewport);
+        log::info!("[UndoRedo] Undo completed: {}, remaining: {}", result, self.undo_redo.undo_stack.len());
+        result
     }
 
     /// Redo last undone action
     pub fn redo(&mut self) -> bool {
-        self.undo_redo.redo(&mut self.grid, &mut self.viewport)
+        log::info!("[UndoRedo] Redo requested - stack size: {}", self.undo_redo.redo_stack.len());
+        let result = self.undo_redo.redo(&mut self.grid, &mut self.viewport);
+        log::info!("[UndoRedo] Redo completed: {}, remaining: {}", result, self.undo_redo.redo_stack.len());
+        result
     }
 
     /// Check if undo is available
