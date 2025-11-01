@@ -57,6 +57,9 @@
 - Device pixel ratio support for crisp rendering on high-DPI displays
 - Passive scroll listeners for smooth scrolling performance
 - RequestAnimationFrame-based rendering for 60 FPS
+- rAF-based scroll throttling to prevent excessive rendering
+- Proper event listener cleanup to prevent memory leaks
+- ResizeObserver cleanup in destroy() method
 
 ## Installation
 
@@ -125,7 +128,10 @@ const gridWrapper = new DataGridWrapper('container-id', wasmModule, {
 
     // Cell editing behavior
     blurBehavior: 'save',         // 'save' or 'cancel' - what to do when clicking outside (default: 'save')
-    saveOnScroll: true            // true = save on scroll, false = keep editing while scrolling (default: true)
+    saveOnScroll: true,           // true = save on scroll, false = keep editing while scrolling (default: true)
+
+    // Debugging
+    debug: false                  // Enable debug logging to console (default: false)
 });
 ```
 
