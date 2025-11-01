@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
 
-use core::{cell::CellBorder, Cell, CellValue, ColumnConfig, DataType, Grid, Viewport};
+use core::{cell::CellBorder, Cell, CellBorders, CellValue, ColumnConfig, DataType, Grid, Viewport};
 pub use error::GridError;
 use features::{
     editing::EditingState, resize::ResizeState, search::SearchState,
@@ -1778,66 +1778,57 @@ impl DataGrid {
     /// Set custom border for a cell (top, right, bottom, or left)
     /// side: 0=top, 1=right, 2=bottom, 3=left
     pub fn set_cell_border(&mut self, row: usize, col: usize, side: u8, color: u32, width: f32) {
-        if let Some(cell) = self.grid.get_cell_mut(row, col) {
-            let border = Some(CellBorder { color, width });
-            match side {
-                0 => cell.border_top = border,
-                1 => cell.border_right = border,
-                2 => cell.border_bottom = border,
-                3 => cell.border_left = border,
-                _ => {}
-            }
-        } else {
-            // Create cell if it doesn't exist
-            let mut cell = Cell::empty();
-            let border = Some(CellBorder { color, width });
-            match side {
-                0 => cell.border_top = border,
-                1 => cell.border_right = border,
-                2 => cell.border_bottom = border,
-                3 => cell.border_left = border,
-                _ => {}
-            }
-            self.grid.set_cell(row, col, cell);
+        // Get or create borders for this cell
+        let mut borders = self.grid.get_cell_borders(row, col)
+            .cloned()
+            .unwrap_or_default();
+
+        let border = Some(CellBorder { color, width });
+        match side {
+            0 => borders.top = border,
+            1 => borders.right = border,
+            2 => borders.bottom = border,
+            3 => borders.left = border,
+            _ => {}
         }
+
+        self.grid.set_cell_borders_at(row, col, borders);
     }
 
     /// Set all borders for a cell at once
     pub fn set_cell_borders(&mut self, row: usize, col: usize, color: u32, width: f32) {
-        if let Some(cell) = self.grid.get_cell_mut(row, col) {
-            let border = Some(CellBorder { color, width });
-            cell.border_top = border.clone();
-            cell.border_right = border.clone();
-            cell.border_bottom = border.clone();
-            cell.border_left = border;
-        } else {
-            let mut cell = Cell::empty();
-            let border = Some(CellBorder { color, width });
-            cell.border_top = border.clone();
-            cell.border_right = border.clone();
-            cell.border_bottom = border.clone();
-            cell.border_left = border;
-            self.grid.set_cell(row, col, cell);
-        }
+        let border = Some(CellBorder { color, width });
+        let borders = CellBorders {
+            top: border.clone(),
+            right: border.clone(),
+            bottom: border.clone(),
+            left: border,
+        };
+        self.grid.set_cell_borders_at(row, col, borders);
     }
 
     /// Clear border for a cell side
     /// side: 0=top, 1=right, 2=bottom, 3=left, 4=all
     pub fn clear_cell_border(&mut self, row: usize, col: usize, side: u8) {
-        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+        if side == 4 {
+            // Clear all borders by removing the entry
+            self.grid.remove_cell_borders(row, col);
+        } else if let Some(borders) = self.grid.get_cell_borders(row, col) {
+            // Clone borders and modify
+            let mut new_borders = borders.clone();
             match side {
-                0 => cell.border_top = None,
-                1 => cell.border_right = None,
-                2 => cell.border_bottom = None,
-                3 => cell.border_left = None,
-                4 => {
-                    // Clear all borders
-                    cell.border_top = None;
-                    cell.border_right = None;
-                    cell.border_bottom = None;
-                    cell.border_left = None;
-                }
+                0 => new_borders.top = None,
+                1 => new_borders.right = None,
+                2 => new_borders.bottom = None,
+                3 => new_borders.left = None,
                 _ => {}
+            }
+            // If all borders are None, remove the entry; otherwise update it
+            if new_borders.top.is_none() && new_borders.right.is_none()
+                && new_borders.bottom.is_none() && new_borders.left.is_none() {
+                self.grid.remove_cell_borders(row, col);
+            } else {
+                self.grid.set_cell_borders_at(row, col, new_borders);
             }
         }
     }
