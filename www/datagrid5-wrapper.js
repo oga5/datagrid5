@@ -268,6 +268,12 @@ export class DataGridWrapper {
         const y = e.clientY - rect.top;
         this._log('canvas coords:', x, y);
 
+        // If currently editing, end the edit first (save the value)
+        if (this.editingRow !== null && this.editingCol !== null) {
+            this._log('Ending edit due to cell click');
+            this.endCellEdit(true, false, false, false);
+        }
+
         // Check for resize handle
         const resizeType = this.grid.check_resize_handle(x, y);
         this._log('resizeType:', resizeType);
@@ -350,6 +356,7 @@ export class DataGridWrapper {
         }
 
         const isCtrl = e.ctrlKey || e.metaKey;
+        const isAlt = e.altKey;
 
         // Handle clipboard operations
         if (isCtrl) {
@@ -380,6 +387,23 @@ export class DataGridWrapper {
                 this.startCellEdit(row, col);
             }
             return;
+        }
+
+        // Handle printable character input to start editing
+        // Check if it's a printable character (single char, no modifiers except Shift)
+        if (this.options.enableEditing &&
+            e.key.length === 1 &&
+            !isCtrl &&
+            !isAlt &&
+            !e.metaKey) {
+            const selectedCell = this.getSelectedCell();
+            if (selectedCell) {
+                const [row, col] = selectedCell;
+                e.preventDefault();
+                // Start editing with the typed character
+                this.startCellEdit(row, col, e.key);
+                return;
+            }
         }
 
         const handled = this.grid.handle_keyboard_with_modifiers_key(
@@ -595,7 +619,7 @@ export class DataGridWrapper {
         this.setupEditorEvents();
     }
 
-    startCellEdit(row, col) {
+    startCellEdit(row, col, initialValue = null) {
         if (!this.options.enableEditing || !this.cellEditor) return;
 
         this._log(`startCellEdit called for (${row}, ${col})`);
@@ -620,8 +644,8 @@ export class DataGridWrapper {
         const rect = this.grid.get_cell_edit_rect(row, col);
         const [x, y, width, height] = rect;
 
-        // Get current value
-        const currentValue = this.grid.get_cell_value(row, col);
+        // Get current value or use initial value if provided
+        const currentValue = initialValue !== null ? initialValue : this.grid.get_cell_value(row, col);
 
         // Calculate position
         // get_cell_edit_rect returns canvas coordinates (already accounts for viewport scroll)
@@ -642,10 +666,16 @@ export class DataGridWrapper {
         this.editingRow = row;
         this.editingCol = col;
 
-        // Focus and select after a short delay to ensure DOM is ready
+        // Focus and position cursor after a short delay to ensure DOM is ready
         setTimeout(() => {
             this.cellEditor.focus();
-            this.cellEditor.select();
+            if (initialValue !== null) {
+                // Position cursor at end when starting with character input
+                this.cellEditor.setSelectionRange(currentValue.length, currentValue.length);
+            } else {
+                // Select all when starting with F2 or double-click
+                this.cellEditor.select();
+            }
         }, 0);
 
         // Emit edit start event
@@ -698,7 +728,7 @@ export class DataGridWrapper {
             }
         }));
 
-        // Move to next cell if requested
+        // Move to next cell if requested (without starting edit)
         const maxRow = this.grid.row_count() - 1;
         const maxCol = this.grid.col_count() - 1;
 
@@ -706,17 +736,20 @@ export class DataGridWrapper {
             const nextRow = currentRow + 1;
             this.grid.select_cell(nextRow, currentCol);
             this.requestRender();
-            setTimeout(() => this.startCellEdit(nextRow, currentCol), 10);
+            // Don't auto-start editing after navigation
+            this.textCanvas.focus();
         } else if (save && moveRight && currentCol < maxCol) {
             const nextCol = currentCol + 1;
             this.grid.select_cell(currentRow, nextCol);
             this.requestRender();
-            setTimeout(() => this.startCellEdit(currentRow, nextCol), 10);
+            // Don't auto-start editing after navigation
+            this.textCanvas.focus();
         } else if (save && moveLeft && currentCol > 0) {
             const nextCol = currentCol - 1;
             this.grid.select_cell(currentRow, nextCol);
             this.requestRender();
-            setTimeout(() => this.startCellEdit(currentRow, nextCol), 10);
+            // Don't auto-start editing after navigation
+            this.textCanvas.focus();
         } else {
             this.textCanvas.focus();
         }
