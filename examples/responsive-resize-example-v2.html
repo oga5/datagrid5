@@ -218,6 +218,8 @@
         async function loadSampleData() {
             const grid = gridWrapper.getGrid();
 
+            console.log('[DataLoad] Starting data load...');
+
             // Set column headers (not as data, but as column names)
             for (let col = 0; col < 26; col++) {
                 const colName = String.fromCharCode(65 + col);
@@ -235,11 +237,12 @@
                 // Process chunk
                 for (let row = startRow; row < endRow; row++) {
                     for (let col = 0; col < 26; col++) {
-                        grid.set_cell_value(row, col, `R${row + 1}C${col + 1}`);
+                        // Use _no_undo methods to avoid recording bulk data load to undo stack
+                        grid.set_cell_value_no_undo(row, col, `R${row + 1}C${col + 1}`);
 
                         // Zebra striping
                         if (row % 2 === 0) {
-                            grid.set_cell_bg_color(row, col, 0xF5F5F5FF);
+                            grid.set_cell_bg_color_no_undo(row, col, 0xF5F5F5FF);
                         }
                     }
                 }
@@ -249,7 +252,9 @@
                 gridWrapper.render();
             }
 
-            console.log(`Sample data loaded (${initialRows} rows shown, grid supports 100K rows with virtual scrolling)`);
+            console.log(`[DataLoad] Sample data loaded (${initialRows} rows shown, grid supports 100K rows with virtual scrolling)`);
+            console.log('[DataLoad] Data loaded using _no_undo methods - undo stack is clean');
+
             gridWrapper.render();
         }
 

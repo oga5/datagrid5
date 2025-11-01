@@ -42,6 +42,7 @@ export class DataGridWrapper {
         // Observers and handlers (for proper cleanup)
         this.resizeObserver = null;
         this.documentClickHandler = null;
+        this.documentKeyDownHandler = null;
 
         // Bind event handlers to this instance for proper cleanup
         this._onTextCanvasMouseDown = this._onTextCanvasMouseDown.bind(this);
@@ -60,6 +61,7 @@ export class DataGridWrapper {
         this._onEditorKeyDown = this._onEditorKeyDown.bind(this);
         this._onEditorFocus = this._onEditorFocus.bind(this);
         this._onEditorBlur = this._onEditorBlur.bind(this);
+        this._onDocumentKeyDown = this._onDocumentKeyDown.bind(this);
 
         this.init();
     }
@@ -254,6 +256,9 @@ export class DataGridWrapper {
         this.textCanvas.addEventListener('keydown', this._onTextCanvasKeyDown);
         this.textCanvas.addEventListener('wheel', this._onTextCanvasWheel);
         this.textCanvas.addEventListener('contextmenu', this._onTextCanvasContextMenu);
+
+        // Register document-level keyboard handler for global shortcuts (Ctrl+Z/Y, F2)
+        document.addEventListener('keydown', this._onDocumentKeyDown);
     }
 
     _onTextCanvasMouseDown(e) {
@@ -366,6 +371,17 @@ export class DataGridWrapper {
             }
         }
 
+        // Handle F2 key to start editing
+        if (e.key === 'F2' && this.options.enableEditing) {
+            e.preventDefault();
+            const selectedCell = this.getSelectedCell();
+            if (selectedCell) {
+                const [row, col] = selectedCell;
+                this.startCellEdit(row, col);
+            }
+            return;
+        }
+
         const handled = this.grid.handle_keyboard_with_modifiers_key(
             e.key,
             isCtrl,
@@ -395,6 +411,75 @@ export class DataGridWrapper {
             this.container.dispatchEvent(new CustomEvent('gridcontextmenu', {
                 detail: info
             }));
+        }
+    }
+
+    _onDocumentKeyDown(e) {
+        // Don't handle global shortcuts if user is typing in an input/textarea
+        const target = e.target;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+            // Exception: if it's our cell editor, handle Ctrl+Z/Y for undo/redo
+            if (target === this.cellEditor) {
+                // Allow Ctrl+Z/Y even in cell editor for grid undo/redo
+                const isCtrl = e.ctrlKey || e.metaKey;
+                if (isCtrl && (e.key === 'z' || e.key === 'Z' || e.key === 'y' || e.key === 'Y')) {
+                    e.preventDefault();
+                    if (e.key === 'z' || e.key === 'Z') {
+                        if (this.grid.undo()) {
+                            this.requestRender();
+                        }
+                    } else if (e.key === 'y' || e.key === 'Y') {
+                        if (this.grid.redo()) {
+                            this.requestRender();
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        const isCtrl = e.ctrlKey || e.metaKey;
+
+        // Handle Ctrl+Z (Undo)
+        if (isCtrl && (e.key === 'z' || e.key === 'Z')) {
+            e.preventDefault();
+            const undoCount = this.grid.get_undo_count();
+            const canUndo = this.grid.can_undo();
+            console.log('[Undo] Requested - can_undo:', canUndo, 'undo_count:', undoCount);
+            if (this.grid.undo()) {
+                console.log('[Undo] Executed successfully');
+                this.requestRender();
+            } else {
+                console.log('[Undo] Failed - nothing to undo');
+            }
+            return;
+        }
+
+        // Handle Ctrl+Y (Redo)
+        if (isCtrl && (e.key === 'y' || e.key === 'Y')) {
+            e.preventDefault();
+            const redoCount = this.grid.get_redo_count();
+            const canRedo = this.grid.can_redo();
+            console.log('[Redo] Requested - can_redo:', canRedo, 'redo_count:', redoCount);
+            if (this.grid.redo()) {
+                console.log('[Redo] Executed successfully');
+                this.requestRender();
+            } else {
+                console.log('[Redo] Failed - nothing to redo');
+            }
+            return;
+        }
+
+        // Handle F2 (Start editing) - only if grid container or canvas has focus context
+        if (e.key === 'F2' && this.options.enableEditing) {
+            e.preventDefault();
+            const selectedCell = this.getSelectedCell();
+            if (selectedCell) {
+                const [row, col] = selectedCell;
+                this._log('F2 pressed - starting edit for cell', row, col);
+                this.startCellEdit(row, col);
+            }
+            return;
         }
     }
 
@@ -450,13 +535,15 @@ export class DataGridWrapper {
         const rect = this.grid.get_cell_edit_rect(this.editingRow, this.editingCol);
         const [x, y, width, height] = rect;
 
-        const scrollContainerRect = this.scrollContainer.getBoundingClientRect();
+        // get_cell_edit_rect returns canvas coordinates (already accounts for viewport scroll)
+        // We just need to offset by the canvas position relative to container
+        const canvasRect = this.textCanvas.getBoundingClientRect();
         const containerRect = this.container.getBoundingClientRect();
-        const offsetX = scrollContainerRect.left - containerRect.left;
-        const offsetY = scrollContainerRect.top - containerRect.top;
+        const offsetX = canvasRect.left - containerRect.left;
+        const offsetY = canvasRect.top - containerRect.top;
 
-        this.cellEditor.style.left = `${x + offsetX - this.scrollContainer.scrollLeft}px`;
-        this.cellEditor.style.top = `${y + offsetY - this.scrollContainer.scrollTop}px`;
+        this.cellEditor.style.left = `${x + offsetX}px`;
+        this.cellEditor.style.top = `${y + offsetY}px`;
         this.cellEditor.style.width = `${width}px`;
         this.cellEditor.style.height = `${height}px`;
     }
@@ -537,14 +624,16 @@ export class DataGridWrapper {
         const currentValue = this.grid.get_cell_value(row, col);
 
         // Calculate position
-        const scrollContainerRect = this.scrollContainer.getBoundingClientRect();
+        // get_cell_edit_rect returns canvas coordinates (already accounts for viewport scroll)
+        // We just need to offset by the canvas position relative to container
+        const canvasRect = this.textCanvas.getBoundingClientRect();
         const containerRect = this.container.getBoundingClientRect();
-        const offsetX = scrollContainerRect.left - containerRect.left;
-        const offsetY = scrollContainerRect.top - containerRect.top;
+        const offsetX = canvasRect.left - containerRect.left;
+        const offsetY = canvasRect.top - containerRect.top;
 
         // Position editor
-        this.cellEditor.style.left = `${x + offsetX - this.scrollContainer.scrollLeft}px`;
-        this.cellEditor.style.top = `${y + offsetY - this.scrollContainer.scrollTop}px`;
+        this.cellEditor.style.left = `${x + offsetX}px`;
+        this.cellEditor.style.top = `${y + offsetY}px`;
         this.cellEditor.style.width = `${width}px`;
         this.cellEditor.style.height = `${height}px`;
         this.cellEditor.style.display = 'block';
@@ -575,8 +664,11 @@ export class DataGridWrapper {
 
         if (save && this.cellEditor.value !== oldValue) {
             // Save value
+            console.log(`[Edit] Updating cell (${this.editingRow}, ${this.editingCol}): "${oldValue}" -> "${this.cellEditor.value}"`);
             this.grid.update_cell_value(this.editingRow, this.editingCol, this.cellEditor.value);
             changed = true;
+            const undoCount = this.grid.get_undo_count();
+            console.log(`[Edit] After update_cell_value, undo_count: ${undoCount}, can_undo: ${this.grid.can_undo()}`);
             this.requestRender();
         }
 
@@ -770,6 +862,9 @@ export class DataGridWrapper {
             document.removeEventListener('click', this.documentClickHandler, true);
             this.documentClickHandler = null;
         }
+
+        // Clean up document keydown listener
+        document.removeEventListener('keydown', this._onDocumentKeyDown);
 
         // Clean up ResizeObserver
         if (this.resizeObserver) {
@@ -971,5 +1066,38 @@ export class DataGridWrapper {
         } else {
             this.handlePaste();
         }
+    }
+
+    // Undo/Redo methods
+    undo() {
+        if (this.grid.undo()) {
+            this.requestRender();
+            return true;
+        }
+        return false;
+    }
+
+    redo() {
+        if (this.grid.redo()) {
+            this.requestRender();
+            return true;
+        }
+        return false;
+    }
+
+    canUndo() {
+        return this.grid.can_undo();
+    }
+
+    canRedo() {
+        return this.grid.can_redo();
+    }
+
+    clearUndoHistory() {
+        this.grid.clear_undo_history();
+    }
+
+    clearRedoHistory() {
+        this.grid.clear_redo_history();
     }
 }
