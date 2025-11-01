@@ -1489,7 +1489,7 @@ impl DataGrid {
 
     /// Check if currently resizing
     pub fn is_resizing(&self) -> bool {
-        self.resize.is_resizing
+        self.resize.is_resizing()
     }
 
     /// Check if currently drag-selecting (for live selection preview)
@@ -2226,57 +2226,20 @@ impl DataGrid {
 
     /// Search for text with options
     pub fn search_text_with_options(&mut self, query: String, case_sensitive: bool, whole_word: bool) -> usize {
-        self.search.search_case_sensitive = case_sensitive;
-        self.search.search_whole_word = whole_word;
-        self.search.search_query = if case_sensitive { query.clone() } else { query.to_lowercase() };
-        self.search.search_results.clear();
-        self.search.current_search_index = None;
+        let count = self.search.search_text_with_options(query, case_sensitive, whole_word, &self.grid);
 
-        if query.is_empty() {
-            return 0;
-        }
-
-        // Search through all cells
-        for row in 0..self.grid.row_count() {
-            for col in 0..self.grid.col_count() {
-                let cell_text = self.grid.get_value_string(row, col);
-                let search_text = if case_sensitive { cell_text.clone() } else { cell_text.to_lowercase() };
-
-                let is_match = if whole_word {
-                    // Whole word matching: split by whitespace and check for exact match
-                    search_text.split_whitespace().any(|word| word == self.search.search_query)
-                } else {
-                    // Substring matching
-                    search_text.contains(&self.search.search_query)
-                };
-
-                if is_match {
-                    self.search.search_results.push((row, col));
-                }
-            }
-        }
-
-        if !self.search.search_results.is_empty() {
-            self.search.current_search_index = Some(0);
+        if count > 0 && self.search.current_search_index.is_some() {
             let (row, col) = self.search.search_results[0];
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
         }
 
-        self.search.search_results.len()
+        count
     }
 
     /// Move to next search result
     pub fn search_next(&mut self) -> bool {
-        if self.search.search_results.is_empty() {
-            return false;
-        }
-
-        if let Some(current_idx) = self.search.current_search_index {
-            let next_idx = (current_idx + 1) % self.search.search_results.len();
-            self.search.current_search_index = Some(next_idx);
-
-            let (row, col) = self.search.search_results[next_idx];
+        if let Some((row, col)) = self.search.search_next() {
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
             true
@@ -2287,19 +2250,7 @@ impl DataGrid {
 
     /// Move to previous search result
     pub fn search_prev(&mut self) -> bool {
-        if self.search.search_results.is_empty() {
-            return false;
-        }
-
-        if let Some(current_idx) = self.search.current_search_index {
-            let prev_idx = if current_idx == 0 {
-                self.search.search_results.len() - 1
-            } else {
-                current_idx - 1
-            };
-            self.search.current_search_index = Some(prev_idx);
-
-            let (row, col) = self.search.search_results[prev_idx];
+        if let Some((row, col)) = self.search.search_prev() {
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
             true
@@ -2310,161 +2261,77 @@ impl DataGrid {
 
     /// Search using regular expression
     pub fn search_regex(&mut self, pattern: String, case_sensitive: bool) -> Result<usize, GridError> {
-        use regex::RegexBuilder;
+        let count = self.search.search_regex(pattern, case_sensitive, &self.grid)?;
 
-        // Build regex with case sensitivity option
-        let regex = match RegexBuilder::new(&pattern)
-            .case_insensitive(!case_sensitive)
-            .build()
-        {
-            Ok(re) => re,
-            Err(e) => {
-                return Err(GridError::InvalidRegex {
-                    pattern: pattern.clone(),
-                    error: e.to_string(),
-                })
-            }
-        };
-
-        self.search.search_query = pattern;
-        self.search.search_case_sensitive = case_sensitive;
-        self.search.search_whole_word = false; // Not applicable for regex
-        self.search.search_results.clear();
-        self.search.current_search_index = None;
-
-        // Search through all cells
-        for row in 0..self.grid.row_count() {
-            for col in 0..self.grid.col_count() {
-                let cell_text = self.grid.get_value_string(row, col);
-
-                if regex.is_match(&cell_text) {
-                    self.search.search_results.push((row, col));
-                }
-            }
-        }
-
-        if !self.search.search_results.is_empty() {
-            self.search.current_search_index = Some(0);
+        if count > 0 && self.search.current_search_index.is_some() {
             let (row, col) = self.search.search_results[0];
             self.select_single_cell(row, col);
             self.ensure_cell_visible(row, col);
         }
 
-        Ok(self.search.search_results.len())
+        Ok(count)
     }
 
     /// Validate regex pattern without performing search
     pub fn validate_regex_pattern(&self, pattern: String) -> bool {
-        use regex::Regex;
-        Regex::new(&pattern).is_ok()
+        SearchState::validate_regex_pattern(&pattern)
     }
 
     /// Clear search results
     pub fn clear_search(&mut self) {
-        self.search.search_query.clear();
-        self.search.search_results.clear();
-        self.search.current_search_index = None;
+        self.search.clear_search();
     }
 
     /// Get search result count
     pub fn get_search_result_count(&self) -> usize {
-        self.search.search_results.len()
+        self.search.get_search_result_count()
     }
 
     /// Get current search index (1-based for display)
     pub fn get_current_search_index(&self) -> i32 {
-        if let Some(idx) = self.search.current_search_index {
-            (idx + 1) as i32
-        } else {
-            -1
-        }
+        self.search.get_current_search_index()
     }
 
     /// Check if a cell is a search result
     pub fn is_search_result(&self, row: usize, col: usize) -> bool {
-        self.search.search_results.contains(&(row, col))
+        self.search.is_search_result(row, col)
     }
 
     /// Check if a cell is the current (active) search result
     pub fn is_current_search_result(&self, row: usize, col: usize) -> bool {
-        if let Some(idx) = self.search.current_search_index {
-            if idx < self.search.search_results.len() {
-                self.search.search_results[idx] == (row, col)
-            } else {
-                false
-            }
-        } else {
-            false
-        }
+        self.search.is_current_search_result(row, col)
     }
 
     /// Replace current search result with new text
     pub fn replace_current(&mut self, replacement: String) -> bool {
-        if let Some(idx) = self.search.current_search_index {
-            if idx < self.search.search_results.len() {
-                let (row, col) = self.search.search_results[idx];
-
-                // Parse replacement as number if possible
-                if let Ok(num) = replacement.parse::<f64>() {
-                    self.grid.set_value(row, col, CellValue::Number(num));
-                } else {
-                    self.grid.set_value(row, col, CellValue::Text(replacement));
+        let result = self.search.replace_current(replacement, &mut self.grid);
+        if result {
+            // Update selection after search state moves to next result
+            if let Some(idx) = self.search.current_search_index {
+                if idx < self.search.search_results.len() {
+                    let (row, col) = self.search.search_results[idx];
+                    self.select_single_cell(row, col);
+                    self.ensure_cell_visible(row, col);
                 }
-
-                // Move to next search result (or wrap around)
-                self.search_next();
-                true
-            } else {
-                false
             }
-        } else {
-            false
         }
+        result
     }
 
     /// Replace all search results with new text
     pub fn replace_all(&mut self, replacement: String) -> usize {
-        let count = self.search.search_results.len();
-
-        // Replace all matching cells
-        for (row, col) in &self.search.search_results {
-            // Parse replacement as number if possible
-            if let Ok(num) = replacement.parse::<f64>() {
-                self.grid.set_value(*row, *col, CellValue::Number(num));
-            } else {
-                self.grid.set_value(*row, *col, CellValue::Text(replacement.clone()));
-            }
-        }
-
-        // Clear search results after replacing all
-        self.clear_search();
-        count
+        self.search.replace_all(replacement, &mut self.grid)
     }
 
     /// Replace in selection only
     pub fn replace_in_selection(&mut self, search: String, replacement: String, case_sensitive: bool) -> usize {
-        let mut count = 0;
-        let search_str = if case_sensitive { search.clone() } else { search.to_lowercase() };
-
-        // Get list of selected cells
-        let selected: Vec<(usize, usize)> = self.selection.selected_cells.iter().cloned().collect();
-
-        for (row, col) in selected {
-            let cell_text = self.grid.get_value_string(row, col);
-            let search_text = if case_sensitive { cell_text.clone() } else { cell_text.to_lowercase() };
-
-            if search_text.contains(&search_str) {
-                // Parse replacement as number if possible
-                if let Ok(num) = replacement.parse::<f64>() {
-                    self.grid.set_value(row, col, CellValue::Number(num));
-                } else {
-                    self.grid.set_value(row, col, CellValue::Text(replacement.clone()));
-                }
-                count += 1;
-            }
-        }
-
-        count
+        SearchState::replace_in_selection(
+            search,
+            replacement,
+            case_sensitive,
+            &self.selection.selected_cells,
+            &mut self.grid,
+        )
     }
 
     /// Sort by column
@@ -2608,22 +2475,22 @@ impl DataGrid {
 
     /// Check if undo is available
     pub fn can_undo(&self) -> bool {
-        !self.undo_redo.undo_stack.is_empty()
+        self.undo_redo.can_undo()
     }
 
     /// Check if redo is available
     pub fn can_redo(&self) -> bool {
-        !self.undo_redo.redo_stack.is_empty()
+        self.undo_redo.can_redo()
     }
 
     /// Get undo stack size
     pub fn get_undo_count(&self) -> usize {
-        self.undo_redo.undo_stack.len()
+        self.undo_redo.get_undo_count()
     }
 
     /// Get redo stack size
     pub fn get_redo_count(&self) -> usize {
-        self.undo_redo.redo_stack.len()
+        self.undo_redo.get_redo_count()
     }
 
     /// Clear undo history (useful after initial data load)

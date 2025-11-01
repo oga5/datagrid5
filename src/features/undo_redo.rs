@@ -239,6 +239,26 @@ impl UndoRedoState {
         self.redo_stack.clear();
     }
 
+    /// Check if undo is available
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    /// Check if redo is available
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    /// Get undo stack size
+    pub fn get_undo_count(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    /// Get redo stack size
+    pub fn get_redo_count(&self) -> usize {
+        self.redo_stack.len()
+    }
+
     /// Get cell style for undo tracking
     pub fn get_cell_style(grid: &Grid, row: usize, col: usize) -> CellStyle {
         if let Some(cell) = grid.get_cell(row, col) {
