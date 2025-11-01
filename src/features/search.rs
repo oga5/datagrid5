@@ -1,4 +1,5 @@
 use crate::core::{cell::CellValue, Grid, Viewport};
+use crate::GridError;
 use std::collections::HashSet;
 
 /// Search and replace functionality for DataGrid
@@ -127,7 +128,7 @@ impl SearchState {
         pattern: String,
         case_sensitive: bool,
         grid: &Grid,
-    ) -> Result<usize, String> {
+    ) -> Result<usize, GridError> {
         use regex::RegexBuilder;
 
         // Build regex with case sensitivity option
@@ -136,7 +137,12 @@ impl SearchState {
             .build()
         {
             Ok(re) => re,
-            Err(e) => return Err(format!("Invalid regex pattern: {}", e)),
+            Err(e) => {
+                return Err(GridError::InvalidRegex {
+                    pattern: pattern.clone(),
+                    error: e.to_string(),
+                })
+            }
         };
 
         self.search_query = pattern;

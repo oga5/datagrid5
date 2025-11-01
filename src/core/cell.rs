@@ -67,22 +67,25 @@ pub struct CellBorder {
     pub width: f32,      // Border width in pixels
 }
 
+/// Collection of borders for a cell (stored separately from Cell for memory efficiency)
+#[derive(Clone, Debug, Default)]
+pub struct CellBorders {
+    pub top: Option<CellBorder>,
+    pub right: Option<CellBorder>,
+    pub bottom: Option<CellBorder>,
+    pub left: Option<CellBorder>,
+}
+
 /// Represents a single cell in the grid
 #[derive(Clone, Debug)]
 pub struct Cell {
     pub value: CellValue,
     pub editable: bool,
-    pub selected: bool,
     pub modified: bool, // Track if cell has been edited
     pub bg_color: Option<u32>, // RGBA color as u32
     pub fg_color: Option<u32>,
     pub font_bold: bool,
     pub font_italic: bool,
-    // Custom borders (top, right, bottom, left)
-    pub border_top: Option<CellBorder>,
-    pub border_right: Option<CellBorder>,
-    pub border_bottom: Option<CellBorder>,
-    pub border_left: Option<CellBorder>,
 }
 
 impl Cell {
@@ -90,16 +93,11 @@ impl Cell {
         Self {
             value,
             editable: true,
-            selected: false,
             modified: false,
             bg_color: None,
             fg_color: None,
             font_bold: false,
             font_italic: false,
-            border_top: None,
-            border_right: None,
-            border_bottom: None,
-            border_left: None,
         }
     }
 

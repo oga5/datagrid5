@@ -30,7 +30,7 @@ impl EditingState {
 
         // Check if column is editable
         if !grid.is_column_editable(col) {
-            web_sys::console::log_1(&format!("Column {} is read-only", col).into());
+            log::debug!("Column {} is read-only", col);
             return false;
         }
 
@@ -44,7 +44,7 @@ impl EditingState {
         self.is_editing = true;
         self.editing_cell = Some((row, col));
 
-        web_sys::console::log_1(&format!("Started editing cell: ({}, {})", row, col).into());
+        log::debug!("Started editing cell: ({}, {})", row, col);
         true
     }
 
@@ -52,7 +52,7 @@ impl EditingState {
     pub fn end_edit(&mut self) {
         self.is_editing = false;
         self.editing_cell = None;
-        web_sys::console::log_1(&"Ended editing".into());
+        log::debug!("Ended editing");
     }
 
     /// Check if currently editing
@@ -70,7 +70,7 @@ impl EditingState {
         if self.is_editing && self.editing_cell == Some((row, col)) {
             use crate::core::cell::CellValue;
             grid.set_value(row, col, CellValue::Text(value.clone()));
-            web_sys::console::log_1(&format!("Updated cell ({}, {}) to: {}", row, col, value).into());
+            log::debug!("Updated cell ({}, {}) to: {}", row, col, value);
         }
     }
 

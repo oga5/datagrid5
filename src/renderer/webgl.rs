@@ -1,5 +1,7 @@
 use super::shader::ShaderProgram;
 use crate::core::{Grid, Viewport};
+use crate::features::selection::SelectionState;
+use crate::GridError;
 use wasm_bindgen::JsCast;
 use web_sys::{
     HtmlCanvasElement, WebGlBuffer, WebGlRenderingContext, WebGlUniformLocation,
@@ -27,13 +29,19 @@ pub struct WebGLRenderer {
 
 impl WebGLRenderer {
     /// Create a new WebGL renderer
-    pub fn new(canvas: &HtmlCanvasElement) -> Result<Self, String> {
+    pub fn new(canvas: &HtmlCanvasElement) -> Result<Self, GridError> {
         let context = canvas
             .get_context("webgl")
-            .map_err(|_| "Failed to get WebGL context")?
-            .ok_or("WebGL context is None")?
+            .map_err(|_| GridError::RenderInitFailed {
+                error: "Failed to get WebGL context".to_string(),
+            })?
+            .ok_or_else(|| GridError::RenderInitFailed {
+                error: "WebGL context is None".to_string(),
+            })?
             .dyn_into::<WebGlRenderingContext>()
-            .map_err(|_| "Failed to cast to WebGlRenderingContext")?;
+            .map_err(|_| GridError::RenderInitFailed {
+                error: "Failed to cast to WebGlRenderingContext".to_string(),
+            })?;
 
         let shader_program = ShaderProgram::new(&context)?;
 
@@ -103,7 +111,7 @@ impl WebGLRenderer {
     }
 
     /// Render the grid with freeze support
-    pub fn render(&self, grid: &Grid, viewport: &Viewport) {
+    pub fn render(&self, grid: &Grid, viewport: &Viewport, selection: &SelectionState) {
         self.clear();
 
         self.context.use_program(Some(&self.shader_program.program));
@@ -132,7 +140,7 @@ impl WebGLRenderer {
                 header_offset_x,
                 header_offset_y,
             );
-            self.render_region(grid, viewport, 0, frozen_rows, 0, frozen_cols);
+            self.render_region(grid, selection, viewport, 0, frozen_rows, 0, frozen_cols);
         }
 
         // Region 2: Frozen rows × Scrollable cols (top-right) - horizontal scroll
@@ -191,6 +199,7 @@ impl WebGLRenderer {
     fn render_region(
         &self,
         grid: &Grid,
+        selection: &SelectionState,
         _viewport: &Viewport,
         row_start: usize,
         row_end: usize,
@@ -205,7 +214,7 @@ impl WebGLRenderer {
         self.render_grid_lines_region(grid, row_start, row_end, col_start, col_end);
 
         // Render cell backgrounds for this region
-        self.render_cell_backgrounds_region(grid, row_start, row_end, col_start, col_end);
+        self.render_cell_backgrounds_region(grid, selection, row_start, row_end, col_start, col_end);
 
         // Render cell borders for this region
         self.render_cell_borders_region(grid, row_start, row_end, col_start, col_end);
@@ -266,6 +275,7 @@ impl WebGLRenderer {
     fn render_cell_backgrounds_region(
         &self,
         grid: &Grid,
+        selection: &SelectionState,
         row_start: usize,
         row_end: usize,
         col_start: usize,
@@ -296,11 +306,14 @@ impl WebGLRenderer {
                         let b = ((cell_color >> 8) & 0xFF) as f32 / 255.0;
                         let a = (cell_color & 0xFF) as f32 / 255.0;
                         [r, g, b, a]
-                    } else if cell.selected {
+                    } else if selection.is_selected(row, col) {
                         [0.8, 0.9, 1.0, 1.0] // Light blue selection
                     } else {
                         continue; // Skip cells without background
                     }
+                } else if selection.is_selected(row, col) {
+                    // No cell exists but it's selected
+                    [0.8, 0.9, 1.0, 1.0] // Light blue selection
                 } else {
                     // No cell exists at this position, skip
                     continue;

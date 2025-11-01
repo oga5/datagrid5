@@ -1,4 +1,5 @@
 use crate::core::{cell::CellValue, Grid};
+use crate::GridError;
 use std::collections::HashSet;
 
 /// Clipboard operations for copying and pasting cells
@@ -77,7 +78,7 @@ impl ClipboardOps {
         selection_anchor: Option<(usize, usize)>,
         selected_cells: &HashSet<(usize, usize)>,
         grid: &mut Grid,
-    ) -> Result<(), String> {
+    ) -> Result<(), GridError> {
         if tsv_text.is_empty() {
             return Ok(());
         }
@@ -96,7 +97,9 @@ impl ClipboardOps {
             });
             cells[0]
         } else {
-            return Err("No cell selected for paste".to_string());
+            return Err(GridError::PasteFailed {
+                reason: "No cell selected for paste".to_string(),
+            });
         };
 
         // Parse TSV and paste

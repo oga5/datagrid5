@@ -203,7 +203,10 @@ export class DataGridWrapper {
                 this.requestRender();
             } else {
                 this.grid.handle_mouse_move(e);
-                // Don't render on every mouse move unless needed
+                // Render if drag-selecting to show live selection preview
+                if (this.grid.is_selecting()) {
+                    this.requestRender();
+                }
             }
         });
 

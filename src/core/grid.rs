@@ -1,4 +1,4 @@
-use super::cell::{Cell, CellValue, DataType};
+use super::cell::{Cell, CellValue, CellBorders, DataType};
 use std::collections::{HashMap, HashSet};
 
 /// Column group for multi-level headers
@@ -91,6 +91,10 @@ pub struct Grid {
     // Key: (row, col), Value: Cell
     cells: HashMap<(usize, usize), Cell>,
 
+    // Sparse storage for cell borders (only cells with custom borders)
+    // Key: (row, col), Value: CellBorders
+    cell_borders: HashMap<(usize, usize), CellBorders>,
+
     // Column configurations
     pub column_configs: Vec<ColumnConfig>,
 
@@ -153,6 +157,7 @@ impl Grid {
             rows,
             cols,
             cells: HashMap::new(),
+            cell_borders: HashMap::new(),
             column_configs,
             column_groups: Vec::new(),
             header_levels: 1,
@@ -289,6 +294,9 @@ impl Grid {
         // Remove cells outside new bounds
         self.cells.retain(|&(r, c), _| r < rows && c < cols);
 
+        // Remove borders outside new bounds
+        self.cell_borders.retain(|&(r, c), _| r < rows && c < cols);
+
         // Adjust column widths
         if cols > self.cols {
             self.col_widths.resize(cols, self.default_col_width);
@@ -310,6 +318,7 @@ impl Grid {
     /// Clear all cells
     pub fn clear(&mut self) {
         self.cells.clear();
+        self.cell_borders.clear();
     }
 
     /// Fill grid with sample data (for testing)
@@ -367,6 +376,17 @@ impl Grid {
         }
         self.cells = new_cells;
 
+        // Move all borders at or after the insertion point down by one row
+        let mut new_borders = HashMap::new();
+        for ((row, col), borders) in self.cell_borders.drain() {
+            if row >= at_index {
+                new_borders.insert((row + 1, col), borders);
+            } else {
+                new_borders.insert((row, col), borders);
+            }
+        }
+        self.cell_borders = new_borders;
+
         // Insert new row height
         self.row_heights.insert(at_index, self.default_row_height);
         self.rows += 1;
@@ -393,6 +413,21 @@ impl Grid {
         }
         self.cells = new_cells;
 
+        // Remove borders in the deleted row and shift remaining borders up
+        let mut new_borders = HashMap::new();
+        for ((row, col), borders) in self.cell_borders.drain() {
+            if row == index {
+                // Skip borders in deleted row
+                continue;
+            } else if row > index {
+                // Shift rows down
+                new_borders.insert((row - 1, col), borders);
+            } else {
+                new_borders.insert((row, col), borders);
+            }
+        }
+        self.cell_borders = new_borders;
+
         // Remove row height
         if index < self.row_heights.len() {
             self.row_heights.remove(index);
@@ -416,6 +451,17 @@ impl Grid {
             }
         }
         self.cells = new_cells;
+
+        // Move all borders at or after the insertion point right by one column
+        let mut new_borders = HashMap::new();
+        for ((row, col), borders) in self.cell_borders.drain() {
+            if col >= at_index {
+                new_borders.insert((row, col + 1), borders);
+            } else {
+                new_borders.insert((row, col), borders);
+            }
+        }
+        self.cell_borders = new_borders;
 
         // Insert new column width
         self.col_widths.insert(at_index, self.default_col_width);
@@ -442,6 +488,21 @@ impl Grid {
             }
         }
         self.cells = new_cells;
+
+        // Remove borders in the deleted column and shift remaining borders left
+        let mut new_borders = HashMap::new();
+        for ((row, col), borders) in self.cell_borders.drain() {
+            if col == index {
+                // Skip borders in deleted column
+                continue;
+            } else if col > index {
+                // Shift columns left
+                new_borders.insert((row, col - 1), borders);
+            } else {
+                new_borders.insert((row, col), borders);
+            }
+        }
+        self.cell_borders = new_borders;
 
         // Remove column width
         if index < self.col_widths.len() {
@@ -875,6 +936,30 @@ impl Grid {
     /// Get editable status for all columns
     pub fn get_all_column_editable_status(&self) -> Vec<bool> {
         self.column_configs.iter().map(|c| c.editable).collect()
+    }
+
+    // ========== Cell Border Management ==========
+
+    /// Get borders for a specific cell
+    pub fn get_cell_borders(&self, row: usize, col: usize) -> Option<&CellBorders> {
+        self.cell_borders.get(&(row, col))
+    }
+
+    /// Get mutable borders for a specific cell
+    pub fn get_cell_borders_mut(&mut self, row: usize, col: usize) -> Option<&mut CellBorders> {
+        self.cell_borders.get_mut(&(row, col))
+    }
+
+    /// Set borders for a specific cell
+    pub fn set_cell_borders_at(&mut self, row: usize, col: usize, borders: CellBorders) {
+        if row < self.rows && col < self.cols {
+            self.cell_borders.insert((row, col), borders);
+        }
+    }
+
+    /// Remove borders for a specific cell
+    pub fn remove_cell_borders(&mut self, row: usize, col: usize) {
+        self.cell_borders.remove(&(row, col));
     }
 }
 
