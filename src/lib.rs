@@ -325,7 +325,7 @@ impl DataGrid {
 
         // Check if clicked on column header (for sorting)
         if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
-            web_sys::console::log_1(&format!("Clicked column header: {}", col).into());
+            log::debug!("Clicked column header: {}", col);
             self.toggle_column_sort(col);
             return;
         }
@@ -354,7 +354,7 @@ impl DataGrid {
             }
 
             self.mouse_handler.select_cell(row, col);
-            web_sys::console::log_1(&format!("Selected {} cells", self.selection.selected_cells.len()).into());
+            log::debug!("Selected {} cells", self.selection.selected_cells.len());
         } else {
             // Clicked outside grid, clear selection
             if !ctrl {
@@ -372,7 +372,7 @@ impl DataGrid {
 
     /// Handle mouse down at coordinates with modifier keys (for JavaScript)
     pub fn handle_mouse_down_at_with_modifiers(&mut self, x: f32, y: f32, shift: bool, ctrl: bool) {
-        web_sys::console::log_1(&format!("[DEBUG RS] handle_mouse_down_at_with_modifiers: x={}, y={}", x, y).into());
+        log::debug!("handle_mouse_down_at_with_modifiers: x={}, y={}", x, y);
 
         // If currently editing, commit the edit before processing the click
         if self.is_editing() {
@@ -381,21 +381,21 @@ impl DataGrid {
 
         // Check if clicked on column header (for sorting)
         if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
-            web_sys::console::log_1(&format!("[DEBUG RS] Clicked column header: {}", col).into());
+            log::debug!("Clicked column header: {}", col);
             self.toggle_column_sort(col);
             return;
         }
 
         // Check if clicked on row header (for row selection)
         if let Some(row) = self.viewport.canvas_to_row_header(x, y, &self.grid) {
-            web_sys::console::log_1(&format!("[DEBUG RS] Clicked row header: {}", row).into());
+            log::debug!("Clicked row header: {}", row);
             self.select_row(row);
             return;
         }
 
         // Check if clicked on a cell
         if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
-            web_sys::console::log_1(&format!("[DEBUG RS] Clicked cell: ({}, {}), shift={}, ctrl={}", row, col, shift, ctrl).into());
+            log::debug!("Clicked cell: ({}, {}), shift={}, ctrl={}", row, col, shift, ctrl);
             if shift {
                 // Shift+Click: Range selection
                 self.select_range(row, col);
@@ -406,16 +406,16 @@ impl DataGrid {
                 self.mouse_handler.mouse_down(x, y);
             } else {
                 // Normal click: Single selection and start drag selection
-                web_sys::console::log_1(&format!("[DEBUG RS] Calling select_single_cell({}, {})", row, col).into());
+                log::debug!("Calling select_single_cell({}, {})", row, col);
                 self.select_single_cell(row, col);
-                web_sys::console::log_1(&format!("[DEBUG RS] After select_single_cell, selected_cells.len={}", self.selection.selected_cells.len()).into());
+                log::debug!("After select_single_cell, selected_cells.len={}", self.selection.selected_cells.len());
                 self.mouse_handler.start_selection(x, y);
             }
 
             self.mouse_handler.select_cell(row, col);
-            web_sys::console::log_1(&format!("[DEBUG RS] Selected {} cells", self.selection.selected_cells.len()).into());
+            log::debug!("Selected {} cells", self.selection.selected_cells.len());
         } else {
-            web_sys::console::log_1(&format!("[DEBUG RS] Clicked outside grid area").into());
+            log::debug!("Clicked outside grid area");
             // Clicked outside grid, clear selection
             if !ctrl {
                 self.clear_selection();
@@ -427,7 +427,7 @@ impl DataGrid {
 
     /// Handle mouse down at specific coordinates
     pub fn handle_mouse_down_at(&mut self, x: f32, y: f32) {
-        web_sys::console::log_1(&format!("handle_mouse_down_at called: x={}, y={}", x, y).into());
+        log::debug!("handle_mouse_down_at called: x={}, y={}", x, y);
 
         // If currently editing, commit the edit before processing the click
         if self.is_editing() {
@@ -436,14 +436,14 @@ impl DataGrid {
 
         // Check if clicked on column header (for sorting)
         if let Some(col) = self.viewport.canvas_to_column_header(x, y, &self.grid) {
-            web_sys::console::log_1(&format!("Clicked column header: {}", col).into());
+            log::debug!("Clicked column header: {}", col);
             self.toggle_column_sort(col);
             return;
         }
 
         // Check if clicked on row header (already handled for row selection)
         if let Some(row) = self.viewport.canvas_to_row_header(x, y, &self.grid) {
-            web_sys::console::log_1(&format!("Clicked row header: {}", row).into());
+            log::debug!("Clicked row header: {}", row);
             // Row header click - select entire row
             self.select_row(row);
             return;
@@ -451,14 +451,14 @@ impl DataGrid {
 
         // Check if clicked on a cell
         if let Some((row, col)) = self.viewport.canvas_to_cell(x, y, &self.grid) {
-            web_sys::console::log_1(&format!("Clicked cell: ({}, {})", row, col).into());
+            log::debug!("Clicked cell: ({}, {})", row, col);
             // Normal click: Single selection and start drag selection
             self.select_single_cell(row, col);
             self.mouse_handler.start_selection(x, y);
             self.mouse_handler.select_cell(row, col);
-            web_sys::console::log_1(&format!("Selected {} cells", self.selection.selected_cells.len()).into());
+            log::debug!("Selected {} cells", self.selection.selected_cells.len());
         } else {
-            web_sys::console::log_1(&"No cell found at coordinates".into());
+            log::debug!("No cell found at coordinates");
             // Clicked outside grid, clear selection
             self.clear_selection();
             self.mouse_handler.selected_cell = None;
@@ -785,12 +785,12 @@ impl DataGrid {
     /// Value can be string, number, boolean, date, or null (for empty)
     /// If column has data_type configured, value will be converted accordingly
     pub fn load_data_json(&mut self, data_json: &str) -> Result<(), JsValue> {
-        web_sys::console::log_1(&format!("load_data_json called with {} bytes", data_json.len()).into());
+        log::debug!("load_data_json called with {} bytes", data_json.len());
 
         let data: Vec<serde_json::Value> = serde_json::from_str(data_json)
             .map_err(|e| JsValue::from_str(&format!("Invalid JSON data: {}", e)))?;
 
-        web_sys::console::log_1(&format!("Parsed {} cell data entries", data.len()).into());
+        log::debug!("Parsed {} cell data entries", data.len());
 
         let mut loaded_count = 0;
         for cell_data in data {
@@ -798,7 +798,7 @@ impl DataGrid {
             let col = cell_data["col"].as_u64().unwrap_or(0) as usize;
 
             if row >= self.grid.row_count() || col >= self.grid.col_count() {
-                web_sys::console::log_1(&format!("Skipping cell ({}, {}) - out of bounds", row, col).into());
+                log::debug!("Skipping cell ({}, {}) - out of bounds", row, col);
                 continue;
             }
 
@@ -841,11 +841,11 @@ impl DataGrid {
             loaded_count += 1;
 
             if loaded_count <= 5 {
-                web_sys::console::log_1(&format!("Loaded cell ({}, {}): {:?}", row, col, cell_value).into());
+                log::debug!("Loaded cell ({}, {}): {:?}", row, col, cell_value);
             }
         }
 
-        web_sys::console::log_1(&format!("load_data_json completed. Loaded {} cells, {} dirty cells", loaded_count, self.dirty_cells.len()).into());
+        log::debug!("load_data_json completed. Loaded {} cells, {} dirty cells", loaded_count, self.dirty_cells.len());
 
         Ok(())
     }
@@ -961,7 +961,7 @@ impl DataGrid {
                         self.undo_redo.undo_stack.push(action);
                         self.undo_redo.redo_stack.clear();
 
-                        web_sys::console::log_1(&format!("Cleared {} cell(s)", self.selection.selected_cells.len()).into());
+                        log::debug!("Cleared {} cell(s)", self.selection.selected_cells.len());
                         return true; // Force render
                     } else if let Some((row, col)) = current {
                         // Single cell clear
@@ -975,21 +975,21 @@ impl DataGrid {
                         self.undo_redo.undo_stack.push(action);
                         self.undo_redo.redo_stack.clear();
 
-                        web_sys::console::log_1(&format!("Cleared cell: ({}, {})", row, col).into());
+                        log::debug!("Cleared cell: ({}, {})", row, col);
                         return true; // Force render
                     }
                     None
                 }
                 NavigationCommand::Undo => {
                     if self.undo() {
-                        web_sys::console::log_1(&"Undo action".into());
+                        log::debug!("Undo action");
                         return true; // Force render
                     }
                     None
                 }
                 NavigationCommand::Redo => {
                     if self.redo() {
-                        web_sys::console::log_1(&"Redo action".into());
+                        log::debug!("Redo action");
                         return true; // Force render
                     }
                     None
@@ -1053,7 +1053,7 @@ impl DataGrid {
                 // Ensure selected cell is visible
                 self.ensure_cell_visible(new_row, new_col);
 
-                web_sys::console::log_1(&format!("Navigated to cell: ({}, {})", new_row, new_col).into());
+                log::debug!("Navigated to cell: ({}, {})", new_row, new_col);
 
                 return true; // Event handled
             }
@@ -1137,20 +1137,20 @@ impl DataGrid {
                 NavigationCommand::Delete => {
                     if let Some((row, col)) = current {
                         self.grid.set_value(row, col, CellValue::Empty);
-                        web_sys::console::log_1(&format!("Cleared cell: ({}, {})", row, col).into());
+                        log::debug!("Cleared cell: ({}, {})", row, col);
                     }
                     None
                 }
                 NavigationCommand::Undo => {
                     if self.undo() {
-                        web_sys::console::log_1(&"Undo action".into());
+                        log::debug!("Undo action");
                         return true; // Force render
                     }
                     None
                 }
                 NavigationCommand::Redo => {
                     if self.redo() {
-                        web_sys::console::log_1(&"Redo action".into());
+                        log::debug!("Redo action");
                         return true; // Force render
                     }
                     None
@@ -1184,7 +1184,7 @@ impl DataGrid {
 
                 self.mouse_handler.select_cell(new_row, new_col);
                 self.ensure_cell_visible(new_row, new_col);
-                web_sys::console::log_1(&format!("Navigated to cell: ({}, {})", new_row, new_col).into());
+                log::debug!("Navigated to cell: ({}, {})", new_row, new_col);
 
                 return true;
             }
@@ -1270,14 +1270,14 @@ impl DataGrid {
                 }
                 NavigationCommand::Undo => {
                     if self.undo() {
-                        web_sys::console::log_1(&"Undo action".into());
+                        log::debug!("Undo action");
                         return true; // Force render
                     }
                     None
                 }
                 NavigationCommand::Redo => {
                     if self.redo() {
-                        web_sys::console::log_1(&"Redo action".into());
+                        log::debug!("Redo action");
                         return true; // Force render
                     }
                     None
@@ -1471,91 +1471,22 @@ impl DataGrid {
 
     /// Select a single cell (clears previous selection)
     fn select_single_cell(&mut self, row: usize, col: usize) {
-        // Clear all previous selections
-        self.clear_selection();
-
-        // Add new selection
-        self.selection.selected_cells.insert((row, col));
-        self.selection.selection_anchor = Some((row, col));
-
-        // Update cell state
-        if let Some(cell) = self.grid.get_cell_mut(row, col) {
-            cell.selected = true;
-        } else {
-            let mut cell = Cell::default();
-            cell.selected = true;
-            self.grid.set_cell(row, col, cell);
-        }
+        self.selection.select_single_cell(row, col, &mut self.grid)
     }
 
     /// Toggle cell selection (add/remove from selection)
     fn toggle_cell_selection(&mut self, row: usize, col: usize) {
-        if self.selection.selected_cells.contains(&(row, col)) {
-            // Remove from selection
-            self.selection.selected_cells.remove(&(row, col));
-            if let Some(cell) = self.grid.get_cell_mut(row, col) {
-                cell.selected = false;
-            }
-        } else {
-            // Add to selection
-            self.selection.selected_cells.insert((row, col));
-            if let Some(cell) = self.grid.get_cell_mut(row, col) {
-                cell.selected = true;
-            } else {
-                let mut cell = Cell::default();
-                cell.selected = true;
-                self.grid.set_cell(row, col, cell);
-            }
-        }
-
-        // Update anchor
-        if !self.selection.selected_cells.is_empty() {
-            self.selection.selection_anchor = Some((row, col));
-        }
+        self.selection.toggle_cell_selection(row, col, &mut self.grid)
     }
 
     /// Select range from anchor to target cell
     fn select_range(&mut self, target_row: usize, target_col: usize) {
-        if let Some((anchor_row, anchor_col)) = self.selection.selection_anchor {
-            // Clear previous selection
-            self.clear_selection();
-
-            // Calculate range
-            let min_row = anchor_row.min(target_row);
-            let max_row = anchor_row.max(target_row);
-            let min_col = anchor_col.min(target_col);
-            let max_col = anchor_col.max(target_col);
-
-            // Select all cells in range
-            for r in min_row..=max_row {
-                for c in min_col..=max_col {
-                    if r < self.grid.row_count() && c < self.grid.col_count() {
-                        self.selection.selected_cells.insert((r, c));
-
-                        if let Some(cell) = self.grid.get_cell_mut(r, c) {
-                            cell.selected = true;
-                        } else {
-                            let mut cell = Cell::default();
-                            cell.selected = true;
-                            self.grid.set_cell(r, c, cell);
-                        }
-                    }
-                }
-            }
-        } else {
-            // No anchor, just select single cell
-            self.select_single_cell(target_row, target_col);
-        }
+        self.selection.select_range(target_row, target_col, &mut self.grid)
     }
 
     /// Clear all selections
     fn clear_selection(&mut self) {
-        for (row, col) in &self.selection.selected_cells {
-            if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
-                cell.selected = false;
-            }
-        }
-        self.selection.selected_cells.clear();
+        self.selection.clear_selection(&mut self.grid)
     }
 
     /// Get selected cells as a JSON array of [row, col] pairs
@@ -2660,142 +2591,12 @@ impl DataGrid {
 
     /// Undo last edit action
     pub fn undo(&mut self) -> bool {
-        if let Some(action) = self.undo_redo.undo_stack.pop() {
-            match &action {
-                EditAction::SetValue { row, col, old_value, new_value: _ } => {
-                    // Restore old value without recording undo
-                    self.grid.set_value(*row, *col, old_value.clone());
-                }
-                EditAction::InsertRow { index, cells: _ } => {
-                    // Undo insert by deleting the row
-                    self.grid.delete_row(*index);
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::DeleteRow { index, cells } => {
-                    // Undo delete by inserting the row back
-                    self.grid.insert_row(*index);
-                    self.grid.restore_row_cells(*index, cells);
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::InsertColumn { index, cells: _ } => {
-                    // Undo insert by deleting the column
-                    self.grid.delete_column(*index);
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::DeleteColumn { index, cells } => {
-                    // Undo delete by inserting the column back
-                    self.grid.insert_column(*index);
-                    self.grid.restore_column_cells(*index, cells);
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::DeleteRows { rows } => {
-                    // Undo bulk delete by inserting rows back in reverse order
-                    for (index, cells) in rows.iter() {
-                        self.grid.insert_row(*index);
-                        self.grid.restore_row_cells(*index, cells);
-                    }
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::ClearCells { cells } => {
-                    // Restore all cleared cell values
-                    for (row, col, old_value) in cells.iter() {
-                        self.grid.set_value(*row, *col, old_value.clone());
-                    }
-                }
-                EditAction::SetMultipleCells { cells } => {
-                    // Restore all old cell values
-                    for (row, col, old_value, _new_value) in cells.iter() {
-                        self.grid.set_value(*row, *col, old_value.clone());
-                    }
-                }
-                EditAction::SetStyle { row, col, old_style, new_style: _ } => {
-                    // Restore old style
-                    if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
-                        cell.bg_color = old_style.bg_color;
-                        cell.fg_color = old_style.fg_color;
-                        cell.font_bold = old_style.font_bold;
-                        cell.font_italic = old_style.font_italic;
-                    }
-                }
-            }
-
-            // Move action to redo stack
-            self.undo_redo.redo_stack.push(action);
-            true
-        } else {
-            false
-        }
+        self.undo_redo.undo(&mut self.grid, &mut self.viewport)
     }
 
     /// Redo last undone action
     pub fn redo(&mut self) -> bool {
-        if let Some(action) = self.undo_redo.redo_stack.pop() {
-            match &action {
-                EditAction::SetValue { row, col, old_value: _, new_value } => {
-                    // Re-apply new value without recording undo
-                    self.grid.set_value(*row, *col, new_value.clone());
-                }
-                EditAction::InsertRow { index, cells } => {
-                    // Redo insert
-                    self.grid.insert_row(*index);
-                    self.grid.restore_row_cells(*index, cells);
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::DeleteRow { index, cells: _ } => {
-                    // Redo delete
-                    self.grid.delete_row(*index);
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::InsertColumn { index, cells } => {
-                    // Redo insert
-                    self.grid.insert_column(*index);
-                    self.grid.restore_column_cells(*index, cells);
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::DeleteColumn { index, cells: _ } => {
-                    // Redo delete
-                    self.grid.delete_column(*index);
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::DeleteRows { rows } => {
-                    // Redo bulk delete from bottom to top to avoid index shifting
-                    let mut sorted_indices: Vec<usize> = rows.iter().map(|(idx, _)| *idx).collect();
-                    sorted_indices.sort_unstable();
-                    sorted_indices.reverse();
-                    for index in sorted_indices {
-                        self.grid.delete_row(index);
-                    }
-                    self.viewport.update_visible_range(&self.grid);
-                }
-                EditAction::ClearCells { cells } => {
-                    // Re-clear all cells
-                    for (row, col, _old_value) in cells.iter() {
-                        self.grid.set_value(*row, *col, CellValue::Empty);
-                    }
-                }
-                EditAction::SetMultipleCells { cells } => {
-                    // Re-apply all new cell values
-                    for (row, col, _old_value, new_value) in cells.iter() {
-                        self.grid.set_value(*row, *col, new_value.clone());
-                    }
-                }
-                EditAction::SetStyle { row, col, old_style: _, new_style } => {
-                    // Re-apply new style
-                    if let Some(cell) = self.grid.get_cell_mut(*row, *col) {
-                        cell.bg_color = new_style.bg_color;
-                        cell.fg_color = new_style.fg_color;
-                        cell.font_bold = new_style.font_bold;
-                        cell.font_italic = new_style.font_italic;
-                    }
-                }
-            }
-
-            // Move action back to undo stack
-            self.undo_redo.undo_stack.push(action);
-            true
-        } else {
-            false
-        }
+        self.undo_redo.redo(&mut self.grid, &mut self.viewport)
     }
 
     /// Check if undo is available
@@ -2913,7 +2714,10 @@ pub fn init() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
-    web_sys::console::log_1(&"DataGrid5 initialized".into());
+    // Initialize console_log for proper logging
+    console_log::init_with_level(log::Level::Debug).expect("Failed to initialize logger");
+
+    log::info!("DataGrid5 initialized");
 }
 
 // Performance monitoring methods (outside wasm_bindgen)

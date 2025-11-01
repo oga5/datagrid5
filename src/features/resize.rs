@@ -102,7 +102,7 @@ impl ResizeState {
                     self.resizing_column = Some(col);
                     self.resize_start_pos = x;
                     self.resize_start_size = col_width;
-                    web_sys::console::log_1(&format!("Started resizing column {}", col).into());
+                    log::debug!("Started resizing column {}", col);
                     return true;
                 }
             }
@@ -124,7 +124,7 @@ impl ResizeState {
                     self.resizing_row = Some(row);
                     self.resize_start_pos = y;
                     self.resize_start_size = row_height;
-                    web_sys::console::log_1(&format!("Started resizing row {}", row).into());
+                    log::debug!("Started resizing row {}", row);
                     return true;
                 }
             }
@@ -153,7 +153,7 @@ impl ResizeState {
     /// End resize
     pub fn end_resize(&mut self) {
         if self.is_resizing {
-            web_sys::console::log_1(&"Ended resizing".into());
+            log::debug!("Ended resizing");
         }
         self.is_resizing = false;
         self.resizing_column = None;
