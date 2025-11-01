@@ -75,3 +75,10 @@ impl From<String> for GridError {
         GridError::OperationError { message }
     }
 }
+
+// Conversion from &str for error handling
+impl From<&str> for GridError {
+    fn from(message: &str) -> Self {
+        GridError::OperationError { message: message.to_string() }
+    }
+}

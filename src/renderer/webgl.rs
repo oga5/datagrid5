@@ -152,6 +152,7 @@ impl WebGLRenderer {
             );
             self.render_region(
                 grid,
+                selection,
                 viewport,
                 0,
                 frozen_rows,
@@ -169,6 +170,7 @@ impl WebGLRenderer {
             );
             self.render_region(
                 grid,
+                selection,
                 viewport,
                 frozen_rows.max(viewport.first_visible_row),
                 viewport.last_visible_row.min(grid.row_count().saturating_sub(1)) + 1,
@@ -185,6 +187,7 @@ impl WebGLRenderer {
         );
         self.render_region(
             grid,
+            selection,
             viewport,
             frozen_rows.max(viewport.first_visible_row),
             viewport.last_visible_row.min(grid.row_count().saturating_sub(1)) + 1,

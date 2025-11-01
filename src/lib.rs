@@ -180,10 +180,10 @@ impl DataGrid {
         viewport.update_visible_range(&grid);
 
         let webgl_renderer = WebGLRenderer::new(&webgl_canvas)
-            .map_err(|e| JsValue::from_str(&e))?;
+            .map_err(|e: GridError| JsValue::from(e))?;
 
         let text_renderer = TextRenderer::new(&text_canvas)
-            .map_err(|e| JsValue::from_str(&e))?;
+            .map_err(|e: GridError| JsValue::from(e))?;
 
         let mouse_handler = MouseHandler::new();
         let keyboard_handler = KeyboardHandler::new();
@@ -246,10 +246,10 @@ impl DataGrid {
         viewport.update_visible_range(&grid);
 
         let webgl_renderer = WebGLRenderer::new(&webgl_canvas)
-            .map_err(|e| JsValue::from_str(&e))?;
+            .map_err(|e: GridError| JsValue::from(e))?;
 
         let text_renderer = TextRenderer::new(&text_canvas)
-            .map_err(|e| JsValue::from_str(&e))?;
+            .map_err(|e: GridError| JsValue::from(e))?;
 
         let mouse_handler = MouseHandler::new();
         let keyboard_handler = KeyboardHandler::new();

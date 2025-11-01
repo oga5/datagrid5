@@ -34,7 +34,7 @@ impl ResizeState {
         // Column resize: only detect in column header area
         if y < grid.col_header_height {
             // Convert canvas x to grid x, considering scroll offset
-            let grid_x = x - grid.row_header_width + viewport.scroll_x;
+            let _grid_x = x - grid.row_header_width + viewport.scroll_x;
 
             // Check visible columns only
             let first_col = viewport.first_visible_col;
@@ -58,7 +58,7 @@ impl ResizeState {
         // Row resize: only detect in row header area
         if x < grid.row_header_width {
             // Convert canvas y to grid y, considering scroll offset
-            let grid_y = y - grid.col_header_height + viewport.scroll_y;
+            let _grid_y = y - grid.col_header_height + viewport.scroll_y;
 
             // Check visible rows only
             let first_row = viewport.first_visible_row;

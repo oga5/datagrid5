@@ -258,27 +258,27 @@ impl TextRenderer {
 
         // Priority order: selected > current_match > search_match > cell.bg_color > default white
         if is_selected {
-            self.context.set_fill_style(&self.selected_bg_color.clone().into());
+            self.context.set_fill_style_str(&self.selected_bg_color);
             self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         } else if is_current_match {
-            self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+            self.context.set_fill_style_str("rgba(255, 165, 0, 0.6)");
             self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         } else if is_search_match {
-            self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
+            self.context.set_fill_style_str("rgba(255, 255, 0, 0.3)");
             self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         } else if let Some(cell) = cell {
             if let Some(bg_color) = cell.bg_color {
                 let bg_str = u32_to_rgba_string(bg_color);
-                self.context.set_fill_style(&bg_str.into());
+                self.context.set_fill_style_str(&bg_str);
                 self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
             } else {
                 // Draw default white background for consistent grid line appearance
-                self.context.set_fill_style(&"#FFFFFF".into());
+                self.context.set_fill_style_str("#FFFFFF");
                 self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
             }
         } else {
             // Draw default white background for empty cells
-            self.context.set_fill_style(&"#FFFFFF".into());
+            self.context.set_fill_style_str("#FFFFFF");
             self.context.fill_rect(bg_x as f64, bg_y as f64, bg_width as f64, bg_height as f64);
         }
 
@@ -296,7 +296,7 @@ impl TextRenderer {
         } else {
             self.text_color.clone()
         };
-        self.context.set_fill_style(&text_color.into());
+        self.context.set_fill_style_str(&text_color);
 
         // Set font style
         if let Some(cell) = cell {
@@ -399,7 +399,7 @@ impl TextRenderer {
 
         // Get cell data
         let cell = grid.get_cell(row, col);
-        let is_selected = selection.is_selected(row, col);
+        let is_selected = false; // No selection in this function
 
         // Check if this cell is a search result
         let is_search_match = search_results.contains(&(row, col));
@@ -416,7 +416,7 @@ impl TextRenderer {
 
         if is_selected {
             // Use selection background (highest priority)
-            self.context.set_fill_style(&self.selected_bg_color.clone().into());
+            self.context.set_fill_style_str(&self.selected_bg_color);
             self.context.fill_rect(
                 canvas_x as f64,
                 canvas_y as f64,
@@ -425,7 +425,7 @@ impl TextRenderer {
             );
         } else if is_current_match {
             // Current (active) search result - bright orange
-            self.context.set_fill_style(&"rgba(255, 165, 0, 0.6)".into());
+            self.context.set_fill_style_str("rgba(255, 165, 0, 0.6)");
             self.context.fill_rect(
                 canvas_x as f64,
                 canvas_y as f64,
@@ -434,7 +434,7 @@ impl TextRenderer {
             );
         } else if is_search_match {
             // Other search results - light yellow
-            self.context.set_fill_style(&"rgba(255, 255, 0, 0.3)".into());
+            self.context.set_fill_style_str("rgba(255, 255, 0, 0.3)");
             self.context.fill_rect(
                 canvas_x as f64,
                 canvas_y as f64,
@@ -445,7 +445,7 @@ impl TextRenderer {
             if let Some(bg_color) = cell.bg_color {
                 // Use custom background color
                 let bg_str = u32_to_rgba_string(bg_color);
-                self.context.set_fill_style(&bg_str.into());
+                self.context.set_fill_style_str(&bg_str);
                 self.context.fill_rect(
                     canvas_x as f64,
                     canvas_y as f64,
@@ -454,7 +454,7 @@ impl TextRenderer {
                 );
             } else {
                 // Draw default white background for consistent grid line appearance
-                self.context.set_fill_style(&"#FFFFFF".into());
+                self.context.set_fill_style_str("#FFFFFF");
                 self.context.fill_rect(
                     canvas_x as f64,
                     canvas_y as f64,
@@ -464,7 +464,7 @@ impl TextRenderer {
             }
         } else {
             // Draw default white background for empty cells
-            self.context.set_fill_style(&"#FFFFFF".into());
+            self.context.set_fill_style_str("#FFFFFF");
             self.context.fill_rect(
                 canvas_x as f64,
                 canvas_y as f64,
@@ -487,7 +487,7 @@ impl TextRenderer {
         } else {
             self.text_color.clone()
         };
-        self.context.set_fill_style(&text_color.into());
+        self.context.set_fill_style_str(&text_color);
 
         // Set font style (bold/italic)
         if let Some(cell) = cell {
@@ -560,7 +560,7 @@ impl TextRenderer {
         let height = grid.row_height(row);
 
         // Draw selection highlight border
-        self.context.set_stroke_style(&"#667eea".into());
+        self.context.set_stroke_style_str("#667eea");
         self.context.set_line_width(2.0);
         self.context.stroke_rect(
             canvas_x as f64,
@@ -609,13 +609,13 @@ impl TextRenderer {
         let header_border = "#cccccc";
 
         // Draw top-left corner cell (all-select button area)
-        self.context.set_fill_style(&header_bg.into());
+        self.context.set_fill_style_str(&header_bg);
         self.context.fill_rect(0.0, 0.0,
             row_header_width as f64,
             col_header_height as f64);
 
         // Border for corner
-        self.context.set_stroke_style(&header_border.into());
+        self.context.set_stroke_style_str(&header_border);
         self.context.set_line_width(1.0);
         self.context.stroke_rect(0.0, 0.0,
             row_header_width as f64,
@@ -686,7 +686,7 @@ impl TextRenderer {
             }
 
             // Draw header background (clipped to not overlap top-left corner)
-            self.context.set_fill_style(&header_bg.into());
+            self.context.set_fill_style_str(&header_bg);
             self.context.fill_rect(
                 draw_x as f64,
                 0.0,
@@ -695,7 +695,7 @@ impl TextRenderer {
             );
 
             // Draw header border (clipped to not overlap top-left corner)
-            self.context.set_stroke_style(&header_border.into());
+            self.context.set_stroke_style_str(&header_border);
             self.context.set_line_width(1.0);
             self.context.stroke_rect(
                 draw_x as f64,
@@ -723,7 +723,7 @@ impl TextRenderer {
             };
 
             // Draw text - always centered in the original cell position, not the clipped area
-            self.context.set_fill_style(&self.header_text_color.clone().into());
+            self.context.set_fill_style_str(&self.header_text_color);
             self.context.set_text_align("center");
             self.context.set_font(&self.font_string);
 
@@ -804,7 +804,7 @@ impl TextRenderer {
                 }
 
                 // Draw group background
-                self.context.set_fill_style(&"#e8e8e8".into());
+                self.context.set_fill_style_str("#e8e8e8");
                 self.context.fill_rect(
                     visible_x as f64,
                     y_pos as f64,
@@ -813,7 +813,7 @@ impl TextRenderer {
                 );
 
                 // Draw group border
-                self.context.set_stroke_style(&header_border.into());
+                self.context.set_stroke_style_str(&header_border);
                 self.context.set_line_width(1.0);
                 self.context.stroke_rect(
                     visible_x as f64,
@@ -823,7 +823,7 @@ impl TextRenderer {
                 );
 
                 // Draw group label (centered, with clipping)
-                self.context.set_fill_style(&"#333333".into());
+                self.context.set_fill_style_str("#333333");
                 self.context.set_text_align("center");
                 self.context.set_font("bold 13px Arial");
 
@@ -876,7 +876,7 @@ impl TextRenderer {
             }
 
             // Draw header background (clipped)
-            self.context.set_fill_style(&header_bg.into());
+            self.context.set_fill_style_str(&header_bg);
             self.context.fill_rect(
                 draw_x as f64,
                 col_header_y as f64,
@@ -885,7 +885,7 @@ impl TextRenderer {
             );
 
             // Draw header border (clipped)
-            self.context.set_stroke_style(&header_border.into());
+            self.context.set_stroke_style_str(&header_border);
             self.context.set_line_width(1.0);
             self.context.stroke_rect(
                 draw_x as f64,
@@ -908,7 +908,7 @@ impl TextRenderer {
                 col_name
             };
 
-            self.context.set_fill_style(&self.header_text_color.clone().into());
+            self.context.set_fill_style_str(&self.header_text_color);
             self.context.set_text_align("center");
             self.context.set_font(&self.font_string);
 
@@ -979,7 +979,7 @@ impl TextRenderer {
             }
 
             // Draw header background (clipped)
-            self.context.set_fill_style(&header_bg.into());
+            self.context.set_fill_style_str(&header_bg);
             self.context.fill_rect(
                 0.0,
                 draw_y as f64,
@@ -988,7 +988,7 @@ impl TextRenderer {
             );
 
             // Draw header border (clipped)
-            self.context.set_stroke_style(&header_border.into());
+            self.context.set_stroke_style_str(&header_border);
             self.context.set_line_width(1.0);
             self.context.stroke_rect(
                 0.0,
@@ -999,7 +999,7 @@ impl TextRenderer {
 
             // Draw row number (1, 2, 3, ...) with clipping
             let row_number = format!("{}", row + 1);
-            self.context.set_fill_style(&self.header_text_color.clone().into());
+            self.context.set_fill_style_str(&self.header_text_color);
             self.context.set_text_align("center");
             self.context.set_font(&self.font_string);
 
