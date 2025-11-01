@@ -1447,6 +1447,11 @@ impl DataGrid {
         self.resize.is_resizing
     }
 
+    /// Check if currently drag-selecting (for live selection preview)
+    pub fn is_selecting(&self) -> bool {
+        self.mouse_handler.is_selecting
+    }
+
     /// Select a single cell (clears previous selection)
     fn select_single_cell(&mut self, row: usize, col: usize) {
         self.selection.select_single_cell(row, col)
