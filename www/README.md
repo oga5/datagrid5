@@ -20,8 +20,15 @@
 - Shift+Tab to save and move left
 - Escape to cancel
 - Automatic positioning and scrolling
-- Full IME support for Japanese/Chinese/Korean input
+- **Complete IME support** for Japanese/Chinese/Korean input
+  - compositionstart/compositionupdate/compositionend events
+  - Prevents premature save during text composition
+  - No text loss during IME conversion
+- **Smart external click detection**
+  - Document-level click handler for reliable detection
+  - Distinguishes between grid, editor, and external clicks
 - Configurable blur behavior (save or cancel)
+- Configurable scroll behavior (save on scroll or keep editing)
 
 ✅ **Excel-Compatible Clipboard**: Automatic copy/cut/paste operations
 - Ctrl+C to copy selected cells
@@ -117,7 +124,38 @@ const gridWrapper = new DataGridWrapper('container-id', wasmModule, {
     enableResize: true,           // Enable column/row resizing (default: true)
 
     // Cell editing behavior
-    blurBehavior: 'save'          // 'save' or 'cancel' - what to do when clicking outside (default: 'save')
+    blurBehavior: 'save',         // 'save' or 'cancel' - what to do when clicking outside (default: 'save')
+    saveOnScroll: true            // true = save on scroll, false = keep editing while scrolling (default: true)
+});
+```
+
+### Editing Behavior Options
+
+**blurBehavior**: Controls what happens when clicking outside the editor
+- `'save'` (default): Automatically save changes when clicking outside
+- `'cancel'`: Discard changes when clicking outside
+
+**saveOnScroll**: Controls what happens when scrolling during editing
+- `true` (default): Save and end edit when scrolling
+- `false`: Keep editor open and update its position while scrolling
+
+**Example: Excel-like behavior**
+```javascript
+// Excel-like: save on blur, save on scroll
+const gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+    enableEditing: true,
+    blurBehavior: 'save',
+    saveOnScroll: true
+});
+```
+
+**Example: Continuous editing mode**
+```javascript
+// Allow editing while scrolling, cancel on external click
+const gridWrapper = new DataGridWrapper('grid-container', wasmModule, {
+    enableEditing: true,
+    blurBehavior: 'cancel',
+    saveOnScroll: false
 });
 ```
 
@@ -376,18 +414,67 @@ Key differences in the simplified examples:
 - ✅ Simple event-based integration
 - ✅ Focus on application logic only
 
+## IME (Input Method Editor) Support
+
+DataGridWrapper provides complete support for IME input, essential for Japanese, Chinese, and Korean users.
+
+### How it Works
+
+The wrapper listens to three composition events:
+- `compositionstart`: User begins IME input (e.g., typing "nihongo" in Japanese IME)
+- `compositionupdate`: User is converting text (e.g., selecting kanji from candidates)
+- `compositionend`: User confirms the final text (e.g., "日本語" is inserted)
+
+During composition, the `isComposing` flag prevents:
+- **Enter key** from prematurely saving incomplete text
+- **Tab key** from moving to next cell during conversion
+- **Escape key** from canceling during selection
+
+### Example: Japanese Input
+
+```
+User types: "ni" → "に"
+           ↓ (compositionstart)
+User types: "hon" → "にほん"
+           ↓ (compositionupdate)
+User selects: "日本" from candidates
+           ↓ (compositionupdate)
+User presses Enter to confirm
+           ↓ (compositionend)
+Final text: "日本" is saved
+           ↓ (now Enter key can move to next cell)
+```
+
+**Without IME support**: Pressing Enter during conversion would save "にほん" instead of allowing kanji selection.
+
+**With IME support**: Enter is ignored during composition, allowing proper text conversion.
+
+### Testing IME
+
+To test Japanese input:
+1. Enable Japanese IME on your system
+2. Double-click a cell to edit
+3. Type "nihongo" and select "日本語" from candidates
+4. Press Enter to confirm the kanji
+5. Press Enter again to save and move down
+
+The editor will correctly:
+- ✅ Ignore the first Enter (used for IME confirmation)
+- ✅ Process the second Enter (saves and moves down)
+
 ## Browser Compatibility
 
-- Chrome/Edge: ✅ Full support
-- Firefox: ✅ Full support
-- Safari: ✅ Full support
-- Opera: ✅ Full support
+- Chrome/Edge: ✅ Full support (including IME)
+- Firefox: ✅ Full support (including IME)
+- Safari: ✅ Full support (including IME)
+- Opera: ✅ Full support (including IME)
 
 Requires:
 - ES6 Modules support
 - WebAssembly support
 - WebGL support
 - Canvas 2D API support
+- CompositionEvent API (for IME support)
 
 ## License
 

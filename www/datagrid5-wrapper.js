@@ -14,6 +14,7 @@ export class DataGridWrapper {
             enableVirtualScroll: options.enableVirtualScroll !== false,
             enableResize: options.enableResize !== false,
             blurBehavior: options.blurBehavior || 'save', // 'save' or 'cancel'
+            saveOnScroll: options.saveOnScroll !== false, // Save on scroll (default: true)
             ...options
         };
 
@@ -32,6 +33,7 @@ export class DataGridWrapper {
         this.isDirty = false; // Track if render is needed
         this.renderScheduled = false; // Track if render is already scheduled
         this.isComposing = false; // Track IME composition state
+        this.documentClickHandler = null; // Store document click handler reference
 
         this.init();
     }
@@ -352,11 +354,24 @@ export class DataGridWrapper {
     setupVirtualScroll() {
         this.updateVirtualScrollSize();
 
-        // Use passive listener for better scrolling performance
+        // Scroll event handler
         this.scrollContainer.addEventListener('scroll', () => {
             if (!this.grid || this.isInternalScroll) {
                 this.isInternalScroll = false;
                 return;
+            }
+
+            // Handle editing during scroll based on configuration
+            if (this.editingRow !== null && this.editingCol !== null) {
+                if (this.options.saveOnScroll) {
+                    console.log('[Wrapper] Scroll detected during edit - saving');
+                    // Save and end edit on scroll
+                    this.endCellEdit(true);
+                } else {
+                    // Just update editor position without ending edit
+                    // This allows continuous editing while scrolling
+                    this.updateEditorPosition();
+                }
             }
 
             const scrollX = this.scrollContainer.scrollLeft;
@@ -364,6 +379,26 @@ export class DataGridWrapper {
             this.grid.set_scroll(scrollX, scrollY);
             this.requestRender();
         }, { passive: true });
+    }
+
+    updateEditorPosition() {
+        // Update editor position if currently editing
+        if (!this.cellEditor || this.editingRow === null || this.editingCol === null) {
+            return;
+        }
+
+        const rect = this.grid.get_cell_edit_rect(this.editingRow, this.editingCol);
+        const [x, y, width, height] = rect;
+
+        const scrollContainerRect = this.scrollContainer.getBoundingClientRect();
+        const containerRect = this.container.getBoundingClientRect();
+        const offsetX = scrollContainerRect.left - containerRect.left;
+        const offsetY = scrollContainerRect.top - containerRect.top;
+
+        this.cellEditor.style.left = `${x + offsetX - this.scrollContainer.scrollLeft}px`;
+        this.cellEditor.style.top = `${y + offsetY - this.scrollContainer.scrollTop}px`;
+        this.cellEditor.style.width = `${width}px`;
+        this.cellEditor.style.height = `${height}px`;
     }
 
     updateVirtualScrollSize() {
@@ -544,9 +579,19 @@ export class DataGridWrapper {
             this.isComposing = true;
         });
 
-        this.cellEditor.addEventListener('compositionend', () => {
-            console.log('[Wrapper] IME composition ended');
-            this.isComposing = false;
+        this.cellEditor.addEventListener('compositionupdate', (e) => {
+            console.log('[Wrapper] IME composition updating:', e.data);
+            // Keep isComposing flag true during updates
+            this.isComposing = true;
+        });
+
+        this.cellEditor.addEventListener('compositionend', (e) => {
+            console.log('[Wrapper] IME composition ended:', e.data);
+            // Set flag to false, but with a small delay to ensure
+            // the final text is properly inserted before any keydown handler fires
+            setTimeout(() => {
+                this.isComposing = false;
+            }, 0);
         });
 
         // Keyboard navigation
@@ -575,27 +620,66 @@ export class DataGridWrapper {
             }
         });
 
-        // Click outside to save/cancel based on configuration
-        let blurTimeout = null;
-        this.cellEditor.addEventListener('focus', () => {
-            console.log('[Wrapper] Editor focused');
-            // Clear any pending blur handler when focused
-            if (blurTimeout) {
-                clearTimeout(blurTimeout);
-                blurTimeout = null;
+        // Document click handler for detecting external clicks
+        this.documentClickHandler = (e) => {
+            // Only process if we're currently editing
+            if (this.editingRow === null || this.editingCol === null) {
+                return;
             }
+
+            // Check if click is outside the editor and grid
+            const clickedElement = e.target;
+            const isEditorClick = this.cellEditor.contains(clickedElement);
+            const isGridClick = this.container.contains(clickedElement);
+
+            console.log('[Wrapper] Document click:', {
+                isEditorClick,
+                isGridClick,
+                target: clickedElement.tagName
+            });
+
+            // If clicked outside both editor and grid, end edit
+            if (!isEditorClick && !isGridClick) {
+                console.log('[Wrapper] External click detected - ending edit');
+                const shouldSave = this.options.blurBehavior === 'save';
+                // Use setTimeout to avoid conflicts with other click handlers
+                setTimeout(() => {
+                    if (this.editingRow !== null || this.editingCol !== null) {
+                        this.endCellEdit(shouldSave);
+                    }
+                }, 0);
+            }
+        };
+
+        // Focus handler - setup document click listener when editor is focused
+        this.cellEditor.addEventListener('focus', () => {
+            console.log('[Wrapper] Editor focused - adding document click listener');
+            // Add document click listener when editor gains focus
+            document.addEventListener('click', this.documentClickHandler, true);
         });
 
-        this.cellEditor.addEventListener('blur', () => {
+        // Blur handler - cleanup and handle edge cases
+        this.cellEditor.addEventListener('blur', (e) => {
             console.log('[Wrapper] Editor blur event');
-            // Only end edit if we're actually editing and this isn't an immediate blur after focus
-            blurTimeout = setTimeout(() => {
-                if (this.editingRow !== null && this.editingCol !== null) {
-                    console.log('[Wrapper] Blur timeout - ending edit');
-                    const shouldSave = this.options.blurBehavior === 'save';
-                    this.endCellEdit(shouldSave);
+            // Remove document click listener when editor loses focus
+            document.removeEventListener('click', this.documentClickHandler, true);
+
+            // Handle blur if we're still editing (edge case: might have been ended already)
+            // This handles cases like pressing Tab to move to next cell
+            if (this.editingRow !== null && this.editingCol !== null) {
+                // If blur was caused by clicking inside the grid, the grid click handler
+                // will take care of ending the edit. Otherwise, end it here.
+                const relatedTarget = e.relatedTarget;
+                if (!relatedTarget || !this.container.contains(relatedTarget)) {
+                    console.log('[Wrapper] Blur without related target in grid - ending edit');
+                    setTimeout(() => {
+                        if (this.editingRow !== null || this.editingCol !== null) {
+                            const shouldSave = this.options.blurBehavior === 'save';
+                            this.endCellEdit(shouldSave);
+                        }
+                    }, 100);
                 }
-            }, 150);
+            }
         });
     }
 
@@ -613,10 +697,24 @@ export class DataGridWrapper {
     }
 
     destroy() {
+        // Clean up document click listener if it exists
+        if (this.documentClickHandler) {
+            document.removeEventListener('click', this.documentClickHandler, true);
+            this.documentClickHandler = null;
+        }
+
+        // Clean up DOM
         if (this.container) {
             this.container.innerHTML = '';
         }
+
+        // Clean up references
         this.grid = null;
+        this.cellEditor = null;
+        this.webglCanvas = null;
+        this.textCanvas = null;
+        this.scrollContainer = null;
+        this.scrollContent = null;
     }
 
     // Expose common grid methods
