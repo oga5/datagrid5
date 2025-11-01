@@ -280,12 +280,13 @@ impl DataGrid {
     /// Render the grid
     pub fn render(&self) {
         // Render WebGL layer (grid lines and backgrounds)
-        self.webgl_renderer.render(&self.grid, &self.viewport);
+        self.webgl_renderer.render(&self.grid, &self.viewport, &self.selection);
 
         // Render text layer on top with search highlight info
         self.text_renderer.render_with_search(
             &self.grid,
             &self.viewport,
+            &self.selection,
             &self.search.search_results,
             self.search.current_search_index
         );
@@ -1035,22 +1036,9 @@ impl DataGrid {
 
             // Update selection if we have a new one
             if let Some((new_row, new_col)) = new_selection {
-                // Clear previous selection
-                if let Some((prev_row, prev_col)) = current {
-                    if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
-                        cell.selected = false;
-                    }
-                }
-
                 // Set new selection
+                self.select_single_cell(new_row, new_col);
                 self.mouse_handler.select_cell(new_row, new_col);
-                if let Some(cell) = self.grid.get_cell_mut(new_row, new_col) {
-                    cell.selected = true;
-                } else {
-                    let mut cell = Cell::default();
-                    cell.selected = true;
-                    self.grid.set_cell(new_row, new_col, cell);
-                }
 
                 // Ensure selected cell is visible
                 self.ensure_cell_visible(new_row, new_col);
@@ -1175,12 +1163,6 @@ impl DataGrid {
                     self.select_range(new_row, new_col);
                 } else {
                     // No shift: move selection to new cell
-                    if let Some((prev_row, prev_col)) = current {
-                        if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
-                            cell.selected = false;
-                        }
-                    }
-
                     self.select_single_cell(new_row, new_col);
                 }
 
@@ -1302,12 +1284,6 @@ impl DataGrid {
                     self.select_range(new_row, new_col);
                 } else {
                     // No shift: move selection to new cell
-                    if let Some((prev_row, prev_col)) = current {
-                        if let Some(cell) = self.grid.get_cell_mut(prev_row, prev_col) {
-                            cell.selected = false;
-                        }
-                    }
-
                     self.select_single_cell(new_row, new_col);
                 }
 
@@ -1473,22 +1449,22 @@ impl DataGrid {
 
     /// Select a single cell (clears previous selection)
     fn select_single_cell(&mut self, row: usize, col: usize) {
-        self.selection.select_single_cell(row, col, &mut self.grid)
+        self.selection.select_single_cell(row, col)
     }
 
     /// Toggle cell selection (add/remove from selection)
     fn toggle_cell_selection(&mut self, row: usize, col: usize) {
-        self.selection.toggle_cell_selection(row, col, &mut self.grid)
+        self.selection.toggle_cell_selection(row, col)
     }
 
     /// Select range from anchor to target cell
     fn select_range(&mut self, target_row: usize, target_col: usize) {
-        self.selection.select_range(target_row, target_col, &mut self.grid)
+        self.selection.select_range(target_row, target_col, self.grid.row_count(), self.grid.col_count())
     }
 
     /// Clear all selections
     fn clear_selection(&mut self) {
-        self.selection.clear_selection(&mut self.grid)
+        self.selection.clear_selection()
     }
 
     /// Get selected cells as a JSON array of [row, col] pairs
@@ -1508,17 +1484,8 @@ impl DataGrid {
 
     /// Select a single cell and make it the active cell
     pub fn select_cell(&mut self, row: usize, col: usize) {
-        // Clear previous selection
-        self.clear_selection();
-
         // Select the cell
-        self.selection.selected_cells.insert((row, col));
-        if let Some(cell) = self.grid.get_cell_mut(row, col) {
-            cell.selected = true;
-        }
-
-        // Set as anchor
-        self.selection.selection_anchor = Some((row, col));
+        self.select_single_cell(row, col);
 
         // Update mouse handler
         self.mouse_handler.select_cell(row, col);
@@ -1526,55 +1493,17 @@ impl DataGrid {
 
     /// Select all cells (Ctrl+A)
     pub fn select_all(&mut self) {
-        self.clear_selection();
-
-        for row in 0..self.grid.row_count() {
-            for col in 0..self.grid.col_count() {
-                self.selection.selected_cells.insert((row, col));
-                if let Some(cell) = self.grid.get_cell_mut(row, col) {
-                    cell.selected = true;
-                }
-            }
-        }
-
-        // Set anchor to first cell
-        self.selection.selection_anchor = Some((0, 0));
+        self.selection.select_all(self.grid.row_count(), self.grid.col_count());
     }
 
     /// Select entire row
     pub fn select_row(&mut self, row: usize) {
-        if row >= self.grid.row_count() {
-            return;
-        }
-
-        self.clear_selection();
-
-        for col in 0..self.grid.col_count() {
-            self.selection.selected_cells.insert((row, col));
-            if let Some(cell) = self.grid.get_cell_mut(row, col) {
-                cell.selected = true;
-            }
-        }
-
-        self.selection.selection_anchor = Some((row, 0));
+        self.selection.select_row(row, self.grid.row_count(), self.grid.col_count());
     }
 
     /// Select entire column
     pub fn select_col(&mut self, col: usize) {
-        if col >= self.grid.col_count() {
-            return;
-        }
-
-        self.clear_selection();
-
-        for row in 0..self.grid.row_count() {
-            self.selection.selected_cells.insert((row, col));
-            if let Some(cell) = self.grid.get_cell_mut(row, col) {
-                cell.selected = true;
-            }
-        }
-
-        self.selection.selection_anchor = Some((0, col));
+        self.selection.select_col(col, self.grid.row_count(), self.grid.col_count());
     }
 
     /// Copy selected cells to TSV (Tab-Separated Values) format

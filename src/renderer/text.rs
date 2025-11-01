@@ -1,4 +1,5 @@
 use crate::core::{Grid, Viewport};
+use crate::features::selection::SelectionState;
 use crate::GridError;
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
@@ -96,14 +97,15 @@ impl TextRenderer {
     }
 
     /// Render all visible text in the grid
-    pub fn render(&self, grid: &Grid, viewport: &Viewport) {
-        self.render_with_search(grid, viewport, &[], None);
+    pub fn render(&self, grid: &Grid, viewport: &Viewport, selection: &SelectionState) {
+        self.render_with_search(grid, viewport, selection, &[], None);
     }
 
     pub fn render_with_search(
         &self,
         grid: &Grid,
         viewport: &Viewport,
+        selection: &SelectionState,
         search_results: &[(usize, usize)],
         current_search_index: Option<usize>
     ) {
@@ -135,7 +137,7 @@ impl TextRenderer {
             for row in 0..frozen_rows.min(grid.row_count()) {
                 if grid.is_row_filtered(row) { continue; }
                 for col in 0..frozen_cols.min(grid.col_count()) {
-                    self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, true, true);
+                    self.render_cell_with_search_frozen(grid, viewport, selection, row, col, search_results, current_search_index, true, true);
                 }
             }
         }
@@ -145,7 +147,7 @@ impl TextRenderer {
             for row in 0..frozen_rows.min(grid.row_count()) {
                 if grid.is_row_filtered(row) { continue; }
                 for col in first_col.max(frozen_cols)..=last_col {
-                    self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, true, false);
+                    self.render_cell_with_search_frozen(grid, viewport, selection, row, col, search_results, current_search_index, true, false);
                 }
             }
         }
@@ -155,7 +157,7 @@ impl TextRenderer {
             for row in first_row.max(frozen_rows)..=last_row {
                 if grid.is_row_filtered(row) { continue; }
                 for col in 0..frozen_cols.min(grid.col_count()) {
-                    self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, false, true);
+                    self.render_cell_with_search_frozen(grid, viewport, selection, row, col, search_results, current_search_index, false, true);
                 }
             }
         }
@@ -164,7 +166,7 @@ impl TextRenderer {
         for row in first_row.max(frozen_rows)..=last_row {
             if grid.is_row_filtered(row) { continue; }
             for col in first_col.max(frozen_cols)..=last_col {
-                self.render_cell_with_search_frozen(grid, viewport, row, col, search_results, current_search_index, false, false);
+                self.render_cell_with_search_frozen(grid, viewport, selection, row, col, search_results, current_search_index, false, false);
             }
         }
     }
@@ -179,6 +181,7 @@ impl TextRenderer {
         &self,
         grid: &Grid,
         viewport: &Viewport,
+        selection: &SelectionState,
         row: usize,
         col: usize,
         search_results: &[(usize, usize)],
@@ -218,7 +221,7 @@ impl TextRenderer {
 
         // Get cell data
         let cell = grid.get_cell(row, col);
-        let is_selected = cell.map(|c| c.selected).unwrap_or(false);
+        let is_selected = selection.is_selected(row, col);
 
         // Check if this cell is a search result
         let is_search_match = search_results.contains(&(row, col));
@@ -396,7 +399,7 @@ impl TextRenderer {
 
         // Get cell data
         let cell = grid.get_cell(row, col);
-        let is_selected = cell.map(|c| c.selected).unwrap_or(false);
+        let is_selected = selection.is_selected(row, col);
 
         // Check if this cell is a search result
         let is_search_match = search_results.contains(&(row, col));

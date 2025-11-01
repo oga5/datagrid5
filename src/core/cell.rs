@@ -72,7 +72,6 @@ pub struct CellBorder {
 pub struct Cell {
     pub value: CellValue,
     pub editable: bool,
-    pub selected: bool,
     pub modified: bool, // Track if cell has been edited
     pub bg_color: Option<u32>, // RGBA color as u32
     pub fg_color: Option<u32>,
@@ -90,7 +89,6 @@ impl Cell {
         Self {
             value,
             editable: true,
-            selected: false,
             modified: false,
             bg_color: None,
             fg_color: None,
