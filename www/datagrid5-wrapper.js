@@ -13,6 +13,7 @@ export class DataGridWrapper {
             enableEditing: options.enableEditing !== false,
             enableVirtualScroll: options.enableVirtualScroll !== false,
             enableResize: options.enableResize !== false,
+            blurBehavior: options.blurBehavior || 'save', // 'save' or 'cancel'
             ...options
         };
 
@@ -30,6 +31,7 @@ export class DataGridWrapper {
         this.clipboardData = ''; // Fallback clipboard storage
         this.isDirty = false; // Track if render is needed
         this.renderScheduled = false; // Track if render is already scheduled
+        this.isComposing = false; // Track IME composition state
 
         this.init();
     }
@@ -64,6 +66,10 @@ export class DataGridWrapper {
         this.container.style.height = '100%';
         this.container.style.overflow = 'hidden';
 
+        // ARIA attributes for accessibility
+        this.container.setAttribute('role', 'application');
+        this.container.setAttribute('aria-label', 'Data Grid');
+
         // Create scroll container
         this.scrollContainer = document.createElement('div');
         this.scrollContainer.id = 'scroll-container';
@@ -88,23 +94,35 @@ export class DataGridWrapper {
         const width = Math.floor(rect.width);
         const height = Math.floor(rect.height);
 
+        // Get device pixel ratio for high-DPI displays
+        const dpr = window.devicePixelRatio || 1;
+
         // Create WebGL canvas
         this.webglCanvas = document.createElement('canvas');
         this.webglCanvas.id = 'webgl-canvas';
-        this.webglCanvas.width = width;
-        this.webglCanvas.height = height;
+        // Set actual canvas size (CSS size * device pixel ratio)
+        this.webglCanvas.width = width * dpr;
+        this.webglCanvas.height = height * dpr;
+        // Set display size (CSS pixels)
+        this.webglCanvas.style.width = width + 'px';
+        this.webglCanvas.style.height = height + 'px';
         this.webglCanvas.style.position = 'absolute';
         this.webglCanvas.style.top = '0';
         this.webglCanvas.style.left = '0';
         this.webglCanvas.style.zIndex = '2';
         this.webglCanvas.style.pointerEvents = 'none';
+        this.webglCanvas.setAttribute('aria-hidden', 'true');
         this.container.appendChild(this.webglCanvas);
 
         // Create text canvas
         this.textCanvas = document.createElement('canvas');
         this.textCanvas.id = 'text-canvas';
-        this.textCanvas.width = width;
-        this.textCanvas.height = height;
+        // Set actual canvas size (CSS size * device pixel ratio)
+        this.textCanvas.width = width * dpr;
+        this.textCanvas.height = height * dpr;
+        // Set display size (CSS pixels)
+        this.textCanvas.style.width = width + 'px';
+        this.textCanvas.style.height = height + 'px';
         this.textCanvas.tabIndex = 0;
         this.textCanvas.style.position = 'absolute';
         this.textCanvas.style.top = '0';
@@ -112,6 +130,22 @@ export class DataGridWrapper {
         this.textCanvas.style.zIndex = '3';
         this.textCanvas.style.pointerEvents = 'all';
         this.textCanvas.style.cursor = 'cell';
+
+        // ARIA attributes for grid interaction
+        this.textCanvas.setAttribute('role', 'grid');
+        this.textCanvas.setAttribute('aria-label', `Data grid with ${this.options.rows} rows and ${this.options.cols} columns`);
+        this.textCanvas.setAttribute('aria-readonly', this.options.enableEditing ? 'false' : 'true');
+
+        // High-contrast focus indicator for accessibility
+        this.textCanvas.style.outline = 'none';
+        this.textCanvas.addEventListener('focus', () => {
+            this.textCanvas.style.outline = '3px solid #667eea';
+            this.textCanvas.style.outlineOffset = '-3px';
+        });
+        this.textCanvas.addEventListener('blur', () => {
+            this.textCanvas.style.outline = 'none';
+        });
+
         this.container.appendChild(this.textCanvas);
 
         // Setup resize observer
@@ -121,17 +155,28 @@ export class DataGridWrapper {
 
                 const width = Math.floor(entry.contentRect.width);
                 const height = Math.floor(entry.contentRect.height);
+                const dpr = window.devicePixelRatio || 1;
 
-                // Only resize if dimensions actually changed
-                if (this.webglCanvas.width === width && this.webglCanvas.height === height) {
+                // Check if dimensions changed (compare CSS size, not canvas buffer size)
+                const currentCssWidth = parseInt(this.webglCanvas.style.width);
+                const currentCssHeight = parseInt(this.webglCanvas.style.height);
+
+                if (currentCssWidth === width && currentCssHeight === height) {
                     return;
                 }
 
-                this.webglCanvas.width = width;
-                this.webglCanvas.height = height;
-                this.textCanvas.width = width;
-                this.textCanvas.height = height;
+                // Update canvas sizes with device pixel ratio
+                this.webglCanvas.width = width * dpr;
+                this.webglCanvas.height = height * dpr;
+                this.webglCanvas.style.width = width + 'px';
+                this.webglCanvas.style.height = height + 'px';
 
+                this.textCanvas.width = width * dpr;
+                this.textCanvas.height = height * dpr;
+                this.textCanvas.style.width = width + 'px';
+                this.textCanvas.style.height = height + 'px';
+
+                // Pass CSS size to grid (not buffer size)
                 this.grid.resize(width, height);
                 this.updateVirtualScrollSize();
                 this.requestRender();
@@ -307,6 +352,7 @@ export class DataGridWrapper {
     setupVirtualScroll() {
         this.updateVirtualScrollSize();
 
+        // Use passive listener for better scrolling performance
         this.scrollContainer.addEventListener('scroll', () => {
             if (!this.grid || this.isInternalScroll) {
                 this.isInternalScroll = false;
@@ -317,7 +363,7 @@ export class DataGridWrapper {
             const scrollY = this.scrollContainer.scrollTop;
             this.grid.set_scroll(scrollX, scrollY);
             this.requestRender();
-        });
+        }, { passive: true });
     }
 
     updateVirtualScrollSize() {
@@ -345,6 +391,12 @@ export class DataGridWrapper {
         this.cellEditor = document.createElement('input');
         this.cellEditor.type = 'text';
         this.cellEditor.id = 'cell-editor';
+
+        // Prevent browser autocomplete/autocorrect/spellcheck interference
+        this.cellEditor.setAttribute('autocomplete', 'off');
+        this.cellEditor.setAttribute('autocorrect', 'off');
+        this.cellEditor.setAttribute('spellcheck', 'false');
+
         this.cellEditor.style.position = 'absolute';
         this.cellEditor.style.border = '2px solid #667eea';
         this.cellEditor.style.outline = 'none';
@@ -418,10 +470,10 @@ export class DataGridWrapper {
         }));
     }
 
-    endCellEdit(save = false, moveDown = false, moveRight = false) {
+    endCellEdit(save = false, moveDown = false, moveRight = false, moveLeft = false) {
         if (!this.grid || this.editingRow === null || this.editingCol === null) return;
 
-        console.log(`[Wrapper] endCellEdit called: save=${save}, moveDown=${moveDown}, moveRight=${moveRight}`);
+        console.log(`[Wrapper] endCellEdit called: save=${save}, moveDown=${moveDown}, moveRight=${moveRight}, moveLeft=${moveLeft}`);
 
         const oldValue = this.grid.get_cell_value(this.editingRow, this.editingCol);
         let changed = false;
@@ -473,6 +525,11 @@ export class DataGridWrapper {
             this.grid.select_cell(currentRow, nextCol);
             this.requestRender();
             setTimeout(() => this.startCellEdit(currentRow, nextCol), 10);
+        } else if (save && moveLeft && currentCol > 0) {
+            const nextCol = currentCol - 1;
+            this.grid.select_cell(currentRow, nextCol);
+            this.requestRender();
+            setTimeout(() => this.startCellEdit(currentRow, nextCol), 10);
         } else {
             this.textCanvas.focus();
         }
@@ -481,21 +538,44 @@ export class DataGridWrapper {
     setupEditorEvents() {
         // Setup event listeners (called once during initialization)
 
-        // Enter to save and move down
+        // IME composition event handling for Japanese/Chinese/Korean input
+        this.cellEditor.addEventListener('compositionstart', () => {
+            console.log('[Wrapper] IME composition started');
+            this.isComposing = true;
+        });
+
+        this.cellEditor.addEventListener('compositionend', () => {
+            console.log('[Wrapper] IME composition ended');
+            this.isComposing = false;
+        });
+
+        // Keyboard navigation
         this.cellEditor.addEventListener('keydown', (e) => {
+            // Don't handle navigation keys during IME composition
+            if (this.isComposing) {
+                console.log('[Wrapper] Ignoring keydown during IME composition:', e.key);
+                return;
+            }
+
             if (e.key === 'Enter') {
                 e.preventDefault();
                 this.endCellEdit(true, true, false);
             } else if (e.key === 'Tab') {
                 e.preventDefault();
-                this.endCellEdit(true, false, true);
+                if (e.shiftKey) {
+                    // Shift+Tab: move left
+                    this.endCellEdit(true, false, false, true);
+                } else {
+                    // Tab: move right
+                    this.endCellEdit(true, false, true, false);
+                }
             } else if (e.key === 'Escape') {
                 e.preventDefault();
                 this.endCellEdit(false);
             }
         });
 
-        // Click outside to save - but only after a delay to avoid immediate blur
+        // Click outside to save/cancel based on configuration
         let blurTimeout = null;
         this.cellEditor.addEventListener('focus', () => {
             console.log('[Wrapper] Editor focused');
@@ -512,7 +592,8 @@ export class DataGridWrapper {
             blurTimeout = setTimeout(() => {
                 if (this.editingRow !== null && this.editingCol !== null) {
                     console.log('[Wrapper] Blur timeout - ending edit');
-                    this.endCellEdit(true);
+                    const shouldSave = this.options.blurBehavior === 'save';
+                    this.endCellEdit(shouldSave);
                 }
             }, 150);
         });
