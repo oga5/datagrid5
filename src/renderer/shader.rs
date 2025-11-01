@@ -1,3 +1,4 @@
+use crate::GridError;
 use web_sys::{WebGlProgram, WebGlRenderingContext, WebGlShader};
 
 /// Vertex shader for grid rendering
@@ -37,10 +38,12 @@ pub fn compile_shader(
     context: &WebGlRenderingContext,
     shader_type: u32,
     source: &str,
-) -> Result<WebGlShader, String> {
+) -> Result<WebGlShader, GridError> {
     let shader = context
         .create_shader(shader_type)
-        .ok_or_else(|| String::from("Unable to create shader object"))?;
+        .ok_or_else(|| GridError::ShaderError {
+            error: "Unable to create shader object".to_string(),
+        })?;
 
     context.shader_source(&shader, source);
     context.compile_shader(&shader);
@@ -52,9 +55,10 @@ pub fn compile_shader(
     {
         Ok(shader)
     } else {
-        Err(context
+        let error = context
             .get_shader_info_log(&shader)
-            .unwrap_or_else(|| String::from("Unknown error creating shader")))
+            .unwrap_or_else(|| "Unknown error creating shader".to_string());
+        Err(GridError::ShaderError { error })
     }
 }
 
@@ -63,10 +67,12 @@ pub fn link_program(
     context: &WebGlRenderingContext,
     vert_shader: &WebGlShader,
     frag_shader: &WebGlShader,
-) -> Result<WebGlProgram, String> {
+) -> Result<WebGlProgram, GridError> {
     let program = context
         .create_program()
-        .ok_or_else(|| String::from("Unable to create shader program"))?;
+        .ok_or_else(|| GridError::ShaderError {
+            error: "Unable to create shader program".to_string(),
+        })?;
 
     context.attach_shader(&program, vert_shader);
     context.attach_shader(&program, frag_shader);
@@ -79,9 +85,10 @@ pub fn link_program(
     {
         Ok(program)
     } else {
-        Err(context
+        let error = context
             .get_program_info_log(&program)
-            .unwrap_or_else(|| String::from("Unknown error creating program")))
+            .unwrap_or_else(|| "Unknown error creating program".to_string());
+        Err(GridError::ShaderError { error })
     }
 }
 
@@ -92,7 +99,7 @@ pub struct ShaderProgram {
 
 impl ShaderProgram {
     /// Create a new shader program
-    pub fn new(context: &WebGlRenderingContext) -> Result<Self, String> {
+    pub fn new(context: &WebGlRenderingContext) -> Result<Self, GridError> {
         let vert_shader = compile_shader(
             context,
             WebGlRenderingContext::VERTEX_SHADER,

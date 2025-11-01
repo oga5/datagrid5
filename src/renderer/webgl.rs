@@ -1,5 +1,6 @@
 use super::shader::ShaderProgram;
 use crate::core::{Grid, Viewport};
+use crate::GridError;
 use wasm_bindgen::JsCast;
 use web_sys::{
     HtmlCanvasElement, WebGlBuffer, WebGlRenderingContext, WebGlUniformLocation,
@@ -27,13 +28,19 @@ pub struct WebGLRenderer {
 
 impl WebGLRenderer {
     /// Create a new WebGL renderer
-    pub fn new(canvas: &HtmlCanvasElement) -> Result<Self, String> {
+    pub fn new(canvas: &HtmlCanvasElement) -> Result<Self, GridError> {
         let context = canvas
             .get_context("webgl")
-            .map_err(|_| "Failed to get WebGL context")?
-            .ok_or("WebGL context is None")?
+            .map_err(|_| GridError::RenderInitFailed {
+                error: "Failed to get WebGL context".to_string(),
+            })?
+            .ok_or_else(|| GridError::RenderInitFailed {
+                error: "WebGL context is None".to_string(),
+            })?
             .dyn_into::<WebGlRenderingContext>()
-            .map_err(|_| "Failed to cast to WebGlRenderingContext")?;
+            .map_err(|_| GridError::RenderInitFailed {
+                error: "Failed to cast to WebGlRenderingContext".to_string(),
+            })?;
 
         let shader_program = ShaderProgram::new(&context)?;
 

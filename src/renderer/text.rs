@@ -1,4 +1,5 @@
 use crate::core::{Grid, Viewport};
+use crate::GridError;
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 
@@ -46,13 +47,19 @@ pub struct TextRenderer {
 
 impl TextRenderer {
     /// Create a new text renderer
-    pub fn new(canvas: &HtmlCanvasElement) -> Result<Self, String> {
+    pub fn new(canvas: &HtmlCanvasElement) -> Result<Self, GridError> {
         let context = canvas
             .get_context("2d")
-            .map_err(|_| "Failed to get 2D context")?
-            .ok_or("2D context is None")?
+            .map_err(|_| GridError::RenderInitFailed {
+                error: "Failed to get 2D context".to_string(),
+            })?
+            .ok_or_else(|| GridError::RenderInitFailed {
+                error: "2D context is None".to_string(),
+            })?
             .dyn_into::<CanvasRenderingContext2d>()
-            .map_err(|_| "Failed to cast to CanvasRenderingContext2d")?;
+            .map_err(|_| GridError::RenderInitFailed {
+                error: "Failed to cast to CanvasRenderingContext2d".to_string(),
+            })?;
 
         let font_config = FontConfig::default();
         let font_string = Self::build_font_string(&font_config);

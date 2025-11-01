@@ -1,4 +1,5 @@
 mod core;
+mod error;
 mod features;
 mod input;
 mod renderer;
@@ -9,6 +10,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{HtmlCanvasElement, KeyboardEvent, MouseEvent, WheelEvent};
 
 use core::{cell::CellBorder, Cell, CellValue, ColumnConfig, DataType, Grid, Viewport};
+pub use error::GridError;
 use features::{
     editing::EditingState, resize::ResizeState, search::SearchState,
     selection::SelectionState, undo_redo::UndoRedoState, EditAction, CellStyle,
@@ -1638,7 +1640,7 @@ impl DataGrid {
 
     /// Paste cells from TSV (Tab-Separated Values) format
     /// Pastes starting from the current focus cell
-    pub fn paste_cells(&mut self, tsv_text: String) -> Result<(), String> {
+    pub fn paste_cells(&mut self, tsv_text: String) -> Result<(), GridError> {
         if tsv_text.is_empty() {
             return Ok(());
         }
@@ -1657,7 +1659,9 @@ impl DataGrid {
             });
             cells[0]
         } else {
-            return Err("No cell selected for paste".to_string());
+            return Err(GridError::PasteFailed {
+                reason: "No cell selected for paste".to_string(),
+            });
         };
 
         // Parse TSV and paste, recording old and new values for undo/redo
@@ -2313,7 +2317,7 @@ impl DataGrid {
     }
 
     /// Search using regular expression
-    pub fn search_regex(&mut self, pattern: String, case_sensitive: bool) -> Result<usize, String> {
+    pub fn search_regex(&mut self, pattern: String, case_sensitive: bool) -> Result<usize, GridError> {
         use regex::RegexBuilder;
 
         // Build regex with case sensitivity option
@@ -2322,7 +2326,12 @@ impl DataGrid {
             .build()
         {
             Ok(re) => re,
-            Err(e) => return Err(format!("Invalid regex pattern: {}", e)),
+            Err(e) => {
+                return Err(GridError::InvalidRegex {
+                    pattern: pattern.clone(),
+                    error: e.to_string(),
+                })
+            }
         };
 
         self.search.search_query = pattern;
