@@ -37,6 +37,9 @@ impl KeyboardHandler {
             // Delete key
             "Delete" => Some(NavigationCommand::Delete),
 
+            // F2 key for edit mode
+            "F2" => Some(NavigationCommand::EditCell),
+
             _ => None,
         }
     }
@@ -85,4 +88,5 @@ pub enum NavigationCommand {
     DocumentEnd,
     Undo,
     Redo,
+    EditCell,
 }

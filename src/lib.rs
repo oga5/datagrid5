@@ -661,6 +661,27 @@ impl DataGrid {
         }
     }
 
+    /// Set cell value without recording to undo stack (useful for bulk data loading)
+    pub fn set_cell_value_no_undo(&mut self, row: usize, col: usize, value: &str) {
+        // Try to parse as number
+        let new_value = if let Ok(num) = value.parse::<f64>() {
+            CellValue::Number(num)
+        } else {
+            CellValue::Text(value.to_string())
+        };
+
+        self.grid.set_value(row, col, new_value);
+
+        // Mark cell as modified
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.modified = true;
+        }
+
+        // Mark cell as dirty for differential rendering
+        self.dirty_cells.insert((row, col));
+        // Note: We do NOT record to undo stack
+    }
+
     /// Get cell value
     pub fn get_cell_value(&self, row: usize, col: usize) -> String {
         self.grid.get_value_string(row, col)
@@ -1032,6 +1053,11 @@ impl DataGrid {
                         }
                     })
                 }
+                NavigationCommand::EditCell => {
+                    // Return true to signal JavaScript to start editing
+                    // JavaScript wrapper will handle the actual editing UI
+                    return true;
+                }
             };
 
             // Update selection if we have a new one
@@ -1144,6 +1170,11 @@ impl DataGrid {
                         return true; // Force render
                     }
                     None
+                }
+                NavigationCommand::EditCell => {
+                    // Return true to signal JavaScript to start editing
+                    // JavaScript wrapper will handle the actual editing UI
+                    return true;
                 }
                 NavigationCommand::Enter | NavigationCommand::Escape | NavigationCommand::Tab => {
                     None
@@ -1265,6 +1296,11 @@ impl DataGrid {
                         return true; // Force render
                     }
                     None
+                }
+                NavigationCommand::EditCell => {
+                    // Return true to signal JavaScript to start editing
+                    // JavaScript wrapper will handle the actual editing UI
+                    return true;
                 }
                 NavigationCommand::Enter | NavigationCommand::Escape | NavigationCommand::Tab => {
                     None
@@ -1680,6 +1716,19 @@ impl DataGrid {
         let action = EditAction::SetStyle { row, col, old_style, new_style };
         self.undo_redo.undo_stack.push(action);
         self.undo_redo.redo_stack.clear();
+    }
+
+    /// Set background color for a cell without recording to undo stack (useful for bulk styling)
+    pub fn set_cell_bg_color_no_undo(&mut self, row: usize, col: usize, color: u32) {
+        if let Some(cell) = self.grid.get_cell_mut(row, col) {
+            cell.bg_color = Some(color);
+        } else {
+            // Create cell if it doesn't exist
+            let mut cell = Cell::empty();
+            cell.bg_color = Some(color);
+            self.grid.set_cell(row, col, cell);
+        }
+        // Note: We do NOT record to undo stack
     }
 
     /// Set foreground (text) color for a cell (RGBA as u32: 0xRRGGBBAA)
@@ -2551,6 +2600,16 @@ impl DataGrid {
     /// Get redo stack size
     pub fn get_redo_count(&self) -> usize {
         self.undo_redo.redo_stack.len()
+    }
+
+    /// Clear undo history (useful after initial data load)
+    pub fn clear_undo_history(&mut self) {
+        self.undo_redo.clear_undo_history();
+    }
+
+    /// Clear redo history
+    pub fn clear_redo_history(&mut self) {
+        self.undo_redo.clear_redo_history();
     }
 
     /// Auto-fit column width to content
