@@ -82,7 +82,9 @@ impl UndoRedoState {
     pub fn undo(&mut self, grid: &mut Grid, viewport: &mut Viewport) -> bool {
         if let Some(action) = self.undo_stack.pop() {
             match &action {
-                EditAction::SetValue { row, col, old_value, new_value: _ } => {
+                EditAction::SetValue { row, col, old_value, new_value } => {
+                    log::info!("[UndoRedo] Undoing SetValue: ({}, {}) \"{}\" <- \"{}\"",
+                               row, col, old_value.to_string(), new_value.to_string());
                     // Restore old value without recording undo
                     grid.set_value(*row, *col, old_value.clone());
                 }
@@ -151,7 +153,9 @@ impl UndoRedoState {
     pub fn redo(&mut self, grid: &mut Grid, viewport: &mut Viewport) -> bool {
         if let Some(action) = self.redo_stack.pop() {
             match &action {
-                EditAction::SetValue { row, col, old_value: _, new_value } => {
+                EditAction::SetValue { row, col, old_value, new_value } => {
+                    log::info!("[UndoRedo] Redoing SetValue: ({}, {}) \"{}\" -> \"{}\"",
+                               row, col, old_value.to_string(), new_value.to_string());
                     // Re-apply new value without recording undo
                     grid.set_value(*row, *col, new_value.clone());
                 }
