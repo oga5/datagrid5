@@ -17,8 +17,11 @@
 - Double-click to edit
 - Enter to save and move down
 - Tab to save and move right
+- Shift+Tab to save and move left
 - Escape to cancel
 - Automatic positioning and scrolling
+- Full IME support for Japanese/Chinese/Korean input
+- Configurable blur behavior (save or cancel)
 
 ✅ **Excel-Compatible Clipboard**: Automatic copy/cut/paste operations
 - Ctrl+C to copy selected cells
@@ -40,6 +43,13 @@
 - Get selected cells
 - Scroll control
 - Grid access
+
+✅ **Accessibility & Performance**: Built-in optimizations
+- ARIA attributes for screen readers (role="grid", aria-label, etc.)
+- High-contrast focus indicators for keyboard navigation
+- Device pixel ratio support for crisp rendering on high-DPI displays
+- Passive scroll listeners for smooth scrolling performance
+- RequestAnimationFrame-based rendering for 60 FPS
 
 ## Installation
 
@@ -104,7 +114,10 @@ const gridWrapper = new DataGridWrapper('container-id', wasmModule, {
     // Feature flags
     enableEditing: true,          // Enable cell editing (default: true)
     enableVirtualScroll: true,    // Enable virtual scrolling (default: true)
-    enableResize: true            // Enable column/row resizing (default: true)
+    enableResize: true,           // Enable column/row resizing (default: true)
+
+    // Cell editing behavior
+    blurBehavior: 'save'          // 'save' or 'cancel' - what to do when clicking outside (default: 'save')
 });
 ```
 
@@ -144,7 +157,13 @@ const cells = gridWrapper.getSelectedCells();  // Returns array of [row, col]
 gridWrapper.startCellEdit(row, col);
 
 // End editing (with save/cancel and navigation)
-gridWrapper.endCellEdit(save, moveDown, moveRight);
+gridWrapper.endCellEdit(save, moveDown, moveRight, moveLeft);
+
+// Examples:
+gridWrapper.endCellEdit(true, true, false, false);   // Save and move down
+gridWrapper.endCellEdit(true, false, true, false);   // Save and move right (Tab)
+gridWrapper.endCellEdit(true, false, false, true);   // Save and move left (Shift+Tab)
+gridWrapper.endCellEdit(false);                       // Cancel edit (Escape)
 ```
 
 ### Clipboard Operations
